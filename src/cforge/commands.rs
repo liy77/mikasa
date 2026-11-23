@@ -19,7 +19,7 @@ const PROPERTIES_FILE: &str = "properties.kson";
 /// `cforge install` is reproducible (the `lson`/kson counterpart of Cargo.lock).
 const LOCK_FILE: &str = "properties.lock";
 
-/// `cforge init` — scaffold `properties.kson`, `main.crs` and `.gitignore`
+/// `cforge init` — scaffold `properties.kson`, `main.mika` and `.gitignore`
 /// in the current directory. Existing files are never overwritten.
 pub fn init() {
     let project_name = env::current_dir()
@@ -46,20 +46,20 @@ pub fn init() {
         println!("✅ Created {}", PROPERTIES_FILE.green());
     }
 
-    // main.crs — entry point. Top-level statements are wrapped into
+    // main.mika — entry point. Top-level statements are wrapped into
     // `fn main()` by the parser, so a bare `println!` is the whole program.
-    if Path::new("main.crs").exists() {
+    if Path::new("main.mika").exists() {
         println!(
             "⚠️  {} already exists — leaving it untouched.",
-            "main.crs".yellow()
+            "main.mika".yellow()
         );
     } else {
-        let main_src = "// Welcome to Copper! Run this with: cforge run main.crs\nprintln!(\"Hello, Copper!\")\n";
-        if let Err(e) = fs::write("main.crs", main_src) {
-            eprintln!("❌ Failed to write main.crs: {}", e);
+        let main_src = "// Welcome to Mikasa! Run this with: mikasa run main.mika\nprintln!(\"Hello, Mikasa!\")\n";
+        if let Err(e) = fs::write("main.mika", main_src) {
+            eprintln!("❌ Failed to write main.mika: {}", e);
             std::process::exit(1);
         }
-        println!("✅ Created {}", "main.crs".green());
+        println!("✅ Created {}", "main.mika".green());
     }
 
     // .gitignore — keep the transpiler output and Rust build dir out of VCS.

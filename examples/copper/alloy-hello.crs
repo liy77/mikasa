@@ -7,7 +7,7 @@ func int soma_ate(n: int) {
 }
 
 func main() {
-    println("Alloy VM")
+    println("Astra VM")
     mut s = soma_ate(5)
     println("soma 1..5 = ${s}")
 }

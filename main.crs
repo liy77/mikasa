@@ -27,11 +27,11 @@ func void alo() {
 
 alo()
 
-func void copper() {
-    println!("Hello Copper")
+func void mikasa() {
+    println!("Hello Mikasa")
 }
 
-copper()
+mikasa()
 
 class Person {
     name: String

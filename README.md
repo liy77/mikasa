@@ -1,9 +1,27 @@
-<img src="./assets/copperlang.png"/>
+<img src="./assets/mikasa.png" width="128"/>
 
-A high-level language that transpiles to Rust. Copper aims to keep Rust's
+> **Copper is now Mikasa.** The language was renamed: Copper → **Mikasa**, and
+> its interpreter Alloy → **Astra**. The toolchain binary is `mikasa` (it used
+> to be `cforge`) and the interpreter binary is still `alloy`.
+>
+> File extensions were renamed too. The old ones still open, they are just no
+> longer the recommended spelling:
+>
+> | | Recommended | Legacy (still works) |
+> | --- | --- | --- |
+> | Source | `.mika` | `.crs` |
+> | Astra bytecode | `.ast` | `.loy` |
+> | Library | `.mklib` | — |
+> | Package | `.mipkg` | — |
+>
+> `.mika` is also the MocidaUI file: a `.mika` that declares a `view` or an
+> `App()` is a UI document, so there is no separate extension for that.
+> `.crm` is retired — it still opens, with a warning to rename it.
+
+A high-level language that transpiles to Rust. Mikasa aims to keep Rust's
 performance while giving you a syntax that reads like a modern scripting
 language — string interpolation, optional chaining, ternaries, and JS-style
-loop / match / closure forms — backed by `cforge`, the Copper toolchain.
+loop / match / closure forms — backed by `cforge`, the Mikasa toolchain.
 
 ```crs
 import * from std.io
@@ -13,17 +31,17 @@ println!("Your name is $name")
 ```
 
 <p align="center">
-    <img src="./assets/cforge.png" width=300 height=300 />
+    <img src="./assets/mikasa-icon.png" width="220" />
 </p>
 
 ## Two execution paths
 
 | Path | Tool | How it works | When to use |
 | --- | --- | --- | --- |
-| **Transpile → Rust** | `cforge` | `.crs` → Rust source → `cargo build` | Production, full Rust semantics |
-| **Interpreter** | `alloy` | tree-walks the AST directly, no compile step | Fast iteration, scripting, CI |
+| **Transpile → Rust** | `mikasa` | `.mika` → Rust source → `cargo build` | Production, full Rust semantics |
+| **Interpreter** | `alloy` (Astra) | tree-walks the AST directly, no compile step | Fast iteration, scripting, CI |
 
-`alloy run file.crs` is instant — like `python` or `node`. `cforge run file.crs`
+`alloy run file.mika` is instant — like `python` or `node`. `mikasa run file.mika`
 gives you native speed after the first compile. Both share the same
 `copper-syntax` AST so behaviour is identical.
 
@@ -49,60 +67,69 @@ auto-detects admin / root and picks a global or per-user install accordingly.
 Pass `--workspace` to also build and install `alloy`, `lson`, and the LSP
 servers in one shot.
 
-## Compile and run (cforge)
+## Compile and run (mikasa)
 
 ```sh
-cforge run ./main.crs          # transpile + cargo run
-cforge -c -i ./src             # compile only, directory input
-cforge run examples/copper/loops.crs
+mikasa run ./main.mika         # transpile + cargo run
+mikasa build ./src             # compile only, directory input
+mikasa run examples/copper/loops.crs
 ```
 
-`cforge run` (no arg) defaults to `./main.crs` in the current directory.
+`mikasa run` and `mikasa build` warn when the file uses a legacy extension
+(`.crs`, `.loy`, `.crm`) — it still works, the spelling is deprecated.
+`mikasa run` with no argument defaults to `./main.mika` in the current
+directory.
 
 ### Flags
 
 | Flag | Full name | Description | Example |
 | --- | --- | --- | --- |
-| `-i` | `--input`   | Input file or directory | `cforge -c -i main.crs` |
-| `-o` | `--output`  | Output directory | `cforge -o ./build` |
-| `-t` | `--target`  | Cross-compile target | `cforge -t windows` |
-| `-c` | `--compile` | Compile (no run) | `cforge -c -i main.crs` |
-|      | `--clean`   | Clean the output directory | `cforge --clean` |
-| `-V` | `--verbose` | Verbose output | `cforge -V run main.crs` |
-| `-v` | `--version` | Print version (with build date for pre-releases) | `cforge -v` |
+| `-i` | `--input`   | Input file or directory | `mikasa build -i main.mika` |
+| `-o` | `--output`  | Output directory | `mikasa -o ./build` |
+| `-t` | `--target`  | Cross-compile target | `mikasa -t windows` |
+| `-c` | `--compile` | Compile (no run) | `mikasa build main.mika` |
+|      | `--clean`   | Clean the output directory | `mikasa --clean` |
+| `-V` | `--verbose` | Verbose output | `mikasa -V run main.mika` |
+| `-v` | `--version` | Print version (with build date for pre-releases) | `mikasa -v` |
 
 ```sh
-cforge update                  # install the latest GitHub nightly
+mikasa update                  # install the latest GitHub nightly
 ```
 
-## Alloy — the Copper interpreter
+## Astra — the Mikasa interpreter
 
-`alloy` interprets `.crs` files directly with no compile step and can also
-produce a portable `.loy` artifact that runs anywhere without a Rust toolchain.
+<p align="center">
+    <img src="./assets/astra-logo.png" width="180" alt="Astra" />
+</p>
+
+Astra (binary `alloy`) interprets `.mika` files directly with no compile step
+and can also produce a portable `.ast` artifact that runs anywhere without a
+Rust toolchain.
 
 ```sh
-alloy run file.crs             # instant — no compile
-alloy build file.crs           # compile to a portable .loy artifact
-alloy run app.loy              # run the artifact (no rustc needed)
-alloy check file.crs           # verify with real Rust + Miri
+alloy run file.mika            # instant — no compile
+alloy build file.mika          # compile to a portable .ast artifact
+alloy run app.ast              # run the artifact (no rustc needed)
+alloy check file.mika          # verify with real Rust + Miri
 ```
 
-### Portable `.loy` artifacts
+### Portable `.ast` artifacts
 
-A `.loy` is a self-contained binary (magic header + bincoded AST). If the
-program imports sibling `.rs` files Alloy compiles them to WebAssembly once
+An `.ast` is a self-contained binary (magic header + bincoded AST). The older
+`.loy` spelling still loads. If the
+program imports sibling `.rs` files Astra compiles them to WebAssembly once
 (cached by content hash in `~/.alloy/cache`) and embeds the wasm into the
 artifact — so the final `.loy` runs on any platform with no rustc and no
 `.rs` files on disk.
 
 ```sh
-alloy build myapp.crs -o myapp.loy   # bundles sibling .rs as wasm
-alloy run myapp.loy                  # works anywhere, no rustc
+alloy build myapp.mika -o myapp.ast  # bundles sibling .rs as wasm
+alloy run myapp.ast                  # works anywhere, no rustc
 ```
 
-### Importing Rust from Copper
+### Importing Rust from Mikasa
 
-Alloy can call into sibling `.rs` files via WebAssembly — the Copper stays
+Astra can call into sibling `.rs` files via WebAssembly — the Mikasa stays
 interpreted (instant); only the Rust crosses into wasm:
 
 ```crs
@@ -117,7 +144,7 @@ println!("{}", fib(10))   // → 55, runs via embedded wasm
 Current prototype ABI: `i64`/`bool` scalars with `#[no_mangle] pub extern "C"`.
 Richer types (strings, `Vec`, structs) are the next phase.
 
-### Alloy GUI playground
+### Astra GUI playground
 
 `alloy-gui/` is a dual-mode `alloy` binary that adds a MUI playground — open
 a `.crs` file, edit it, and see output live. Hot-reload re-evaluates on save;
@@ -176,7 +203,7 @@ See [`examples/`](./examples) for runnable demos of each feature.
 
 Rust's standard library is powerful but verbose for everyday scripting tasks
 (reading a line of input, sleeping, getting the current time, running a shell
-command). Copper ships an embedded `cstd` module — import what you need and
+command). Mikasa ships an embedded `cstd` module — import what you need and
 the compiler injects only the helpers you used:
 
 ```copper
@@ -199,8 +226,8 @@ Available functions: `input`, `readln`, `read_int`, `read_float`, `to_int`,
 `now_ms`, `env`, `args`, `read_file`, `write_file`, `append_file`, `exists`,
 `is_file`, `is_dir`, `list_dir`, `run`, `rand_int`.
 
-The library lives in [`std/cstd.crs`](./std/cstd.crs) — written in Copper,
-shared between the transpiler and Alloy (single source of truth).
+The library lives in [`std/cstd.crs`](./std/cstd.crs) — written in Mikasa,
+shared between the transpiler and Astra (single source of truth).
 
 ## Project layout
 
@@ -210,19 +237,19 @@ copper-lang/
 ├── crates/
 │   ├── copper-syntax/  # Tokenizer + AST (shared by cforge, alloy, LSPs)
 │   ├── copper-parser/  # Streaming transpiler parser
-│   ├── alloy-vm/       # Alloy interpreter + `alloy` CLI
-│   ├── copper-lsp/     # Copper language server (hover, completion, goto-def)
-│   ├── mui-syntax/     # MUI (.mui/.crm) parser
+│   ├── alloy-vm/       # Astra interpreter + `alloy` CLI
+│   ├── copper-lsp/     # Mikasa language server (hover, completion, goto-def)
+│   ├── mui-syntax/     # MocidaUI parser (.mui, and .mika files with a view)
 │   ├── mui-codegen/    # MUI → Rust codegen (M5 native path)
 │   └── mui-lsp/        # MUI language server
-├── alloy-gui/          # Alloy GUI playground (MUI host, standalone workspace)
+├── alloy-gui/          # Astra GUI playground (MUI host, standalone workspace)
 ├── installer-gui/      # Native MUI installer (Windows-first)
 ├── examples/
 │   ├── copper/         # .crs demos (loops, interpolation, matching, cstd, ...)
-│   └── mui/            # .mui/.crm demos (hello, counter, keyboard, app, ...)
+│   └── mui/            # MocidaUI demos (hello, counter, keyboard, app, ...)
 ├── scripts/            # Python tooling: install / build / cleanup / diagnose / hooks
 ├── docs/               # INSTALL.md, TODO.md, design specs
-├── std/                # Copper standard library (cstd.crs)
+├── std/                # Mikasa standard library (cstd.crs)
 ├── lson/               # LSON parser binaries (per-OS)
 ├── assets/             # Logos
 ├── main.crs            # Default file for `cforge run` with no argument
@@ -244,7 +271,7 @@ cforge run examples/copper/ternary.crs         # `cond ? a : b`
 cforge run examples/copper/cstd.crs            # built-in stdlib (input, sleep, env, ...)
 cforge run examples/copper/unsafe.crs          # `unsafe func` and `unsafe { ... }` blocks
 
-# Alloy (interpreter — instant)
+# Astra (interpreter — instant)
 alloy run examples/copper/loops.crs
 alloy run examples/copper/cstd.crs
 alloy build examples/copper/collections.crs -o collections.loy
@@ -274,19 +301,19 @@ Full backlog with details: [`docs/TODO.md`](./docs/TODO.md).
 - [ ] `?:` ternary inside `${…}` interpolation
 - [ ] Type aliases (`type Foo = Bar<T>`) inside `static`/`as` casts
 
-**Alloy interpreter**
+**Astra interpreter**
 - [x] Tree-walking interpreter for the full `copper-syntax` AST
 - [x] `cstd` interpreted from `std/cstd.crs` (single source, no Rust reimplementation)
 - [x] Portable `.loy` artifacts (`alloy build` / `alloy run`)
 - [x] Imported `.rs` files run via embedded WebAssembly (wasm cache, embedded in `.loy`)
 - [x] `alloy check` — auto-provisioned Miri/rustc verification
 - [x] Return-type checking at runtime
-- [x] Alloy GUI playground (MUI, hot-reload, native file dialog)
+- [x] Astra GUI playground (MUI, hot-reload, native file dialog)
 - [ ] Wasm ABI: strings, `Vec`, structs (currently `i64`/`bool` scalars only)
 - [ ] Auto-generate export wrappers so plain `pub fn` works without `extern "C"`
 - [ ] Short-circuit `&&` / `||` (both sides are currently pre-evaluated)
 
-**MUI front-end (`.mui` / `.crm`)**
+**MocidaUI (`.mui`, and `.mika` with a `view`)**
 - [x] `cforge run x.mui` dev render (via `mui-dev`)
 - [x] `cforge -c [-r] x.mui` codegen + native build (via `mui-codegen`)
 - [x] Component import/reuse, `app { }` config + bundles

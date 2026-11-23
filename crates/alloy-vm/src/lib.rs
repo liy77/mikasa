@@ -1,6 +1,8 @@
-//! Alloy: interpretador tree-walking para Copper.
+//! Astra (formerly Alloy): tree-walking interpreter for Mikasa.
 
 pub mod bytecode;
+/// File extensions shared with the rest of the toolchain.
+pub use copper_syntax::ext as source_ext;
 pub mod env;
 pub mod error;
 pub mod interp;

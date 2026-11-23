@@ -1,21 +1,24 @@
 <p align="center">
-  <img src="../../assets/alloy/alloy-logo.png" alt="Alloy" width="180">
+  <img src="../../assets/astra-logo.png" alt="Astra" width="180">
 </p>
 
-<h1 align="center">Alloy</h1>
+<h1 align="center">Astra</h1>
 
 <p align="center">
-  <em>Copper's fast-iteration VM — a tree-walking interpreter.</em>
+  <em>Mikasa's fast-iteration VM — a tree-walking interpreter.</em>
 </p>
+
+> **Alloy is now Astra.** The interpreter was renamed along with the language
+> (Copper → Mikasa). The binary is still `alloy`.
 
 ---
 
 ## What it is
 
-**Alloy** is the [Copper](../../README.md) interpreter: a separate binary
+**Astra** is the [Mikasa](../../README.md) interpreter: a separate binary
 (`alloy`) that **executes `.crs` directly**, without transpiling to Rust or
 invoking `cargo`. It walks the same AST that the production transpiler (`cforge`)
-uses — so what runs in Alloy is the same Copper that compiles natively.
+uses — so what runs in Astra is the same Mikasa that compiles natively.
 
 Two targets, one language:
 
@@ -45,7 +48,7 @@ func int sum_to(n: int) {
 }
 
 func main() {
-    println("Alloy VM")
+    println("Astra VM")
     mut s = sum_to(5)
     println("sum 1..5 = ${s}")
 }
@@ -53,7 +56,7 @@ func main() {
 
 ```sh
 $ alloy run examples/copper/alloy-hello.crs
-Alloy VM
+Astra VM
 sum 1..5 = 10
 ```
 
@@ -80,7 +83,7 @@ All 19 `examples/copper/*.crs` run under `alloy run`.
   `http` use serde_json / sha2 / hmac / ureq.
 - Local `.crs` imports merged (and bundled into `.loy`). **`.rs` imports run via
   embedded WebAssembly** — `rustc` compiles the `.rs` to wasm once (cached under
-  `~/.alloy/cache`), `wasmi` runs it, the interpreter calls its exports. Copper
+  `~/.alloy/cache`), `wasmi` runs it, the interpreter calls its exports. Mikasa
   stays interpreted; only the Rust leaves cross into wasm. Prototype: scalar
   `i64`/`bool` with `#[no_mangle] pub extern "C"` exports (richer types coming);
   non-exported `.rs` falls back to `cforge`. See the

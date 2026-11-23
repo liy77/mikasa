@@ -504,6 +504,8 @@ fn try_convert_var_decl_line(indent: &str, trimmed: &str) -> Option<String> {
                 | "mod"
                 | "if"
                 | "else"
+                | "guard"
+                | "defer"
                 | "for"
                 | "while"
                 | "loop"
@@ -650,7 +652,11 @@ fn collect_crs(dir: &Path, out: &mut Vec<PathBuf>) {
         let p = e.path();
         if p.is_dir() {
             collect_crs(&p, out);
-        } else if p.extension().and_then(|e| e.to_str()) == Some("crs") {
+        } else if p
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(copper_syntax::ext::is_source)
+        {
             out.push(p);
         }
     }

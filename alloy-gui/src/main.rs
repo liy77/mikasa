@@ -1,4 +1,5 @@
-//! Alloy — dual-mode binary.
+//! Astra — dual-mode binary. (The interpreter was renamed from Alloy; the
+//! binary is still `alloy`.)
 //!
 //! * `alloy run <file.crs>` / `alloy <file.crs>` → interpret in the terminal
 //!   (reuses the portable `alloy-vm` lib; output goes straight to stdout).
@@ -28,7 +29,7 @@ fn main() -> ExitCode {
         Some("update") => match backend::check_update() {
             info if info.available => match backend::apply_update(&info.asset_url) {
                 Ok(()) => {
-                    println!("Alloy updated to {}", info.latest);
+                    println!("Astra updated to {}", info.latest);
                     ExitCode::SUCCESS
                 }
                 Err(e) => {
@@ -37,7 +38,7 @@ fn main() -> ExitCode {
                 }
             },
             info => {
-                println!("Alloy {} is already the latest version ({})", info.current, info.latest);
+                println!("Astra {} is already the latest version ({})", info.current, info.latest);
                 ExitCode::SUCCESS
             }
         },
@@ -141,14 +142,27 @@ fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
     mui_runtime::prefer_custom_titlebar(&cfg);
     mui_runtime::prefer_renderer(&cfg);
 
+    // Assets have to be registered before the window exists: the first frame
+    // loads the logo, and a registration made afterwards never reaches it.
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let star = manifest_dir
+        .parent()
+        .map(|p| p.join("assets").join("astra-logo.png"))
+        .filter(|p| p.is_file());
+    if let Some(star) = &star {
+        mocida::bundle::set("mocida://astra-logo.png", &star.to_string_lossy());
+    }
+    let win_icon = manifest_dir.join("assets").join("astra-icon-win.png");
+    if win_icon.is_file() {
+        mocida::bundle::set("mocida://astra-icon-win.png", &win_icon.to_string_lossy());
+    }
+
     // 3. Load app.bundle (name, id) and register the icon with an ABSOLUTE
     //    path, so `mocida://alloy-icon.png` resolves regardless of the CWD the
     //    binary is launched from (the manifest's relative path would not).
-    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let bundle = manifest_dir.join("app.bundle");
-    if bundle.is_file() {
-        mocida::bundle::load_manifest(&bundle.to_string_lossy());
-    }
+    // Register the assets BEFORE the manifest loads. `load_manifest` reads the
+    // window icon immediately, and a relative entry in app.bundle only
+    // resolves from the CWD — so an absolute registration has to win first.
     let icon = manifest_dir.join("assets").join("alloy-icon.png");
     if icon.is_file() {
         mocida::bundle::set("mocida://alloy-icon.png", &icon.to_string_lossy());
@@ -156,6 +170,18 @@ fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
     let logo = manifest_dir.join("assets").join("alloy-logo.png");
     if logo.is_file() {
         mocida::bundle::set("mocida://alloy-logo.png", &logo.to_string_lossy());
+    }
+    // The Astra mark (the star). The dove is Mikasa's; this window is Astra's.
+    let star = manifest_dir
+        .parent()
+        .map(|p| p.join("assets").join("astra-logo.png"))
+        .filter(|p| p.is_file());
+    if let Some(star) = star {
+        mocida::bundle::set("mocida://astra-logo.png", &star.to_string_lossy());
+    }
+    let bundle = manifest_dir.join("app.bundle");
+    if bundle.is_file() {
+        mocida::bundle::load_manifest(&bundle.to_string_lossy());
     }
 
     // 4. Create the window.
@@ -176,7 +202,14 @@ fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
     // 5. Render tuning + backdrop + window icon.
     mui_runtime::apply_render_config(&mut app, &cfg);
     mui_runtime::apply_backdrop(&cfg);
-    if app.set_window_icon("mocida://alloy-icon.png").unwrap_or(false) {
+    // The platform-shaped mark: a squircle on macOS, a rounded square on
+    // Windows and Linux. The plain star is for inside the window.
+    let app_icon = if cfg!(target_os = "macos") {
+        "mocida://icon"
+    } else {
+        "mocida://astra-icon-win.png"
+    };
+    if app.set_window_icon(app_icon).unwrap_or(false) {
         // custom icon set
     } else {
         mui_runtime::set_default_window_icon(&mut app);
@@ -194,11 +227,11 @@ fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
     let (children, reactive) =
         mui_runtime::build_view_seeded(view, &components, &HashMap::new())?;
     reactive.set_str("version", &backend::current_version());
-    reactive.set_str("output", "");
+    reactive.set_str("output", "ready — write some Mikasa and hit Run");
     // TextArea renders real newlines, so a multi-line default is fine.
     reactive.set_str(
         "source",
-        "func main() {\n    println(\"hello from Alloy\")\n}\n",
+        "func main() {\n    println(\"hello from Astra\")\n}\n",
     );
 
     let slot: Rc<RefCell<Option<Reactive>>> = Rc::new(RefCell::new(Some(reactive)));
@@ -277,6 +310,17 @@ fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
 
         if let Some(r) = tick_slot.borrow().as_ref() {
             // --- Run trigger (incremented by the Run button in the .mui) ---
+            // F1/F2/F3 switch views. Polled rather than handled in the .mui:
+            // a key handler only fires on the widget that holds focus, and
+            // the editor usually has it.
+            if mocida::input::key_down("F1") {
+                r.set_int("nav", 0);
+            } else if mocida::input::key_down("F2") {
+                r.set_int("nav", 1);
+            } else if mocida::input::key_down("F3") {
+                r.set_int("nav", 2);
+            }
+
             let run_n = r.get("run_trigger").unwrap_or(0);
             if run_n != *last_run.borrow() {
                 *last_run.borrow_mut() = run_n;
@@ -289,11 +333,14 @@ fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
                     r.get_str("source").unwrap_or_default()
                 };
                 let res = backend::run_source(&src);
+                let failed = res.error.is_some();
                 let shown = match res.error {
                     Some(err) => format!("{}{}", res.output, err),
                     None => res.output,
                 };
+                let mark = if failed { "failed" } else { "ran" };
                 r.set_str("output", &shown);
+                r.set_str("status", mark);
             }
 
             // --- Open file trigger: native OS file picker (rfd) ---
@@ -301,7 +348,7 @@ fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
             if open_n != *last_open.borrow() {
                 *last_open.borrow_mut() = open_n;
                 if let Some(path) = rfd::FileDialog::new()
-                    .add_filter("Copper", &["crs"])
+                    .add_filter("Mikasa", &["mika", "crs"])
                     .pick_file()
                 {
                     let p = path.to_string_lossy().into_owned();
@@ -323,7 +370,7 @@ fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
                 let info = backend::check_update();
                 let msg = if info.available {
                     match backend::apply_update(&info.asset_url) {
-                        Ok(()) => format!("Updated to {} — restart Alloy.", info.latest),
+                        Ok(()) => format!("Updated to {} — restart Astra.", info.latest),
                         Err(e) => format!("Update failed: {e}"),
                     }
                 } else {

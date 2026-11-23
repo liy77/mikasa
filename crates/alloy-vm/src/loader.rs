@@ -187,7 +187,10 @@ fn collect(
                     }
                 }
             }
-            let crs_candidate = sibling(base, module, "crs");
+            // `.mika` first (recommended), then the legacy `.crs`.
+            let crs_candidate = copper_syntax::ext::SOURCE_EXTS
+                .iter()
+                .find_map(|ext| sibling(base, module, ext));
             if let Some(crs) = crs_candidate {
                 if crs.is_file() {
                     let canon = crs.canonicalize().unwrap_or(crs.clone());

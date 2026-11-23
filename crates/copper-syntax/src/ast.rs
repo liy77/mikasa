@@ -419,7 +419,7 @@ impl Builder {
         if matches!(tok.kind, TokenKind::Keyword)
             && matches!(
                 tok.value.as_str(),
-                "if" | "else" | "return" | "yield" | "as" | "ref" | "move"
+                "if" | "else" | "guard" | "defer" | "return" | "yield" | "as" | "ref" | "move"
             )
         {
             self.cursor += 1;

@@ -2,12 +2,27 @@
 
 Context for AI assistants on **copper-lang** — traps, invariants, conventions.
 
+> **Copper is now Mikasa, and Alloy is now Astra.** The rename is branding:
+> docs, window titles, and logos say Mikasa / Astra. The toolchain binary is
+> `mikasa` (formerly `cforge`). The interpreter binary (`alloy`), crate names
+> (`copper-*`, `alloy-vm`), and module paths stay as they are — do not rename
+> them to match the brand.
+>
+> Extensions (`crates/copper-syntax/src/ext.rs`): `.mika` source, `.ast`
+> bytecode, `.mklib` library, `.mipkg` package. `.crs` and `.loy` still load
+> and must keep loading — they are legacy, not removed. New output uses the
+> new names.
+>
+> `.mika` is also the MocidaUI file. A `.mika` that declares a `view` or an
+> `App()` is a UI document (`source_is_mui`); a plain one transpiles. `.crm`
+> is retired — it still opens, with a warning, and nothing new should use it.
+
 ## What this project is
 
-Copper transpiles to Rust. Binary: `cforge`. Pipeline:
+Mikasa (formerly Copper) transpiles to Rust. Binary: `mikasa`. Pipeline:
 `.crs` → tokenizer → token rewrites → parser → Rust source → `cargo build`.
 
-**Second engine: Alloy** (`crates/alloy-vm`, binary `alloy`) — tree-walking interpreter
+**Second engine: Astra** (formerly Alloy; `crates/alloy-vm`, binary `alloy`) — tree-walking interpreter
 over the shared `copper-syntax` AST. Instant like `python`; no transpile, no cargo.
 Design specs: `docs/superpowers/specs/2026-06-22-alloy-vm-design.md`.
 
@@ -17,20 +32,20 @@ Design specs: `docs/superpowers/specs/2026-06-22-alloy-vm-design.md`.
 crates/
   copper-syntax/    tokenizer + AST (shared by cforge, alloy, LSPs)
   copper-parser/    streaming transpiler parser
-  alloy-vm/         Alloy interpreter lib + `alloy` CLI
+  alloy-vm/         Astra interpreter lib + `alloy` CLI
                     src/{value,env,error,interp,bytecode,loader,stdlib,stdlib_ext,wasm,intrinsics}.rs
-  copper-lsp/       Copper language server
-  mui-syntax/       MUI (.mui/.crm) parser
+  copper-lsp/       Mikasa language server
+  mui-syntax/       MocidaUI parser (.mui, and .mika files with a view)
   mui-codegen/      MUI → Rust codegen (M5)
   mui-lsp/          MUI language server
 src/                cforge entrypoint + re-exports from crates (historical; real code is in crates/)
 alloy-gui/          Dual-mode alloy GUI host (MUI; own workspace; links mocida)
-std/cstd.crs        Copper stdlib — single source for both cforge and alloy
+std/cstd.crs        Mikasa stdlib — single source for both cforge and alloy
 docs/superpowers/specs/   Design specs (alloy-vm, bytecode, gui, check-miri, wasm-interop, mui-codegen)
 docs/TODO.md        Backlog with priorities
 ```
 
-## MUI files (`.mui` / `.crm`)
+## MocidaUI files (`.mui`, and `.mika` with a `view`)
 
 Two verbs:
 - **`cforge run foo.mui`** — dev render (M1): shells out to `mui-dev` (never links mocida directly). Resolution: `MUI_DEV_BIN` env → `mocida-rs/target/` → `cargo run -p mui-dev` (found via `MOCIDA_RS_DIR` or sibling `mocida/mocida-rs`).
@@ -38,7 +53,7 @@ Two verbs:
 
 Handlers + live reactivity are emitted as comments/placeholders — M3/M4 evaluator work pending.
 
-## Alloy — commands, .loy, imports
+## Astra — commands, .ast, imports
 
 **Commands:**
 - `alloy run file.crs` — instant interpret.
@@ -92,7 +107,7 @@ v1 = `Vec<Item>` (AST). v2 = `Vec<Item>` + `Vec<WasmModule { names, bytes }>` (w
 - **`match` arms use `,` not `;`** — enforced via `brace_is_match.last()` in `line_break_token`. Don't disable.
 - **Don't stub the parser back to a minimal echo.** Happened once (cd22d82); restoration was non-trivial.
 
-### copper-syntax AST parser (Alloy)
+### copper-syntax AST parser (Astra)
 
 - **Recoverable parser** — partial tree + `ParseError`s on bad input. `alloy run` rejects non-empty `prog.errors`. Earlier these were silently discarded (`_errs`).
 - **Inside `(...)` identifiers are `Param`/`ParamType`, not `Identifier`.** `expect_ident` and closure-param parsing must accept both.
@@ -110,7 +125,7 @@ v1 = `Vec<Item>` (AST). v2 = `Vec<Item>` + `Vec<WasmModule { names, bytes }>` (w
 - **`scripts/uninstall.py` must be self-contained** — it's copied to the install dir (away from `_pretty.py`), so it MUST NOT `import _pretty`. All other scripts import it freely.
 - New scripts: inherit `_pretty.py` styling; resolve root via `Path(__file__).resolve().parent.parent` — no `cd`.
 
-### Alloy GUI host (mocida)
+### Astra GUI host (mocida)
 
 Build `alloy-gui/` against sibling `mocida-rs` at `/Volumes/MCUDevDisk/mocida/mocida-rs`.
 Required env vars: `MOCIDA_INCLUDE_DIR`, `MOCIDA_LIB_DIR`, `MOCIDA_LIB_NAME=mocida`, `MOCIDA_STATIC=0`, `SDL3_INCLUDE_DIR`. Runtime: `DYLD_FALLBACK_LIBRARY_PATH=<mocida>/mocida/build`.
@@ -158,7 +173,7 @@ Required env vars: `MOCIDA_INCLUDE_DIR`, `MOCIDA_LIB_DIR`, `MOCIDA_LIB_NAME=moci
 
 ## Standard-library policy
 
-**`std/*.crs` is written in Copper, not Rust.** `std/*_native.rs` is deprecated — do not add new native files. When Copper can't express something yet, fix the transpiler. A `.crs` may use Rust-native spellings, fully-qualified paths, method chains, generics, `format!` specifiers — those all transpile through.
+**`std/*.crs` is written in Mikasa, not Rust.** `std/*_native.rs` is deprecated — do not add new native files. When Copper can't express something yet, fix the transpiler. A `.crs` may use Rust-native spellings, fully-qualified paths, method chains, generics, `format!` specifiers — those all transpile through.
 
 ## `unsafe` support
 
@@ -174,7 +189,7 @@ Required env vars: `MOCIDA_INCLUDE_DIR`, `MOCIDA_LIB_DIR`, `MOCIDA_LIB_NAME=moci
 - **`obj?.field`** → `Option<&T>` (reference). Non-`Copy` payloads may need `.clone()`.
 - **Type aliases** (`type Foo = Bar<T>`) don't lower inside `static`/`as` casts.
 
-**Alloy:**
+**Astra:**
 - **No static borrow/ownership checking** — dynamic `Rc<RefCell>`; pointer aliasing doesn't propagate. Use `cforge` or `alloy check` for real borrow-checking.
 - **`&&`/`||` are not short-circuit** — both operands pre-evaluated before `eval_binary`.
 - **Wasm ABI is prototype-only** — `i64`/`bool` + `extern "C"` only. Strings/structs = next phase.

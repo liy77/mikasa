@@ -52,6 +52,11 @@ pub struct Interpreter {
     wasm: HashMap<String, Rc<RefCell<crate::wasm::WasmRuntime>>>,
     globals: Option<Rc<RefCell<Env>>>,
     out: Sink,
+    /// `defer` bodies registered in the scopes currently executing, outermost
+    /// first. Each frame is one scope; within a frame, later entries run
+    /// first (Swift's reverse order). A scope pushes a frame on entry and
+    /// drains it — running each body — on every exit path.
+    defers: Vec<Vec<Block>>,
 }
 
 impl Interpreter {
@@ -440,9 +445,9 @@ impl Interpreter {
                     ExprKind::Ident(name) => {
                         let cur = env.borrow().get(name).unwrap_or(Value::Unit);
                         let nv = compound(self, cur, expr.span)?;
-                        if !env.borrow_mut().set(name, nv) {
+                        if !env.borrow_mut().set(name, nv.clone()) {
                             // first assignment to a free name → define it
-                            env.borrow_mut().define(name.clone(), rhs);
+                            env.borrow_mut().define(name.clone(), nv);
                         }
                         Ok(Value::Unit)
                     }
@@ -1170,21 +1175,28 @@ impl Interpreter {
         env: &Rc<RefCell<Env>>,
     ) -> Result<Outcome, RuntimeError> {
         let scope = Env::child(env);
-        for stmt in &block.stmts {
-            match self.exec_stmt(stmt, &scope)? {
-                Outcome::Normal(_) => {}
-                other => return Ok(other),
-            }
-        }
-        match &block.tail {
-            Some(e) => Ok(Outcome::Normal(self.eval_expr(e, &scope)?)),
-            None => Ok(Outcome::Normal(Value::Unit)),
-        }
+        self.run_block_in(block, &scope)
     }
 
     /// Like `run_block`, but without creating an extra child scope (the caller
     /// already created one — used by `for`, which injects the loop variable).
+    ///
+    /// Opens a `defer` frame for the scope and drains it on the way out, so a
+    /// `defer` registered by the body runs whether the scope returns, breaks,
+    /// continues, or simply ends.
     fn run_block_in(
+        &mut self,
+        block: &Block,
+        scope: &Rc<RefCell<Env>>,
+    ) -> Result<Outcome, RuntimeError> {
+        self.defers.push(Vec::new());
+        let outcome = self.exec_block_body(block, scope);
+        self.flush_defers(scope)?;
+        outcome
+    }
+
+    /// Run a block's statements without opening a scope or a `defer` frame.
+    fn exec_block_body(
         &mut self,
         block: &Block,
         scope: &Rc<RefCell<Env>>,
@@ -1201,6 +1213,25 @@ impl Interpreter {
         }
     }
 
+    /// Run this scope's registered `defer`s, most recent first, then drop the
+    /// frame. Each body runs in the scope it was registered in.
+    ///
+    /// The frame is popped *before* the bodies run, and each body gets a fresh
+    /// frame of its own. A `defer` registered while unwinding therefore belongs
+    /// to that body and runs before the earlier ones — Swift's order — instead
+    /// of appending to the frame being drained, which would loop forever.
+    fn flush_defers(&mut self, scope: &Rc<RefCell<Env>>) -> Result<(), RuntimeError> {
+        let frame = self.defers.pop().unwrap_or_default();
+        for body in frame.into_iter().rev() {
+            self.defers.push(Vec::new());
+            // A `defer` body that transfers control is swallowed: the scope is
+            // already leaving, and Swift ignores such an attempt.
+            let _ = self.exec_block_body(&body, scope)?;
+            self.flush_defers(scope)?;
+        }
+        Ok(())
+    }
+
     fn exec_stmt(&mut self, stmt: &Stmt, env: &Rc<RefCell<Env>>) -> Result<Outcome, RuntimeError> {
         match stmt {
             Stmt::Let { name, value, .. } => {
@@ -1208,7 +1239,16 @@ impl Interpreter {
                     Some(e) => self.eval_expr(e, env)?,
                     None => Value::Unit,
                 };
-                env.borrow_mut().define(name.clone(), v);
+                // Copper writes both `mut i = 0` and `i = i + 1` without a
+                // keyword, and the statement parser cannot tell a fresh
+                // binding from a reassignment. A name that already exists is a
+                // reassignment: update it in place so it isn't shadowed by a
+                // new binding that dies with the current block.
+                if env.borrow().get(name).is_some() {
+                    env.borrow_mut().set(name, v);
+                } else {
+                    env.borrow_mut().define(name.clone(), v);
+                }
                 Ok(Outcome::Normal(Value::Unit))
             }
             Stmt::Expr(e) => Ok(Outcome::Normal(self.eval_expr(e, env)?)),
@@ -1382,6 +1422,53 @@ impl Interpreter {
             Stmt::BlockStmt(b) => self.run_block(b, env),
             // `unsafe { ... }` — no special semantics in the interpreter.
             Stmt::Unsafe { body, .. } => self.run_block(body, env),
+            // `defer { body }` — remember it; `flush_defers` runs it (in
+            // reverse registration order) when the enclosing scope exits.
+            Stmt::Defer { body, .. } => {
+                if let Some(frame) = self.defers.last_mut() {
+                    frame.push(body.clone());
+                }
+                Ok(Outcome::Normal(Value::Unit))
+            }
+            // Swift-style `guard cond else { exit }` / `guard let PAT = expr
+            // else { exit }`. The happy path falls through; a `guard let`
+            // binds in the *enclosing* scope so the name stays usable after
+            // the guard, exactly as in Swift.
+            Stmt::Guard {
+                cond,
+                let_pattern,
+                els,
+                span,
+            } => {
+                if let Some(pat) = let_pattern {
+                    let v = self.eval_expr(cond, env)?;
+                    if self.match_pattern(pat, &v, env) {
+                        return Ok(Outcome::Normal(Value::Unit));
+                    }
+                    return match self.run_block(els, env)? {
+                        Outcome::Normal(_) => Err(RuntimeError::new(
+                            "`guard` `else` must exit the scope (`return`, `break`, or `continue`)",
+                            *span,
+                        )),
+                        other => Ok(other),
+                    };
+                }
+                let c = self.eval_expr(cond, env)?;
+                match c.as_bool() {
+                    Some(true) => Ok(Outcome::Normal(Value::Unit)),
+                    Some(false) => match self.run_block(els, env)? {
+                        Outcome::Normal(_) => Err(RuntimeError::new(
+                            "`guard` `else` must exit the scope (`return`, `break`, or `continue`)",
+                            *span,
+                        )),
+                        other => Ok(other),
+                    },
+                    None => Err(RuntimeError::new(
+                        "`guard` condition is not bool",
+                        cond.span,
+                    )),
+                }
+            }
             _ => Err(RuntimeError::new(
                 "statement not yet supported by the VM",
                 stmt.span(),

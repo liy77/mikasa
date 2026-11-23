@@ -327,35 +327,29 @@
     return fetch(assetUrl(path), opts).catch(function () { return null; });
   }
 
-  /* Docs/film screenshots: stage into MEMFS (wasm Image tries local first) and
-     warm Cache Storage so a MEMFS miss can still finish via emscripten_fetch. */
+  /* Warm the HTTP cache for screenshots. Prefer warmFetch over stuffing every
+     PNG into MEMFS — decoded full-res textures already stress wasm memory;
+     emscripten_fetch + LoadTextureSized(downscale) is the light path. */
   function prefetchLazyImages() {
-    var rest = [
-      "/logo.png",
-      "/media/editor.png",
-      "/media/packages.png",
-      "/media/asset-store.png",
-      "/media/command-palette.png",
-      "/media/play-mode.png",
-      "/media/play.png",
-      "/media/mcp.png",
-      "/media/new-project.png",
-      "/media/add-node.png",
-      "/media/code.png",
-      "/media/blocks.png",
-      "/media/input-ps.png",
-      "/media/input-xbox.png",
-      "/media/assets.png",
-      "/media/guide.png",
-      "/media/guide-upscaling.png",
-      "/media/settings.png",
-      "/media/tour.png",
-      "/media/welcome.png",
-      "/media/docs-hero.png",
-      "/media/docs-tree.png",
-      "/media/docs-chest.png",
-      "/fonts/Inter-Bold.ttf"
-    ];
+    var rest = [];
+    try {
+      if (typeof FS !== "undefined" && vfsExists("/manifest.json")) {
+        var man = JSON.parse(FS.readFile("/manifest.json", { encoding: "utf8" }));
+        if (man && man.media && man.media.length) {
+          for (var mi = 0; mi < man.media.length; mi++) rest.push(man.media[mi]);
+        }
+      }
+    } catch (eMan) { /* ignore */ }
+    if (!rest.length) {
+      rest = [
+        "/media/editor.png",
+        "/media/packages.png",
+        "/media/asset-store.png",
+        "/media/command-palette.png",
+        "/media/play-mode.png"
+      ];
+    }
+    rest.push("/fonts/Inter-Bold.ttf");
     function stageRest() {
       var i = 0;
       (function next() {
@@ -363,9 +357,8 @@
         var batch = [rest[i++]];
         if (i < rest.length) batch.push(rest[i++]);
         Promise.all(batch.map(function (p) {
-          return fetchIntoVfs(p, "low").catch(function () {
-            return warmFetch(p, "low");
-          });
+          /* Warm Cache Storage / HTTP — Image falls back to emscripten_fetch. */
+          return warmFetch(p, "low");
         })).then(function () {
           if (window.requestIdleCallback) {
             window.requestIdleCallback(next, { timeout: 800 });
@@ -375,9 +368,10 @@
         });
       })();
     }
-    /* Kick a few high-priority docs shots immediately so Input & display paints. */
-    ["/media/input-ps.png", "/media/input-xbox.png", "/media/editor.png"].forEach(function (p) {
-      fetchIntoVfs(p, "high").catch(function () { return null; });
+    /* Above-the-fold: warm HTTP only. Staging full 2560x1440 PNGs into MEMFS
+       raced first paint into full-res IMG_Load and OOB'd the wasm heap. */
+    ["/media/editor.png"].forEach(function (p) {
+      warmFetch(p, "high");
     });
     if (window.requestIdleCallback) {
       window.requestIdleCallback(stageRest, { timeout: 400 });
@@ -564,14 +558,16 @@
         addRunDependency("mui-project");
         setBootProgress(Math.max(bootPct, 48));
         var projectDone = false;
+        var muiReady = false;
         var done = function () {
           if (projectDone) return;
+          /* .mui import graph MUST be in MEMFS before wasm builds the tree —
+             otherwise ZoomImage/Docs* stay unresolved as literal `[ZoomImage]`. */
+          if (!muiReady) return;
           projectDone = true;
           try { removeRunDependency("mui-project"); } catch (e) { /* ignore */ }
           setBootProgress(Math.max(bootPct, 78));
         };
-        /* Never block first paint forever if a MEMFS stage fetch stalls. */
-        setTimeout(done, 8000);
 
         /* Stage Regular (+ any non-Bold) fonts + entry before first frame.
            Bold and anything else continue in the background — UI can paint. */
@@ -607,22 +603,32 @@
               if (/\.(mui|crm)$/i.test(files[i])) muiFiles.push(files[i]);
             }
             if (muiFiles.indexOf(entry) < 0) muiFiles.unshift(entry);
-            /* Sprite3D / Scene3D load via IMG_LoadTexture from MEMFS — stage
-               image assets before first paint so the docs demo is not empty. */
+            /* Only first-paint images (Scene3D / bare Image / logo). ZoomImage
+               screenshots stay in man.media and load AFTER paint via
+               prefetchLazyImages — waiting on all of them held the boot bar
+               for ~8s+ and made mocida sites feel unusable. */
             var mediaFiles = [];
-            if (man && man.media && man.media.length) {
-              for (var mi = 0; mi < man.media.length; mi++) mediaFiles.push(man.media[mi]);
-            }
-            for (var fi = 0; fi < files.length; fi++) {
-              if (/\.(png|jpe?g|webp|gif|svg)$/i.test(files[fi])) mediaFiles.push(files[fi]);
-            }
+            var earlyList = (man && man.earlyMedia && man.earlyMedia.length)
+              ? man.earlyMedia
+              : [];
+            for (var mi = 0; mi < earlyList.length; mi++) mediaFiles.push(earlyList[mi]);
+            mediaFiles.push("/logo.png");
+            /* Cap the critical image set — never block paint on a huge gallery. */
+            if (mediaFiles.length > 8) mediaFiles = mediaFiles.slice(0, 8);
+            /* Soft timeout only for images — never for .mui (see muiReady). */
+            setTimeout(function () {
+              if (muiReady) done();
+            }, 1500);
             return Promise.all(muiFiles.map(function (p) {
               return fetchIntoVfs(p, "high").catch(function () { return null; });
-            }).concat(mediaFiles.map(function (p) {
-              return fetchIntoVfs(p, "high").catch(function () { return null; });
-            }))).then(function () {
+            })).then(function () {
+              muiReady = true;
+              /* Kick paint as soon as the import graph is mounted; images may
+                 still be in flight (1.5s soft timeout above). */
               done();
-              /* Bold fonts can keep loading in the background. */
+              mediaFiles.forEach(function (p) {
+                fetchIntoVfs(p, "high").catch(function () { return null; });
+              });
               lateFonts.forEach(function (p) {
                 fetchIntoVfs(p, "low").catch(function () { return null; });
               });
@@ -630,6 +636,7 @@
           })
           .catch(function (e) {
             note("Failed to stage project: " + errText(e));
+            muiReady = true;
             done();
           });
       }

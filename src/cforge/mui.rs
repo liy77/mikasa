@@ -1,6 +1,9 @@
 //! MUI integration for cforge.
 //!
-//! `.mui` / `.crm` files describe a mocida UI (see `mocida/mui/ARCHITECTURE.md`).
+//! MocidaUI files describe a mocida UI (see `mocida/mui/ARCHITECTURE.md`).
+//! A `.mui` is markup-only. A `.mika` that declares a `view` or an `App()` is
+//! a MocidaUI document too — `.mika` is the one extension for both logic and
+//! UI. `.crm` is retired and only kept so old files still open.
 //! In **dev** they're rendered live by the `mui-dev` host (M1: static render;
 //! mocida C library + bindgen into every cforge build and break the portable
 //! Linux/macOS CI. Instead, mirroring how `run()` shells out to `cargo`, cforge
@@ -22,16 +25,24 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::tokenizer::tokenizer::Tokenizer;
 
-/// True if `file` is a MUI document cforge should render rather than transpile.
+/// True if `file` is a MocidaUI document cforge should render rather than
+/// transpile: a `.mui`, the retired `.crm`, or a `.mika` that declares a
+/// `view` or an `App()`.
 pub fn is_mui_file(file: &str) -> bool {
-    matches!(
-        Path::new(file)
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(|e| e.to_ascii_lowercase())
-            .as_deref(),
-        Some("mui") | Some("crm")
-    )
+    let ext = Path::new(file)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if copper_syntax::ext::is_mui(&ext) || copper_syntax::ext::is_mui_legacy(&ext) {
+        return true;
+    }
+    if copper_syntax::ext::is_source(&ext) {
+        if let Ok(src) = std::fs::read_to_string(file) {
+            return copper_syntax::ext::source_is_mui(&src);
+        }
+    }
+    false
 }
 
 /// **M5 — release codegen**, the `.mui`/`.crm` side of `cforge -c`. Lower the
@@ -389,7 +400,7 @@ fn materialize_foreign_imports(file: &str, doc: &mui_syntax::ast::Document, src_
             }
         };
         let (rust, lang) = match imp.kind {
-            ImportKind::Copper => (transpile_copper_module(&content), "Copper"),
+            ImportKind::Copper => (transpile_copper_module(&content), "Mikasa"),
             ImportKind::Rust => (content, "Rust"),
             ImportKind::Mui => unreachable!(),
         };
@@ -683,9 +694,10 @@ fn prepare_web_package(
     let abs = std::fs::canonicalize(file)
         .map(|p| strip_unc(&p))
         .unwrap_or_else(|_| file.to_string());
-    let web = find_mui_web_dir(prefer_release).ok_or_else(|| {
+    let entry_path = Path::new(&abs);
+    let web = find_mui_web_dir(prefer_release, Some(entry_path)).ok_or_else(|| {
         "Could not find the MUI WASM site host (mui-dev.js + mui_dev.wasm).\n\
-         Set MUI_WEB_DIR, or place OndaEngine/site/www next to copper-lang / mocida."
+         Put them in site/www next to your .mui, or set MUI_WEB_DIR."
             .to_string()
     })?;
 
@@ -701,6 +713,24 @@ fn prepare_web_package(
             }
         } else if matches!(name, "mui-dev.js" | "mui_dev.wasm") {
             return Err(format!("{name} is missing from {}", web.display()));
+        }
+    }
+    // Wasm-only hosts omit brand/media. Fill from the project shell next to the
+    // entry .mui (e.g. site/www) so listen works with plain `cforge run --listen`.
+    let shell = project_web_shell(entry_path);
+    if !out.join("logo.png").is_file() {
+        if let Some(logo) = shell.as_ref().map(|s| s.join("logo.png")).filter(|p| p.is_file()) {
+            let _ = std::fs::copy(&logo, out.join("logo.png"));
+        }
+    }
+    if !out.join("media").is_dir() {
+        if let Some(media) = shell.as_ref().map(|s| s.join("media")).filter(|p| p.is_dir()) {
+            let _ = copy_dir_recursive(&media, &out.join("media"));
+        }
+    }
+    if !out.join("fonts").is_dir() {
+        if let Some(fonts) = shell.as_ref().map(|s| s.join("fonts")).filter(|p| p.is_dir()) {
+            let _ = copy_dir_recursive(&fonts, &out.join("fonts"));
         }
     }
 
@@ -729,9 +759,12 @@ fn prepare_web_package(
         for m in &all_media {
             push_unique(&mut files, m.clone());
         }
+        // `earlyMedia` = needed before first paint (Scene3D / bare Image).
+        // `media` = everything else (ZoomImage screenshots) — lazy after paint.
         let manifest = serde_json::json!({
             "entry": staged.entry_vfs,
             "files": files,
+            "earlyMedia": early_media,
             "media": all_media,
         });
         std::fs::write(
@@ -742,6 +775,9 @@ fn prepare_web_package(
     }
 
     let stamp = compute_build_stamp(out)?;
+    // Keep earlyFiles lean: fonts + manifest + .mui graph + first-paint images.
+    // ZoomImage screenshots must NOT land here — they raced the wasm download
+    // and held the boot bar for tens of seconds.
     let mut early: Vec<String> = Vec::new();
     for f in &font_vfs {
         push_unique(&mut early, f.clone());
@@ -749,11 +785,15 @@ fn prepare_web_package(
     early.push("/manifest.json".to_string());
     early.push("/build-id.json".to_string());
     for f in &staged.files {
-        push_unique(&mut early, f.clone());
+        if f.ends_with(".mui") || f.ends_with(".mika") || f.ends_with(".crm") {
+            push_unique(&mut early, f.clone());
+        }
     }
     for m in &early_media {
         push_unique(&mut early, m.clone());
     }
+    // Brand mark — NavBar retries every frame while this is missing.
+    push_unique(&mut early, "/logo.png".to_string());
     let title = mui_app_title(&abs);
     write_listen_host(out, &stamp, &title, &font_vfs, &early)?;
 
@@ -853,7 +893,7 @@ fn stage_mui_import_graph(entry: &Path, stage: &Path) -> Result<StagedMui, Strin
             .and_then(|e| e.to_str())
             .unwrap_or("")
             .to_ascii_lowercase();
-        if !matches!(ext.as_str(), "mui" | "crm") {
+        if !matches!(ext.as_str(), "mui" | "mika" | "crm") {
             continue;
         }
         let rel = src_canon
@@ -953,7 +993,7 @@ fn compute_build_stamp(stage: &Path) -> Result<BuildStamp, String> {
             .and_then(|e| e.to_str())
             .unwrap_or("")
             .to_ascii_lowercase();
-        if ext == "mui" || ext == "crm" {
+        if matches!(ext.as_str(), "mui" | "mika" | "crm") {
             mui_files.push(p.to_path_buf());
         }
     }
@@ -1095,21 +1135,31 @@ fn collect_mui_asset_refs(sources: &[PathBuf]) -> (Vec<String>, Vec<String>, Vec
     let mut fonts: Vec<String> = Vec::new();
     let mut early_media: Vec<String> = Vec::new();
     let mut lazy_media: Vec<String> = Vec::new();
+    /* First-paint media only from the ENTRY .mui. Scanning imports (docs.mui)
+       pulled Sprite3D/Image into earlyMedia, blocked boot on mobile, and the
+       1.5s preRun timeout then started wasm without docs.mui → `[ZoomImage]`. */
+    let entry = sources.first();
     for src in sources {
         let Ok(text) = std::fs::read_to_string(src) else {
             continue;
         };
+        let is_entry = entry.map(|e| e == src).unwrap_or(false);
         for cap in font_re.captures_iter(&text) {
             let path = normalize_asset_vfs(&cap[1]);
             push_unique(&mut fonts, path);
         }
         for cap in image_re.captures_iter(&text) {
             let path = normalize_asset_vfs(&cap[1]);
-            push_unique(&mut early_media, path);
+            if is_entry {
+                push_unique(&mut early_media, path);
+            } else {
+                push_unique(&mut lazy_media, path);
+            }
         }
         for cap in sprite_re.captures_iter(&text) {
             let path = normalize_asset_vfs(&cap[1]);
-            push_unique(&mut early_media, path);
+            /* Docs Scene3D sprites are lazy — home first paint never needs them. */
+            push_unique(&mut lazy_media, path);
         }
         for cap in zoom_re.captures_iter(&text) {
             let path = normalize_asset_vfs(&cap[1]);
@@ -1243,15 +1293,36 @@ fn stage_listen_media(
     Ok(())
 }
 
-fn find_mui_web_dir(prefer_release: bool) -> Option<PathBuf> {
+/// Prefer a *rich* site host (wasm + logo/media) next to the entry `.mui`.
+/// Bare mocida-rs `target/wasm32-…` dirs are last-resort — they lack logo.png
+/// and `media/`, which made `cforge run --listen` hang on a black boot bar.
+fn find_mui_web_dir(prefer_release: bool, entry: Option<&Path>) -> Option<PathBuf> {
     if let Ok(dir) = std::env::var("MUI_WEB_DIR") {
         let p = PathBuf::from(dir);
         if web_dir_ok(&p) {
-            return Some(p);
+            return Some(canon_web(&p));
+        }
+    }
+
+    // 1) Project shell next to the entry (site/www, www, …) — richest host.
+    if let Some(shell) = entry.and_then(project_web_shell) {
+        if web_dir_ok(&shell) {
+            return Some(canon_web(&shell));
         }
     }
 
     let mut roots: Vec<PathBuf> = Vec::new();
+    if let Some(e) = entry {
+        if let Some(dir) = e.parent() {
+            roots.push(dir.to_path_buf());
+            if let Some(p) = dir.parent() {
+                roots.push(p.to_path_buf());
+                if let Some(gp) = p.parent() {
+                    roots.push(gp.to_path_buf());
+                }
+            }
+        }
+    }
     if let Ok(cwd) = std::env::current_dir() {
         roots.push(cwd);
     }
@@ -1270,7 +1341,31 @@ fn find_mui_web_dir(prefer_release: bool) -> Option<PathBuf> {
         }
     }
 
-    // Prefer the matching emscripten profile for release/debug builds.
+    let rels = [
+        "site/www",
+        "www",
+        "OndaEngine/site/www",
+        "../OndaEngine/site/www",
+        "../../OndaEngine/site/www",
+    ];
+    // Prefer rich shells (logo or media/) over bare wasm dirs.
+    let mut bare: Option<PathBuf> = None;
+    for root in &roots {
+        for rel in rels {
+            let cand = root.join(rel);
+            if !web_dir_ok(&cand) {
+                continue;
+            }
+            if web_dir_rich(&cand) {
+                return Some(canon_web(&cand));
+            }
+            if bare.is_none() {
+                bare = Some(cand);
+            }
+        }
+    }
+
+    // 2) Emscripten build output (wasm+js only) — last resort.
     if let Some(ws) = find_mocida_rs() {
         let profiles = if prefer_release {
             ["release", "debug"]
@@ -1283,27 +1378,41 @@ fn find_mui_web_dir(prefer_release: bool) -> Option<PathBuf> {
                 .join("wasm32-unknown-emscripten")
                 .join(profile);
             if web_dir_ok(&cand) {
-                return Some(cand);
+                return Some(canon_web(&cand));
             }
         }
     }
 
-    // Fall back to a full site shell (fonts/media often live here).
-    let rels = [
-        "site/www",
-        "OndaEngine/site/www",
-        "../OndaEngine/site/www",
-        "../../OndaEngine/site/www",
-        "www",
-    ];
-    for root in &roots {
-        for rel in rels {
-            let cand = root.join(rel);
-            if web_dir_ok(&cand) {
-                return std::fs::canonicalize(&cand)
-                    .ok()
-                    .map(|p| PathBuf::from(strip_unc(&p)))
-                    .or(Some(cand));
+    bare.map(|p| canon_web(&p))
+}
+
+fn canon_web(dir: &Path) -> PathBuf {
+    std::fs::canonicalize(dir)
+        .ok()
+        .map(|p| PathBuf::from(strip_unc(&p)))
+        .unwrap_or_else(|| dir.to_path_buf())
+}
+
+/// `site/www` (or `www`) next to / above the entry `.mui`.
+fn project_web_shell(entry: &Path) -> Option<PathBuf> {
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    if let Some(dir) = entry.parent() {
+        dirs.push(dir.to_path_buf());
+        if let Some(p) = dir.parent() {
+            dirs.push(p.to_path_buf());
+            if let Some(gp) = p.parent() {
+                dirs.push(gp.to_path_buf());
+            }
+        }
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        dirs.push(cwd);
+    }
+    for dir in dirs {
+        for name in ["www", "site/www"] {
+            let cand = dir.join(name);
+            if cand.is_dir() {
+                return Some(canon_web(&cand));
             }
         }
     }
@@ -1313,6 +1422,11 @@ fn find_mui_web_dir(prefer_release: bool) -> Option<PathBuf> {
 fn web_dir_ok(dir: &Path) -> bool {
     // `.data` preload pack is optional — fonts/images ship over HTTP.
     dir.join("mui-dev.js").is_file() && dir.join("mui_dev.wasm").is_file()
+}
+
+fn web_dir_rich(dir: &Path) -> bool {
+    web_dir_ok(dir)
+        && (dir.join("logo.png").is_file() || dir.join("media").is_dir() || dir.join("fonts").is_dir())
 }
 
 /// Map a request URL to a path relative to the listen stage. Allows the wasm
@@ -1347,7 +1461,7 @@ fn listen_rel_path(url_path: &str) -> Option<String> {
                 .to_ascii_lowercase();
             if matches!(
                 ext.as_str(),
-                "mui" | "crm" | "json" | "png" | "jpg" | "jpeg" | "webp" | "gif" | "svg"
+                "mui" | "mika" | "crm" | "json" | "png" | "jpg" | "jpeg" | "webp" | "gif" | "svg"
                     | "ttf" | "otf" | "woff" | "woff2" | "js" | "wasm" | "data" | "html"
             ) {
                 trimmed.to_string()
@@ -1437,7 +1551,7 @@ fn serve_mui_listen(root: &Path, port: u16) -> i32 {
                 "otf" => "font/otf",
                 "woff" => "font/woff",
                 "woff2" => "font/woff2",
-                "mui" | "crm" => "text/plain; charset=utf-8",
+                "mui" | "mika" | "crm" => "text/plain; charset=utf-8",
                 _ => "application/octet-stream",
             };
             let cache = listen_cache_control(&rel);
@@ -1470,7 +1584,7 @@ fn listen_cache_control(rel: &str) -> &'static str {
         // Versioned boot.js / mui-dev.js stay immutable via ?v=BUILD_ID.
         "wasm" | "js" | "png" | "jpg" | "jpeg" | "webp" | "gif" | "svg" | "ttf" | "otf"
         | "woff" | "woff2" | "data" => "public, max-age=31536000, immutable",
-        "mui" | "crm" | "json" | "html" => "no-cache",
+        "mui" | "mika" | "crm" | "json" | "html" => "no-cache",
         _ => "no-cache",
     }
 }

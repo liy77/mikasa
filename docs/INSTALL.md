@@ -1,6 +1,9 @@
-# Installing Copper
+# Installing Mikasa
 
-The Copper compiler ships with a universal installer that exposes `cforge`
+> **Copper is now Mikasa.** The language was renamed (Copper → Mikasa, Alloy →
+> Astra). The toolchain binary is now `mikasa`.
+
+The Mikasa compiler ships with a universal installer that exposes `cforge`
 globally on your system. Installers live in [`scripts/`](../scripts) at the
 project root.
 

@@ -1,5 +1,5 @@
 //! `cforge check` — real Rust verification (type + borrow checker + UB via Miri)
-//! for a Copper program, with an **auto-provisioned** toolchain: the user installs
+//! for a Mikasa program, with an **auto-provisioned** toolchain: the user installs
 //! nothing manually; nightly + the `miri` component live in an isolated rustup
 //! under `~/.alloy/rustup`.
 //!
@@ -9,7 +9,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-/// Directory of Alloy's isolated rustup (does not touch the user's rustup).
+/// Directory of Astra's isolated rustup (does not touch the user's rustup).
 fn alloy_rustup_home() -> PathBuf {
     let home = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))

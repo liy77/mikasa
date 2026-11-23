@@ -14,7 +14,7 @@ build = "build.rs"
 authors = ["Liy", "Copper Authors"]
 
 [[bin]]
-name = "cforge"
+name = "mikasa"
 path = "src/main.rs"
 
 [dependencies]

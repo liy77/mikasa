@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Copper / cforge. Versions follow the project's
+All notable changes to Mikasa / cforge. Versions follow the project's
 CalVer scheme (`0.YY.M`, stamped from the build date).
 
 ## [Unreleased]
@@ -90,7 +90,7 @@ CalVer scheme (`0.YY.M`, stamped from the build date).
 
 ## [v0.26.6] - 2026-06-03
 
-First tagged release. Copper is a high-level language that transpiles to Rust,
+First tagged release. Mikasa is a high-level language that transpiles to Rust,
 shipped as the `cforge` compiler, with a declarative UI front-end (**MUI**) on
 top of the mocida toolkit.
 
@@ -113,7 +113,7 @@ top of the mocida toolkit.
   styling + anchors, reusable components with params + cross-file `import`,
   `app.bundle` assets, and **`Video` / `WebView`** elements (runtime + codegen),
   with cross-platform `Video` corner `radius`.
-- **VS Code extension** for Copper + MUI.
+- **VS Code extension** for Mikasa + MUI.
 - **MUI-based GUI installer** (declarative `.mui`, no Tauri/webview shell) with a
   scope-detecting install flow.
 - **Examples** under `examples/copper/` (language features) and `examples/mui/`

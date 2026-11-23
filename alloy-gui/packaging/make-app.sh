@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Packages the `alloy` binary into an Alloy.app bundle for macOS, with an icon
+# Packages the `alloy` binary into an Astra.app bundle for macOS, with an icon
 # (.icns) generated from assets/alloy-icon.png. The app works in Finder/Dock
-# AND on the command line (Alloy.app/Contents/MacOS/alloy run x.crs).
+# AND on the command line (Astra.app/Contents/MacOS/alloy run x.mika).
 #
 # Prerequisites: cargo build --release (produces the binary + libmocida.dylib),
 # `sips` and `iconutil` (both ship with macOS).
@@ -12,8 +12,8 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 gui_dir="$(dirname "$here")"
 target_dir="${CARGO_TARGET_DIR:-$gui_dir/target}/release"
-out="$gui_dir/dist/Alloy.app"
-icon_png="$gui_dir/assets/alloy-icon.png"
+out="$gui_dir/dist/Astra.app"
+icon_png="$gui_dir/assets/astra-icon-mac.png"
 
 bin="$target_dir/alloy"
 if [[ ! -x "$bin" ]]; then
@@ -37,13 +37,13 @@ for dylib in "$target_dir"/*.dylib; do
 done
 
 # 2. Icon: PNG -> .iconset -> .icns.
-iconset="$(mktemp -d)/Alloy.iconset"
+iconset="$(mktemp -d)/Astra.iconset"
 mkdir -p "$iconset"
 for size in 16 32 64 128 256 512; do
   sips -z "$size" "$size"     "$icon_png" --out "$iconset/icon_${size}x${size}.png"     >/dev/null
   sips -z "$((size*2))" "$((size*2))" "$icon_png" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
 done
-iconutil -c icns "$iconset" -o "$out/Contents/Resources/Alloy.icns"
+iconutil -c icns "$iconset" -o "$out/Contents/Resources/Astra.icns"
 
 # 3. Info.plist (GUI by default; CLI is still accessible via the inner binary).
 cat > "$out/Contents/Info.plist" <<PLIST
@@ -51,11 +51,11 @@ cat > "$out/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key><string>Alloy</string>
-  <key>CFBundleDisplayName</key><string>Alloy</string>
+  <key>CFBundleName</key><string>Astra</string>
+  <key>CFBundleDisplayName</key><string>Astra</string>
   <key>CFBundleIdentifier</key><string>net.liy77.alloy</string>
   <key>CFBundleExecutable</key><string>alloy</string>
-  <key>CFBundleIconFile</key><string>Alloy</string>
+  <key>CFBundleIconFile</key><string>Astra</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>0.1.0</string>
   <key>NSHighResolutionCapable</key><true/>

@@ -1,10 +1,10 @@
 // MUI VSCode extension — colors, completion, hover tooltips, and diagnostics
-// for .mui / .crm. Self-contained (no language server): highlighting comes
+// for .mui and .mika. Self-contained (no language server): highlighting comes
 // from the TextMate grammar; this file adds the interactive language features.
 //
 //   1. DocumentColorProvider — swatches + picker for `#rrggbb` / `rgba()`.
 //   2. CompletionItemProvider — elements, props, enum members, prop values,
-//      Copper keywords / reactivity primitives.
+//      Mikasa keywords / reactivity primitives.
 //   3. HoverProvider — description bubbles for elements (Text, Button, …),
 //      props (size, color, …), enums (FontStyle) and members, and keywords.
 //   4. Diagnostics — bracket balance, unknown enum members, and unknown props
@@ -27,27 +27,26 @@ import {
   isKnownProp,
   keywordByLabel,
   allKeywords,
-  loadCopperLexicon,
+  loadMikasaLexicon,
 } from './catalog';
 
-// Both languages are handled identically: `mui` (.mui markup) and `crm`
-// (.crm = Copper + Mocida). They share the grammar and all providers — the
-// only reason they're distinct languages is per-extension file icons.
+// MocidaUI lives in `.mui` and in `.mika` (a `.mika` with a `view` or `App()`
+// is a UI document — `.crm` was retired). Both share the providers.
 const SELECTOR: vscode.DocumentSelector = [
   { scheme: 'file', language: 'mui' },
-  { scheme: 'file', language: 'crm' },
+  { scheme: 'file', language: 'copper' },
 ];
 
-const LANG_IDS = new Set(['mui', 'crm']);
+const LANG_IDS = new Set(['mui', 'copper']);
 
 let client: LanguageClient | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  // Load Copper keyword/type descriptions from the shared lexicon so they
-  // match the Copper extension exactly. Canonical file lives one level up
+  // Load Mikasa keyword/type descriptions from the shared lexicon so they
+  // match the Mikasa extension exactly. Canonical file lives one level up
   // (editors/copper-lexicon.json); fall back to the embedded copy if absent
   // (e.g. a standalone-packaged build).
-  loadSharedCopperLexicon(context);
+  loadSharedMikasaLexicon(context);
 
   // Prefer the real language server (mui-lsp). When it's available it owns
   // completion, hover, color, symbols, go-to-definition and diagnostics — so we
@@ -137,7 +136,7 @@ export async function deactivate(): Promise<void> {
  * it works both in the dev workspace (F5) and a packaged extension; on any
  * failure the catalog uses its embedded mirror, so this never throws.
  */
-function loadSharedCopperLexicon(context: vscode.ExtensionContext): void {
+function loadSharedMikasaLexicon(context: vscode.ExtensionContext): void {
   const candidates = [
     path.join(context.extensionPath, '..', 'copper-lexicon.json'), // editors/ (dev)
     path.join(context.extensionPath, 'out', 'copper-lexicon.json'), // bundled (.vsix)
@@ -146,13 +145,13 @@ function loadSharedCopperLexicon(context: vscode.ExtensionContext): void {
   for (const file of candidates) {
     try {
       const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
-      loadCopperLexicon(raw);
+      loadMikasaLexicon(raw);
       return;
     } catch {
       /* try next candidate */
     }
   }
-  loadCopperLexicon(); // embedded fallback
+  loadMikasaLexicon(); // embedded fallback
 }
 
 // ===========================================================================
@@ -389,7 +388,7 @@ class MuiHoverProvider implements vscode.HoverProvider {
       return new vscode.Hover(widgetMarkdown(w), range);
     }
 
-    // 4) Keyword or primitive type — rendered exactly like the Copper
+    // 4) Keyword or primitive type — rendered exactly like the Mikasa
     //    extension's hover: a ```copper signature block + the description.
     const kw = keywordByLabel(word);
     if (kw) {

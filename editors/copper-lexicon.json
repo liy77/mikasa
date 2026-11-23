@@ -1,11 +1,13 @@
 {
-  "$comment": "SINGLE SOURCE OF TRUTH for Copper keyword + primitive-type descriptions. Read by BOTH the copper-lsp server (embedded via include_str! in src/lexicon.rs) and the MUI/CRM VS Code extension (read at runtime). Editing a description here updates both — they can never drift. Mocida/MUI-specific items (view, signal, computed, effect) are NOT Copper keywords and live in the MUI extension's own catalog, not here.",
+  "$comment": "SINGLE SOURCE OF TRUTH for Mikasa keyword + primitive-type descriptions. Read by BOTH the copper-lsp server (embedded via include_str! in src/lexicon.rs) and the MUI/CRM VS Code extension (read at runtime). Editing a description here updates both — they can never drift. Mocida/MUI-specific items (view, signal, computed, effect) are NOT Mikasa keywords and live in the MUI extension's own catalog, not here.",
   "keywords": [
     { "name": "func", "detail": "func RetType name(params)", "doc": "Declares a function." },
     { "name": "mut", "detail": "mut name = value", "doc": "Declares a mutable variable." },
     { "name": "let", "detail": "let name = value", "doc": "Declares an immutable variable." },
     { "name": "if", "detail": "if cond { ... } else { ... }", "doc": "Conditional branch." },
     { "name": "else", "detail": "else { ... }", "doc": "Else branch." },
+    { "name": "guard", "detail": "guard cond else { return }", "doc": "Early exit, like Swift. Continues only when the condition holds; the `else` block must leave the scope (`return`, `break`, `continue`). `guard let PAT = expr else { ... }` binds `PAT` in the enclosing scope." },
+    { "name": "defer", "detail": "defer { ... }", "doc": "Runs the block when the enclosing scope exits, like Swift: on `return`, `break`, `continue`, or falling off the end. Several `defer`s run in reverse order, and one only runs if control reached its line." },
     { "name": "match", "detail": "match x { pattern => result }", "doc": "Pattern matching." },
     { "name": "for", "detail": "for x in iter { ... }", "doc": "Iterates over a sequence." },
     { "name": "while", "detail": "while cond { ... }", "doc": "Loops while a condition holds." },

@@ -1,7 +1,7 @@
 {
   "name": "copper-lang",
-  "displayName": "Copper",
-  "description": "Language support for Copper (.crs) — syntax highlight, diagnostics, completion, document symbols, hover.",
+  "displayName": "Mikasa",
+  "description": "Language support for Mikasa (.mika, .crs) — syntax highlight, diagnostics, completion, document symbols, hover. Mikasa was formerly Copper.",
   "version": "0.0.1",
   "publisher": "copper-lang",
   "repository": {
@@ -12,7 +12,7 @@
     "vscode": "^1.85.0"
   },
   "categories": ["Programming Languages"],
-  "icon": "icons/extension-icon.jpeg",
+  "icon": "icons/extension-icon.png",
   "main": "./out/extension.js",
   "activationEvents": [
     "onLanguage:copper",
@@ -22,12 +22,12 @@
     "languages": [
       {
         "id": "copper",
-        "aliases": ["Copper", "copper"],
-        "extensions": [".crs"],
+        "aliases": ["Mikasa", "Copper", "copper"],
+        "extensions": [".mika", ".crs"],
         "configuration": "./language-configuration.json",
         "icon": {
-          "light": "./icons/crs-icon-light.png",
-          "dark": "./icons/crs-icon-dark.png"
+          "light": "./icons/mika-icon-light.png",
+          "dark": "./icons/mika-icon-dark.png"
         }
       },
       {
@@ -45,7 +45,7 @@
       {
         "command": "copper.restartLanguageServer",
         "title": "Restart Language Server",
-        "category": "Copper"
+        "category": "Mikasa"
       }
     ],
     "grammars": [
@@ -61,7 +61,7 @@
       }
     ],
     "configuration": {
-      "title": "Copper",
+      "title": "Mikasa",
       "properties": {
         "copper.serverPath": {
           "type": "string",

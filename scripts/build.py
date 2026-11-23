@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Build the Copper compiler (cforge) into target/release/ without installing it.
+Build the Mikasa compiler (cforge) into target/release/ without installing it.
 
 Cross-platform replacement for the old build.bat.
 
@@ -28,7 +28,7 @@ def main():
     ap.add_argument("--debug", action="store_true", help="debug build instead of release")
     args = ap.parse_args()
 
-    banner("Copper", "Language Builder")
+    banner("Mikasa", "Language Builder")
     info(f"Working directory: {ROOT}")
 
     if not (ROOT / "Cargo.toml").exists():
@@ -39,19 +39,19 @@ def main():
         sys.exit(1)
 
     profile = "debug" if args.debug else "release"
-    head(f"Building Copper ({profile})")
+    head(f"Building Mikasa ({profile})")
     cmd = ["cargo", "build"] + ([] if args.debug else ["--release"])
     if subprocess.run(cmd, cwd=str(ROOT)).returncode != 0:
         fail("Build failed.")
         sys.exit(1)
 
-    exe = ROOT / "target" / profile / ("cforge.exe" if SYS == "Windows" else "cforge")
+    exe = ROOT / "target" / profile / ("mikasa.exe" if SYS == "Windows" else "mikasa")
     banner("Build complete")
     ok(f"Executable: {exe}")
     print()
     print(c("  You can now", DIM))
     info("Install it:   python scripts/install.py")
-    info(f"Or run it:    {exe} run main.crs")
+    info(f"Or run it:    {exe} run main.mika")
     print()
 
 

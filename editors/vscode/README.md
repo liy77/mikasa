@@ -1,6 +1,7 @@
-# Copper for VSCode
+# Mikasa for VSCode
 
-Language support for [Copper](https://github.com/liy77/copper-lang) (`.crs`).
+Language support for [Mikasa](https://github.com/liy77/copper-lang) (`.crs`).
+Mikasa was formerly called Copper.
 
 ## Features
 

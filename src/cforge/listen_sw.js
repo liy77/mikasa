@@ -6,12 +6,10 @@ var CACHE = "mocidad-__BUILD_ID__";
 var VER = "__BUILD_ID__";
 var BUILT_AT = "__BUILT_AT__";
 
-/* Warm the shell only — never race the page for the multi-MB wasm on install.
-   Wasm/js/png land in CACHE via fetchAndCache / page fetch wrapper. */
+/* Warm light shell only — never precache index.html (a sticky HTML shell kept
+   clients on a stale BUILD_ID / old wasm and Docs OOBd forever). Wasm/js/png
+   land in CACHE via fetchAndCache / page fetch wrapper. */
 var PRECACHE = [
-  "./",
-  "./index.html",
-  "./build-gate.js",
   "./build-id.json",
   "./boot.js?v=" + VER,
   "./sw.js",

@@ -19,6 +19,7 @@
 )]
 
 pub mod ast;
+pub mod ext;
 pub mod expr;
 pub mod lexicon;
 pub mod program;

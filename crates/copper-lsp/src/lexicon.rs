@@ -1,4 +1,4 @@
-//! Shared Copper keyword + primitive-type descriptions.
+//! Shared Mikasa keyword + primitive-type descriptions.
 //!
 //! These are embedded at compile time from the **single source of truth**,
 //! `editors/copper-lexicon.json`, which the MUI/CRM VS Code extension also

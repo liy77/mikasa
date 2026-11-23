@@ -1,14 +1,14 @@
 # MUI — VSCode extension
 
 Editor support for **MUI** (`.mui` / `.crm`), the mocida UI language. Built to
-sit beside the [Copper extension](../vscode): MUI embeds Copper expressions, so
+sit beside the [Mikasa extension](../vscode): MUI embeds Mikasa expressions, so
 the two share conventions (and the same `mut`/bare bindings — **no `let`**).
 
 ## Features
 
 - **Syntax highlighting** (`syntaxes/mui.tmLanguage.json`) — `view`
   declarations, element tags (PascalCase), prop names, `${…}` interpolation,
-  enum access (`FontStyle.Bold`), Copper keywords/types/operators, comments,
+  enum access (`FontStyle.Bold`), Mikasa keywords/types/operators, comments,
   strings, numbers, macros.
 - **Color swatches + picker** (the "cores") — a `DocumentColorProvider` renders
   an inline swatch next to every `#rrggbb`, `#rrggbbaa`, and `rgba()/rgb()`
@@ -17,7 +17,7 @@ the two share conventions (and the same `mut`/bare bindings — **no `let`**).
   the `mui.colorDecorators` setting.
 - **Autocomplete** — context-aware:
   - **Node position** → element names (`Stack`, `Text`, `Button`, …) with
-    snippets, plus Copper keywords / reactivity (`view`, `mut`, `signal`,
+    snippets, plus Mikasa keywords / reactivity (`view`, `mut`, `signal`,
     `effect`, `if`, `for`, `match`).
   - **Inside an element's `( … )`** → that element's prop names (+ the common
     `UIWidget` props).
@@ -26,9 +26,9 @@ the two share conventions (and the same `mut`/bare bindings — **no `let`**).
     vertical/horizontal, etc.).
 - **Hover tooltips** (the description "bubbles") — a `HoverProvider` shows a
   short description when you hover an element (`Text`, `Button`, …), a prop
-  (`size`, `color`, …), an enum (`FontStyle`) or its members, and Copper
+  (`size`, `color`, …), an enum (`FontStyle`) or its members, and Mikasa
   keywords / types (`func`, `struct`, `impl`, `signal`, `int`, …).
-  - **Copper words use the SAME descriptions as the Copper extension.** They
+  - **Mikasa words use the SAME descriptions as the Mikasa extension.** They
     come from the shared `editors/copper-lexicon.json` — a single JSON read by
     both `copper-lsp` (embedded via `include_str!`) and this extension (at
     runtime), so the `.crs` and `.mui`/`.crm` hovers can never drift. Edit a
@@ -70,7 +70,7 @@ The bundled examples (all under `examples/mui/` in the repo root):
 | `card/` | reusable component (`view` with typed params) |
 | `dashboard/` | cross-file import (`import { Card } from "../card/card.mui"`) |
 | `bundle-demo/` | `app.bundle` asset loading via `mocida://` |
-| `crm/` | Copper `struct` / `impl` / `func` alongside a `view` |
+| `crm/` | Mikasa `struct` / `impl` / `func` alongside a `view` |
 
 ## Build & package
 
@@ -83,13 +83,13 @@ npm run package    # builds a mui-<version>.vsix (via @vscode/vsce)
 `npm run package` produces an installable `.vsix`; install it with
 **Extensions: Install from VSIX…** or `code --install-extension mui-*.vsix`.
 The `compile` step copies `editors/copper-lexicon.json` into `out/` so the
-packaged extension shows the exact same Copper keyword descriptions as
+packaged extension shows the exact same Mikasa keyword descriptions as
 `copper-lsp` (in the dev host it reads the repo copy directly).
 
 ## Scope
 
 Highlighting, colors, completion, hover, and diagnostics are **self-contained**
 (no language server) — driven by the `src/catalog.ts` table. Deeper analysis
-(go-to-definition, cross-file checks, full Copper type-checking) would come
+(go-to-definition, cross-file checks, full Mikasa type-checking) would come
 later via a MUI language server built on the `mui-syntax` crate, the same way
-`copper-lsp` backs the Copper extension.
+`copper-lsp` backs the Mikasa extension.

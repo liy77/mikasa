@@ -39,7 +39,7 @@ pub use utils::*;
 use once_cell::sync::Lazy;
 
 static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
-    ClapCommand::new("cforge")
+    ClapCommand::new("mikasa")
         .arg(Arg::new("input")
             .short('i')
             .long("input")
@@ -71,7 +71,7 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
         .arg(Arg::new("web")
             .long("web")
             .action(clap::ArgAction::SetTrue)
-            .help("Also build a browser package <name>_web/ for .mui/.crm (wasm host + generated boot)"))
+            .help("Also build a browser package <name>_web/ for a MocidaUI file (wasm host + generated boot)"))
         .arg(Arg::new("version")
             .short('v')
             .long("version")
@@ -105,11 +105,11 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
                     .num_args(0..=1)
                     .default_missing_value("3000")
                     .value_name("PORT")
-                    .help("Serve a .mui/.crm as a WASM site on PORT (default 3000). Example: cforge run --listen=3000 app.mui"),
+                    .help("Serve a MocidaUI file as a WASM site on PORT (default 3000). Example: mikasa run --listen=3000 app.mui"),
             ])
         )
         .subcommand(ClapCommand::new("init")
-            .about("Scaffold a new Copper project (properties.kson, main.crs, .gitignore)")
+            .about("Scaffold a new Mikasa project (properties.kson, main.mika, .gitignore)")
         )
         .subcommand(ClapCommand::new("install")
             .about("Install dependencies. With no NAME, resolves + downloads every dependency in properties.kson and writes properties.lock. With a NAME, adds/pins that one.")
@@ -146,7 +146,7 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
         .subcommand(ClapCommand::new("build")
             .about("Compile a file or directory (alias for `-c -i`). Accepts --release, --clean, --bundle, --web, --output, --target.")
             .arg(Arg::new("input")
-                .help("File (.crs/.mui/.crm) or directory to compile")
+                .help("File (.mika/.mui, or a legacy .crs/.crm) or directory to compile")
                 .value_name("FILE")
                 .required(false)
                 .default_value(".")
@@ -161,7 +161,7 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
                 .action(clap::ArgAction::SetTrue).help("Embed app.bundle into the executable (.mui only)"))
             .arg(Arg::new("web").long("web")
                 .action(clap::ArgAction::SetTrue)
-                .help("Build browser package <name>_web/ (.mui/.crm)"))
+                .help("Build browser package <name>_web/ for a MocidaUI file"))
             .arg(Arg::new("target").long("target").num_args(1).value_name("TARGET")
                 .help("Cross-compile target (windows, mac, linux, web or a full rust triple)"))
             .arg(Arg::new("verbose").short('V').long("verbose")
@@ -169,7 +169,7 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
         )
         // `cforge format <paths…>` — pretty-print MUI (.mui/.crm) files.
         .subcommand(ClapCommand::new("format")
-            .about("Pretty-print MUI (.mui/.crm) files: clean indentation, spacing and blank lines (comments preserved).")
+            .about("Pretty-print MocidaUI files (.mui, or a .mika with a view): clean indentation, spacing and blank lines (comments preserved).")
             .arg(Arg::new("input")
                 .help("Files or directories to format (recurses into directories)")
                 .value_name("PATH")
@@ -184,17 +184,17 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
                 .help("Write the formatted result to stdout instead of editing files"))
         )
         // `cforge vm run/build <file>` (alias `virtual`) — execute a .crs through
-        // the Alloy tree-walking interpreter instead of transpiling to Rust. No
+        // the Astra tree-walking interpreter instead of transpiling to Rust. No
         // cargo/rustc needed.
         .subcommand(ClapCommand::new("vm")
             .visible_alias("virtual")
-            .about("Run a .crs through the Alloy interpreter (no Rust build)")
+            .about("Run a .mika through the Astra interpreter (no Rust build)")
             .subcommand_required(true)
             .subcommand(ClapCommand::new("run")
-                .about("Interpret a .crs file with Alloy")
+                .about("Interpret a .mika file with Astra")
                 .arg(Arg::new("input").value_name("FILE").required(true).index(1)))
             .subcommand(ClapCommand::new("build")
-                .about("Parse + validate a .crs through Alloy without running it")
+                .about("Parse + validate a .mika through Astra without running it")
                 .arg(Arg::new("input").value_name("FILE").required(true).index(1)))
         )
         // `cforge check <file.crs>` — real Rust verification (borrow + Miri),
@@ -203,7 +203,7 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
             .about("Download the latest cforge nightly from GitHub and replace this install")
         )
         .subcommand(ClapCommand::new("check")
-            .about("Check a .crs with real Rust (borrow checker + Miri), provisioning the toolchain automatically")
+            .about("Check a .mika with real Rust (borrow checker + Miri), provisioning the toolchain automatically")
             .arg(Arg::new("input").value_name("FILE").required(true).index(1))
             .arg(Arg::new("no-miri").long("no-miri")
                 .action(clap::ArgAction::SetTrue)
@@ -211,7 +211,19 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
         )
 });
 
-/// `cforge vm run/build <file>` — drive the Alloy interpreter. Returns the
+/// Print the deprecation warning for a legacy extension. `mikasa build` and
+/// `mikasa run` call this; the file still works, the spelling is what aged.
+fn warn_deprecated_extension(file: Option<&String>) {
+    let Some(file) = file else { return };
+    let Some(ext) = path::Path::new(file).extension().and_then(|e| e.to_str()) else {
+        return;
+    };
+    if let Some(warning) = copper_syntax::ext::deprecation_warning(ext) {
+        eprintln!("warning: {warning}");
+    }
+}
+
+/// `mikasa vm run/build <file>` — drive the Astra interpreter. Returns the
 /// process exit code.
 fn run_vm(sub: &str, file: &str) -> i32 {
     use alloy_vm::loader;
@@ -243,7 +255,7 @@ fn run_vm(sub: &str, file: &str) -> i32 {
                 }
             }
         }
-        let out = p.with_extension("loy");
+        let out = p.with_extension(copper_syntax::ext::ARTIFACT);
         let bytes = alloy_vm::bytecode::compile(&resolved.program.items, &modules);
         match std::fs::write(&out, bytes) {
             Ok(()) => {
@@ -457,8 +469,8 @@ fn parse_commands() -> ParsedCommands {
             cmd.set_valid(true);
             parsed_args.update_or_add_command(cmd);
         } else {
-            // If no file specified for run, try using main.crs as default
-            let default_file = "main.crs";
+            // If no file specified for run, try using main.mika as default.
+            let default_file = "main.mika";
             if path::Path::new(default_file).exists() {
                 let mut cmd =
                     ParsedCommand::new("input".to_string(), vec![default_file.to_string()]);
@@ -494,7 +506,10 @@ fn parse_commands() -> ParsedCommands {
             parsed_args.update_or_add_command(cmd);
         }
 
-        // `cforge run --listen[=PORT] file.mui` — serve the MUI as a WASM site.
+        // A legacy extension still runs, but `mikasa run` says so.
+        warn_deprecated_extension(run_matches.get_one::<String>("input"));
+
+        // `mikasa run --listen[=PORT] file.mui` — serve the MUI as a WASM site.
         if let Some(port) = run_matches.get_one::<String>("listen") {
             let mut cmd = ParsedCommand::new("listen".to_string(), vec![port.clone()]);
             cmd.set_valid(true);
@@ -502,7 +517,7 @@ fn parse_commands() -> ParsedCommands {
         }
     }
 
-    // `cforge build <file>` — alias for `-c -i <file>`. Translate the subcommand
+    // `mikasa build <file>` — alias for `-c -i <file>`. Translate the subcommand
     // into the same parsed commands `-c -i` produces, so the compile path in
     // main() runs unchanged. Accepts the same flags (--release/--clean/--bundle/
     // --output/--target/--verbose).
@@ -512,6 +527,7 @@ fn parse_commands() -> ParsedCommands {
         parsed_args.update_or_add_command(compile);
 
         if let Some(file_path) = bm.get_one::<String>("input") {
+            warn_deprecated_extension(Some(file_path));
             let path = path::Path::new(file_path);
             if !path.exists() {
                 eprintln!("Error: '{}' does not exist", file_path);
@@ -634,7 +650,7 @@ async fn main() {
             let (sub, sm) = match vm_matches.subcommand() {
                 Some(pair) => pair,
                 None => {
-                    eprintln!("usage: cforge vm <run|build> <file.crs>");
+                    eprintln!("usage: cforge vm <run|build> <file.mika>");
                     std::process::exit(1);
                 }
             };
@@ -690,11 +706,11 @@ async fn main() {
 
     if commands.get_command("version").unwrap().is_valid {
         println!(
-            "CForge v{} (build {}, commit {})",
+            "mikasa v{} (build {}, commit {})",
             CFORGE_VERSION, BUILD_DATE, GIT_HASH
         );
         println!(
-            "Copper v{} (build {}, commit {})",
+            "Mikasa v{} (build {}, commit {})",
             COPPER_VERSION, BUILD_DATE, GIT_HASH
         );
         return;
@@ -781,7 +797,8 @@ async fn main() {
     }
 
     if commands.get_command("compile").unwrap().is_valid {
-        // A single `.mui` / `.crm` is a mocida UI: "compiling" it means lowering
+        // A single MocidaUI file (`.mui`, or a `.mika` with a `view`/`App()`) is
+        // a mocida UI: "compiling" it means lowering
         // the component AST to Rust (mui-codegen) rather than the Copper→Rust
         // transpile. Same `-c` entry point, file extension picks the backend.
         // `--release` additionally `cargo build`s the generated crate; `--bundle`
@@ -841,9 +858,8 @@ async fn main() {
 
     // Handle run subcommand
     if commands.get_command("run").is_some() && commands.get_command("run").unwrap().is_valid {
-        // A single `.mui` / `.crm` file is a mocida UI: render it live via the
-        // mui-dev host instead of going through the Copper→Rust→cargo pipeline.
-        // (Transpiling `.crm` to a native binary is the M5 release path.)
+        // A single MocidaUI file (`.mui`, or a `.mika` with a `view`/`App()`)
+        // renders live via the mui-dev host instead of the transpile pipeline.
         if input_dir.is_none() && files.len() == 1 && cforge::mui::is_mui_file(&files[0]) {
             let listen_port = commands
                 .get_command("listen")

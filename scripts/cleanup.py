@@ -42,7 +42,7 @@ def remove(path, label):
 
 
 def main():
-    banner("Copper", "Project Cleanup")
+    banner("Mikasa", "Project Cleanup")
     info(f"Cleaning development artifacts in {ROOT}")
 
     head("Removing build output")

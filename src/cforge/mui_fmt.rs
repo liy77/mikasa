@@ -21,16 +21,10 @@ use crate::cforge::pretty;
 const INDENT: &str = "  "; // two spaces per level
 const MAX_WIDTH: usize = 100;
 
-/// True for a path this formatter handles (`.mui` or `.crm`).
+/// True for a path this formatter handles: `.mui`, a `.mika` that is a
+/// MocidaUI document, or the retired `.crm`.
 pub fn is_formattable(path: &str) -> bool {
-    matches!(
-        Path::new(path)
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(str::to_ascii_lowercase)
-            .as_deref(),
-        Some("mui") | Some("crm")
-    )
+    crate::cforge::mui::is_mui_file(path)
 }
 
 // ── Scanner ─────────────────────────────────────────────────────────────────
@@ -576,7 +570,7 @@ pub fn format_command(paths: &[String], check: bool, to_stdout: bool) -> i32 {
         collect(Path::new(p), &mut files);
     }
     if files.is_empty() {
-        pretty::warn("no .mui or .crm files found to format");
+        pretty::warn("no MocidaUI files found to format");
         return 0;
     }
 

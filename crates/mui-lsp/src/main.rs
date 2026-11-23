@@ -1,4 +1,5 @@
-//! `mui-lsp` — the language server for MUI (`.mui` / `.crm`).
+//! `mui-lsp` — the language server for MocidaUI (`.mui`, and `.mika` files
+//! that declare a view).
 //!
 //! Speaks LSP (JSON-RPC over stdio). Provides diagnostics, completion (widgets,
 //! props, enum members, imported components), hover, document symbols, color

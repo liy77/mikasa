@@ -1,4 +1,4 @@
-# alloy-gui — native host crate for the Alloy GUI.
+# alloy-gui — native host crate for the Astra GUI.
 #
 # NOT a member of the copper-lang workspace (it links mocida, which the portable
 # crates must not). Build it explicitly:
@@ -17,7 +17,7 @@
 name = "alloy-gui"
 version = "0.1.0"
 edition = "2021"
-description = "Alloy — GUI + dual-mode binary (playground, file runner, updater)"
+description = "Astra — GUI + dual-mode binary (playground, file runner, updater)"
 
 # The shipped binary is named `alloy` (the dual-mode GUI/CLI executable).
 [[bin]]
@@ -25,7 +25,7 @@ name = "alloy"
 path = "src/main.rs"
 
 [dependencies]
-# Portable Alloy interpreter (lib) — reused for the CLI passthrough and the
+# Portable Astra interpreter (lib) — reused for the CLI passthrough and the
 # playground/runner "Run".
 alloy-vm = { path = "../crates/alloy-vm" }
 copper-syntax = { path = "../crates/copper-syntax" }

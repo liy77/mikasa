@@ -66,14 +66,14 @@ def main():
     grp.add_argument("--global", action="store_const", const="global", dest="force")
     args = ap.parse_args()
 
-    banner("Copper", "Diagnostic Tool")
+    banner("Mikasa", "Diagnostic Tool")
     scope, install_dir = resolve_scope(args.force)
     info(f"Privilege: {'admin/root' if is_admin() else 'normal user'}  →  inspecting {scope} scope")
     info(f"Expected install dir: {install_dir}")
 
     # 1. Install directory + binary.
     head("Installation")
-    exe = install_dir / "bin" / ("cforge.exe" if SYS == "Windows" else "cforge")
+    exe = install_dir / "bin" / ("mikasa.exe" if SYS == "Windows" else "mikasa")
     if install_dir.exists():
         ok(f"Install directory found: {install_dir}")
         if exe.exists():
@@ -99,40 +99,40 @@ def main():
         else:
             warn("COPPER_PATH not set in this scope's registry.")
         if r"%COPPER_PATH%\bin" in reg_path or str(install_dir / "bin") in reg_path:
-            ok("Copper bin directory present in persisted PATH.")
+            ok("Mikasa bin directory present in persisted PATH.")
         else:
-            fail("Copper bin directory NOT in persisted PATH.")
+            fail("Mikasa bin directory NOT in persisted PATH.")
     else:
         copper_path = os.environ.get("COPPER_PATH")
         ok(f"COPPER_PATH = {copper_path}") if copper_path else warn("COPPER_PATH not set in this shell.")
         if str(install_dir / "bin") in os.environ.get("PATH", ""):
-            ok("Copper bin directory present in current PATH.")
+            ok("Mikasa bin directory present in current PATH.")
         else:
-            warn("Copper bin directory NOT in current shell PATH (open a new terminal?).")
+            warn("Mikasa bin directory NOT in current shell PATH (open a new terminal?).")
 
-    # 3. Does cforge actually run?
+    # 3. Does mikasa actually run?
     head("Execution")
-    found = shutil.which("cforge")
+    found = shutil.which("mikasa")
     target = found or (str(exe) if exe.exists() else None)
     if found:
-        ok(f"cforge resolved on PATH: {found}")
+        ok(f"mikasa resolved on PATH: {found}")
     else:
-        warn("cforge not on the current PATH; trying the install dir directly.")
+        warn("mikasa not on the current PATH; trying the install dir directly.")
     if target:
         try:
             res = subprocess.run([target, "--version"], capture_output=True, text=True)
             if res.returncode == 0:
-                ok(f"cforge runs: {res.stdout.strip().splitlines()[0] if res.stdout.strip() else 'ok'}")
+                ok(f"mikasa runs: {res.stdout.strip().splitlines()[0] if res.stdout.strip() else 'ok'}")
             else:
-                fail("cforge found but exited non-zero on --version.")
+                fail("mikasa found but exited non-zero on --version.")
         except OSError as e:
-            fail(f"cforge could not be executed: {e}")
+            fail(f"mikasa could not be executed: {e}")
     else:
-        fail("No cforge binary to test — run python scripts/install.py.")
+        fail("No mikasa binary to test — run python scripts/install.py.")
 
     banner("Diagnostic complete")
     if exe.exists():
-        info("If cforge isn't recognised, open a NEW terminal so PATH refreshes.")
+        info("If mikasa isn't recognised, open a NEW terminal so PATH refreshes.")
     else:
         info("Installation not found or incomplete — run python scripts/install.py.")
     print()

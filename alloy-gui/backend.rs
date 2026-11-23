@@ -1,4 +1,4 @@
-//! Backend logic for the Alloy GUI — std + the portable `alloy-vm` lib only
+//! Backend logic for the Astra GUI — std + the portable `alloy-vm` lib only
 //! (no mocida). Imported by `alloy.mui` (`import { run_source, ... } from
 //! "./backend.rs"`) and called directly by the native host (`src/main.rs`).
 //!
@@ -13,7 +13,7 @@ use std::rc::Rc;
 use alloy_vm::interp::Interpreter;
 use copper_syntax::program::parse_program;
 
-/// The result of running a Copper source through the interpreter.
+/// The result of running a Mikasa source through the interpreter.
 pub struct RunResult {
     /// Captured stdout (everything `println`/`print` emitted).
     pub output: String,
@@ -90,11 +90,11 @@ pub fn list_dirs(prefix: &str) -> Vec<String> {
 // ===========================================================================
 //
 // Source of releases. Fill REPO_SLUG with the GitHub `owner/repo` that
-// publishes Alloy release binaries (assets named `alloy-<target>(.exe)`).
+// publishes Astra release binaries (assets named `alloy-<target>(.exe)`).
 // Downloads shell out to `curl` (present on Win10+/macOS/Linux) so the crate
 // stays dependency-light, mirroring the installer's std-only backend.
 
-// Alloy releases come from the copper-lang repo (owner `liy77`, matching the
+// Astra releases come from the copper-lang repo (owner `liy77`, matching the
 // bundle ids `net.liy77.*`). Adjust the owner here if the release repo differs.
 const REPO_SLUG: &str = "liy77/copper-lang";
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");

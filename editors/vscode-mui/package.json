@@ -1,7 +1,7 @@
 {
   "name": "mui-lang",
   "displayName": "MUI (mocida UI)",
-  "description": "Language support for MUI (.mui / .crm) — syntax highlight, color swatches, file icons, and autocomplete for the mocida UI language (Copper-powered).",
+  "description": "Language support for MocidaUI (.mui, and .mika files that declare a view) — syntax highlight, color swatches, file icons, and autocomplete. .crm is retired.",
   "version": "0.0.1",
   "publisher": "copper-lang",
   "repository": {
@@ -28,16 +28,6 @@
         }
       },
       {
-        "id": "crm",
-        "aliases": ["CRM", "Copper Mocida", "crm"],
-        "extensions": [".crm"],
-        "configuration": "./language-configuration.json",
-        "icon": {
-          "light": "./icons/crm-icon.svg",
-          "dark": "./icons/crm-icon.svg"
-        }
-      },
-      {
         "id": "mocida-bundle",
         "aliases": ["Mocida App Bundle"],
         "filenames": ["app.bundle"],
@@ -59,11 +49,6 @@
         "language": "mui",
         "scopeName": "source.mui",
         "path": "./syntaxes/mui.tmLanguage.json"
-      },
-      {
-        "language": "crm",
-        "scopeName": "source.crm",
-        "path": "./syntaxes/crm.tmLanguage.json"
       },
       {
         "language": "mocida-bundle",

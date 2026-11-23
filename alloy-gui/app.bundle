@@ -1,7 +1,13 @@
 {
-  "name": "Alloy",
+  "name": "Astra",
   "id": "net.liy77.alloy",
   "assets": {
-    "alloy-icon.png": "assets/alloy-icon.png"
+    "icon": "assets/astra-icon-mac.png",
+    "astra-logo.png": "../assets/astra-logo.png",
+    "icons/play.png": "assets/icons/play.png",
+    "icons/code.png": "assets/icons/code.png",
+    "icons/terminal.png": "assets/icons/terminal.png",
+    "icons/update.png": "assets/icons/update.png",
+    "icons/folder.png": "assets/icons/folder.png"
   }
 }

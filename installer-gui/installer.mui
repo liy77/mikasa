@@ -1,7 +1,7 @@
 import { prereqs_quick, prereqs_check, install_copper } from "./backend.rs"
 
 App() {
-  name: "Copper Installer"
+  name: "Mikasa Installer"
   width: 720
   height: 530
   minWidth: 720
@@ -63,7 +63,7 @@ view Installer() {
       Stack(id: header, orientation: horizontal, justify: center, align: center, gap: 12) {
         Image("mocida://icon-128.png", width: 76, height: 76, fillMode: fit)
         Stack(orientation: vertical, gap: 0, align: left, justify: center) {
-          Text("Copper", size: 38, color: #000000, weight: bold, align: left)
+          Text("Mikasa", size: 38, color: #000000, weight: bold, align: left)
           Text("Install cforge on this machine", size: 13, color: #0f0f0f, align: left)
         }
       }
@@ -96,7 +96,7 @@ view Installer() {
           Text("Source folder", size: 13, color: #aaaaaa)
           Input(
             value: source_dir,
-            placeholder: "Path to copper-lang (containing Cargo.toml)",
+            placeholder: "Path to the Mikasa source (containing Cargo.toml)",
             background: #252525,
             color: #e6e6e6,
             radius: 6,

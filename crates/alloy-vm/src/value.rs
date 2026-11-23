@@ -1,4 +1,4 @@
-//! Runtime values of the Alloy VM.
+//! Runtime values of the Astra VM.
 
 use crate::env::Env;
 use copper_syntax::expr::Expr;

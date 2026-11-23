@@ -45,7 +45,8 @@ impl ImportKind {
             .to_ascii_lowercase();
         match ext.as_str() {
             "rs" => ImportKind::Rust,
-            "crs" => ImportKind::Copper,
+            // `.mika` is the recommended source extension; `.crs` still imports.
+            ext if copper_syntax::ext::is_source(ext) => ImportKind::Copper,
             _ => ImportKind::Mui, // .mui, .crm, or unspecified
         }
     }

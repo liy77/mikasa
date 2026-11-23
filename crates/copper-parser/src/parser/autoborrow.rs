@@ -1324,7 +1324,7 @@ fn find_plus_lhs_start(tokens: &[Token], plus_pos: usize) -> usize {
             TokenKind::Keyword | TokenKind::In | TokenKind::Yield if depth == 0 => {
                 if matches!(
                     t.value.as_str(),
-                    "return" | "yield" | "in" | "mut" | "let" | "if" | "else" | "match"
+                    "return" | "yield" | "in" | "mut" | "let" | "if" | "else" | "guard" | "defer" | "match"
                 ) {
                     return i + 1;
                 }

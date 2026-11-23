@@ -50,7 +50,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   client = new LanguageClient(
     'copper',
-    'Copper Language Server',
+    'Mikasa Language Server',
     serverOptions,
     clientOptions
   );
@@ -66,13 +66,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(
     vscode.commands.registerCommand('copper.restartLanguageServer', async () => {
       if (!client) {
-        vscode.window.showWarningMessage('Copper: no language server is running.');
+        vscode.window.showWarningMessage('Mikasa: no language server is running.');
         return;
       }
       await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
-          title: 'Restarting Copper Language Server…',
+          title: 'Restarting Mikasa Language Server…',
           cancellable: false,
         },
         async () => {

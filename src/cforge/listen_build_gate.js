@@ -82,7 +82,10 @@
   window.__MOCIDAD_READY__ = (async function () {
     var live = await resolveLiveId();
     var prev = readStoredId();
-    if (prev && prev !== live.id) {
+    /* Purge when localStorage OR the HTML-embedded BUILD_ID disagrees with the
+       live fingerprint — otherwise a sticky SW shell kept clients on an old
+       wasm and Docs ZoomImages OOBd the heap. */
+    if ((prev && prev !== live.id) || (BUILD_ID && BUILD_ID !== live.id)) {
       await purgeAppCaches();
     }
     writeStored(live.id, live.at);

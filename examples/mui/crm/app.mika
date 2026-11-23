@@ -1,9 +1,8 @@
-// app.crm — Copper + mocida in one file.
+// app.mika — Mikasa + MocidaUI in one file.
 //
-// `.crm` = copper-lang + mocida: real Copper declarations (struct / impl /
-// func — note: no `let`, and `func RetType name(args)`) live alongside the
-// `view`s that describe the UI. The grammar highlights both, and hover on a
-// Copper keyword shows the SAME text as the Copper (.crs) extension.
+// A `.mika` that declares a `view` is a MocidaUI document, so logic and UI
+// share one extension. Real Mikasa declarations (struct / impl / func) live
+// alongside the `view`s that describe the UI.
 
 struct Todo {
   title: string

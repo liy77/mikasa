@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Shared terminal styling for Copper's Python tooling.
+Shared terminal styling for Mikasa's Python tooling.
 
 Every script in scripts/ (except the self-contained uninstaller, which has
 to run after being copied away from this module) imports these helpers so

@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use colored::Colorize;
 
-/// Copper accent (matches `_pretty.py`'s 256-colour 208).
+/// Mikasa accent (matches `_pretty.py`'s 256-colour 208).
 fn copper(s: &str) -> String {
     if color() {
         s.truecolor(255, 135, 0).bold().to_string()

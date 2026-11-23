@@ -80,10 +80,10 @@ export async function start(
   const clientOptions: LanguageClientOptions = {
     documentSelector: [
       { scheme: 'file', language: 'mui' },
-      { scheme: 'file', language: 'crm' },
+      { scheme: 'file', language: 'copper' },
     ],
     synchronize: {
-      fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{mui,crm}'),
+      fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{mui,mika}'),
     },
   };
 

@@ -113,6 +113,8 @@ const RUST_KEYWORDS: &[&str] = &[
     // Control Flow Keywords
     "if",
     "else",
+    "guard",
+    "defer",
     "match",
     "loop",
     "while",
@@ -1202,7 +1204,10 @@ impl Tokenizer {
                 }
                 // Control-flow keywords open a block (not a struct literal) at
                 // the next `{`, even when the condition ends in an identifier.
-                if matches!(value.as_str(), "if" | "else" | "while" | "for" | "loop") {
+                if matches!(
+                    value.as_str(),
+                    "if" | "else" | "guard" | "defer" | "while" | "for" | "loop"
+                ) {
                     self.expect_block_brace = true;
                 }
             } else if self.import_specifier_list {

@@ -42,6 +42,67 @@ use utils::convert_type;
 
 const COPPER_OPERATORS: [(&str, &str); 2] = [("++", "+= 1"), ("--", "-= 1")];
 
+/// True when a `guard`'s `else` body transfers control out of the enclosing
+/// scope, which Swift requires. Accepts `return`, `break`, `continue`, and the
+/// diverging calls `panic!` / `exit` / `process::exit` / `unreachable!`.
+fn guard_else_exits(body: &str) -> bool {
+    let mut depth = 0i32;
+    let mut prev_word = false;
+    let mut word = String::new();
+    for ch in body.chars() {
+        match ch {
+            '{' | '(' | '[' => depth += 1,
+            '}' | ')' | ']' => depth -= 1,
+            _ => {}
+        }
+        if ch.is_ascii_alphanumeric() || ch == '_' {
+            word.push(ch);
+            prev_word = true;
+            continue;
+        }
+        if prev_word {
+            if depth == 1 && is_guard_exit_word(&word) {
+                return true;
+            }
+            word.clear();
+            prev_word = false;
+        }
+    }
+    false
+}
+
+fn is_guard_exit_word(word: &str) -> bool {
+    matches!(
+        word,
+        "return" | "break" | "continue" | "panic" | "exit" | "unreachable" | "todo"
+    )
+}
+
+/// Split `PAT = expr` on the `=` that sits at paren/bracket depth 0.
+/// `Some(x)` / `(a, b)` patterns keep their inner `=` out of the way.
+fn split_guard_binding(head: &str) -> (String, String) {
+    let mut depth = 0i32;
+    let bytes = head.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'(' | b'[' | b'{' | b'<' => depth += 1,
+            b')' | b']' | b'}' | b'>' => depth -= 1,
+            b'=' if depth == 0
+                && bytes.get(i + 1) != Some(&b'=')
+                && bytes.get(i.wrapping_sub(1)) != Some(&b'=') =>
+            {
+                let pat = head[..i].trim().to_string();
+                let expr = head[i + 1..].trim().to_string();
+                return (pat, expr);
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    (head.trim().to_string(), String::new())
+}
+
 const RUST_MACROS: [(&str, &str); 1] = [("println", "println!")];
 
 #[derive(Debug)]
@@ -98,6 +159,9 @@ pub struct Parser {
     /// Counter feeding the synthetic closure variable name (`__copt0`,
     /// `__copt1`, ...) so nested chains don't collide.
     optional_chain_counter: usize,
+    /// Set when the token stream contains a `defer`. Triggers emission of the
+    /// `__CopperDefer` guard type, whose `Drop` runs the deferred body.
+    uses_defer: bool,
     /// Set when we see `unsafe func ...`: the `unsafe` is consumed
     /// silently and `parse_function` emits `unsafe fn` instead of `fn`.
     pending_unsafe_fn: bool,
@@ -251,10 +315,15 @@ fn strip_expr_block_tail_semicolons(mut tokens: Vec<Token>) -> Vec<Token> {
                                 bdepth -= 1;
                             }
                             "}" | "{" | ";" if pdepth == 0 && bdepth == 0 => break,
-                            "if" | "match" if pdepth == 0 && bdepth == 0 => {
+                            "if" | "match" | "guard" if pdepth == 0 && bdepth == 0 => {
                                 found_kw = Some(j);
                                 break;
                             }
+                            // A `defer` body is a statement block, never a
+                            // value, so its trailing `;` must survive. Stop the
+                            // scan here without recording a keyword, so the
+                            // block is classified as a statement.
+                            "defer" if pdepth == 0 && bdepth == 0 => break,
                             _ => {}
                         }
                     }
@@ -348,6 +417,8 @@ fn strip_expr_block_tail_semicolons(mut tokens: Vec<Token>) -> Vec<Token> {
                                     | "for"
                                     | "while"
                                     | "loop"
+                                    | "defer"
+                                    | "guard"
                                     | "return"
                                     | "break"
                                     | "continue"
@@ -406,6 +477,7 @@ impl Parser {
         // Apply call-site auto-borrow / auto-clone, `for` preservation, and
         // string `+` concatenation.
         let lowered = autoborrow::rewrite(ternaried);
+        let uses_defer = lowered.iter().any(|t| t.value.contains("__CopperDefer"));
         Self {
             tokens: lowered,
             current: 0,
@@ -427,6 +499,7 @@ impl Parser {
             chain_delim_depth: 0,
             optional_chain_depths: vec![],
             optional_chain_counter: 0,
+            uses_defer,
             pending_unsafe_fn: false,
             pending_pub: false,
             fn_locals: HashSet::new(),
@@ -1237,6 +1310,15 @@ impl Parser {
             }
         }
 
+        // Swift-style `guard`: `guard cond else { exit }` and
+        // `guard let PAT = expr else { exit }`. The happy path falls through
+        // with any binding still in scope; the `else` must leave the scope.
+        if token_value == "guard" {
+            if let Some(consumed) = self.parse_guard() {
+                return consumed;
+            }
+        }
+
         // `async func ...` → set flag so parse_function emits `async fn`
         if token_value == "async" {
             if let Some(next) = self.peek() {
@@ -1340,6 +1422,7 @@ impl Parser {
             token_value.as_str(),
             "if" | "else"
                 | "loop"
+                | "defer"
                 | "while"
                 | "for"
                 | "in"
@@ -1374,6 +1457,124 @@ impl Parser {
 
         self.append(&token_value, AppendMode::Append);
         Consumed::consume(1)
+    }
+
+    /// Lower a Swift-style `guard` into Rust that keeps the same scoping.
+    ///
+    /// ```text
+    /// guard cond else { exit }
+    ///   → if !(cond) { exit }
+    /// guard let PAT = expr else { exit }
+    ///   → let PAT = match expr { Some(v) => v, _ => { exit; loop {} } };
+    /// ```
+    ///
+    /// The `let` form binds in the enclosing scope, matching Swift — the `else`
+    /// never returns, so the `match` diverges and the binding is always
+    /// initialized on the happy path. `else` is mandatory and its body must
+    /// transfer control (`return`, `break`, `continue`, `panic`/`exit`); that
+    /// is checked here so a missing exit is a compile error instead of a
+    /// binding that is silently never reached.
+    fn parse_guard(&mut self) -> Option<Consumed> {
+        let start = self.current;
+        // `guard let` / `guard mut` — the pattern form. Anything else is a
+        // plain boolean condition.
+        let is_let = self
+            .select(start + 1)
+            .map(|t| t.value == "let" || t.value == "mut")
+            .unwrap_or(false);
+
+        let mut i = start + 1;
+        let mut depth = 0i32;
+        let mut else_at = None;
+        while i < self.tokens.len() {
+            let t = &self.tokens[i];
+            match t.kind {
+                TokenKind::ParenthesesStart
+                | TokenKind::ParametersStart
+                | TokenKind::BracketStart
+                | TokenKind::BraceStart => depth += 1,
+                TokenKind::ParenthesesEnd
+                | TokenKind::ParametersEnd
+                | TokenKind::BracketEnd
+                | TokenKind::BraceEnd => depth -= 1,
+                _ => {}
+            }
+            if depth == 0 && t.value == "else" {
+                else_at = Some(i);
+                break;
+            }
+            // A statement boundary before `else` means this `guard` is
+            // malformed (or the word is a name). Bail and let the normal
+            // keyword path emit it.
+            if depth == 0
+                && matches!(
+                    t.kind,
+                    TokenKind::Newline | TokenKind::Semicolon | TokenKind::Eof
+                )
+            {
+                return None;
+            }
+            i += 1;
+        }
+        let else_at = else_at?;
+        let brace_at = (else_at + 1..self.tokens.len())
+            .find(|&k| self.tokens[k].kind == TokenKind::BraceStart)?;
+        let brace_end = self.matching_brace_end(brace_at)?;
+
+        let cond: String = self.tokens[start + 1..else_at]
+            .iter()
+            .map(|t| t.value.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let cond = cond.trim().to_string();
+        let body: String = self.tokens[brace_at..=brace_end]
+            .iter()
+            .map(|t| t.value.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        if !guard_else_exits(&body) {
+            // The trailing `;` is ours: the statement newline that would have
+            // supplied one sits inside the span we consume below.
+            self.append(
+                "compile_error!(\"guard's `else` block must exit the scope (`return`, `break`, `continue`, or `panic`/`exit`)\");",
+                AppendMode::Append,
+            );
+            return Some(Consumed::consume((brace_end - start + 1) as isize));
+        }
+
+        if is_let {
+            let let_head = cond
+                .strip_prefix("let ")
+                .or_else(|| cond.strip_prefix("mut "))
+                .unwrap_or(&cond);
+            let (pat, expr) = split_guard_binding(let_head);
+            // Rust's `let`-`else` binds in the enclosing scope and requires the
+            // `else` to diverge — the same two rules Swift's `guard let` has.
+            let lowered = format!("let {pat} = {expr} else {body};");
+            self.append(&lowered, AppendMode::Append);
+        } else {
+            // Parenthesize so `guard a && b else` negates the whole condition.
+            self.append(&format!("if !({cond}) {body}"), AppendMode::Append);
+        }
+        Some(Consumed::consume((brace_end - start + 1) as isize))
+    }
+
+    fn matching_brace_end(&self, open: usize) -> Option<usize> {
+        let mut depth = 0i32;
+        for (i, t) in self.tokens.iter().enumerate().skip(open) {
+            match t.kind {
+                TokenKind::BraceStart => depth += 1,
+                TokenKind::BraceEnd => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Some(i);
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
     }
 
     /// Emit a `TokenKind::InterpolatedString` with the right shape for its
@@ -3044,8 +3245,8 @@ impl Parser {
             }
 
             if !has_generics && !self.has_preceding_derive() {
-                let all_copy = !field_types.is_empty()
-                    && field_types.iter().all(|t| Self::type_is_copyish(t));
+                let all_copy =
+                    !field_types.is_empty() && field_types.iter().all(|t| Self::type_is_copyish(t));
                 let all_safe = !field_types.is_empty()
                     && field_types
                         .iter()
@@ -4398,6 +4599,30 @@ impl Parser {
         self.result.prepend_value(ext);
     }
 
+    /// Emit the guard type that backs `defer`. Its `Drop` invokes the closure,
+    /// and Rust drops locals in reverse declaration order, so two `defer`s in
+    /// one scope run last-registered first — the same order Swift uses. The
+    /// closure is `FnMut` so the body may mutate captured bindings.
+    fn prepend_defer_guard_if_used(&mut self) {
+        if !self.uses_defer {
+            return;
+        }
+        // A raw pointer, not a reference: the guard must not hold a borrow of
+        // the closure, or every later use of a captured binding would conflict
+        // with it. The closure itself is kept alive in a `ManuallyDrop<Option>`
+        // declared just before the guard, so the pointer stays valid until the
+        // guard's `Drop` runs — which is before that slot is dropped.
+        let guard = concat!(
+            "#[allow(dead_code)]\n",
+            "fn identity<T>(x: T) -> T { x }\n",
+            "struct __CopperDefer(*mut dyn FnMut());\n",
+            "impl Drop for __CopperDefer {\n",
+            "    fn drop(&mut self) { unsafe { (*self.0)(); } }\n",
+            "}\n\n",
+        );
+        self.result.prepend_value(guard);
+    }
+
     pub fn parse(&mut self) -> String {
         loop {
             if self.eof {
@@ -4408,6 +4633,7 @@ impl Parser {
                 // `uses_data_types` flag.
                 self.result.add_data_type_aliases();
                 self.prepend_vec_ext_if_used();
+                self.prepend_defer_guard_if_used();
                 self.prepend_used_std_modules();
                 self.result.write_main_function();
                 break self.result.get().expect("Format Error");
@@ -4559,7 +4785,8 @@ impl Parser {
                         }
 
                         if matches!(
-                            self.select(self.current + consumed).map(|t| t.value.as_str()),
+                            self.select(self.current + consumed)
+                                .map(|t| t.value.as_str()),
                             Some("?" | "!")
                         ) {
                             full.push_str(&self.select(self.current + consumed).unwrap().value);

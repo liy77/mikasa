@@ -31,7 +31,7 @@ enum Cmd {
     /// Compiles a `.crs` to a portable `.loy` artifact.
     Build {
         file: PathBuf,
-        /// Output path (default: same name with `.loy` extension).
+        /// Output path (default: same name with the `.ast` extension).
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
@@ -67,15 +67,21 @@ fn check(file: &Path, no_miri: bool) -> ExitCode {
         }
     }
     eprintln!(
-        "alloy: could not find `cforge` to check. Install cforge and run: cforge check {}",
+        "alloy: could not find `mikasa` to check. Install mikasa and run: mikasa check {}",
         file.display()
     );
     ExitCode::FAILURE
 }
 
 fn run(file: &Path) -> ExitCode {
-    // Resolve the Copper program + Rust to run via wasm (`.rs` to compile, or
-    // modules already embedded in a `.loy`).
+    // `.crs` and `.loy` still run; tell the user the recommended names once.
+    if let Some(ext) = file.extension().and_then(|e| e.to_str()) {
+        if let Some(note) = alloy_vm::source_ext::legacy_note(ext) {
+            eprintln!("note: {note}");
+        }
+    }
+    // Resolve the program + Rust to run via wasm (`.rs` to compile, or modules
+    // already embedded in an `.ast` / `.loy`).
     let resolved = match loader::resolve_runnable_wasm(file) {
         Ok(x) => x,
         Err(e) => {
@@ -162,7 +168,7 @@ fn build(file: &Path, output: Option<&Path>) -> ExitCode {
 
     let out = output
         .map(Path::to_path_buf)
-        .unwrap_or_else(|| file.with_extension("loy"));
+        .unwrap_or_else(|| file.with_extension(alloy_vm::source_ext::ARTIFACT));
     let bytes = alloy_vm::bytecode::compile(&resolved.program.items, &modules);
     match std::fs::write(&out, bytes) {
         Ok(()) => {
@@ -197,8 +203,8 @@ fn delegate_to_cforge(file: &Path) -> ExitCode {
         }
     }
     eprintln!(
-        "alloy: could not find `cforge` to compile the Rust. \
-         Install cforge and run: cforge run {}",
+        "alloy: could not find `mikasa` to compile the Rust. \
+         Install mikasa and run: mikasa run {}",
         file.display()
     );
     ExitCode::FAILURE
@@ -209,14 +215,14 @@ fn cforge_candidates() -> Vec<PathBuf> {
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             let name = if cfg!(windows) {
-                "cforge.exe"
+                "mikasa.exe"
             } else {
-                "cforge"
+                "mikasa"
             };
             v.push(dir.join(name));
         }
     }
     // fallback: resolve via PATH
-    v.push(PathBuf::from("cforge"));
+    v.push(PathBuf::from("mikasa"));
     v
 }

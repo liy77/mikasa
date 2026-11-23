@@ -342,6 +342,25 @@ pub enum Stmt {
     },
     /// `unsafe { .. }` block in statement position.
     Unsafe { body: Block, span: Span },
+    /// Swift-style `guard` early exit.
+    ///
+    /// `guard cond else { exit }` continues only when `cond` holds; the `else`
+    /// block must leave the enclosing scope. `guard let PAT = expr else { .. }`
+    /// binds `PAT` in the *enclosing* scope (not inside the guard), exactly
+    /// like Swift — the happy path falls through with the binding in scope.
+    Guard {
+        cond: Expr,
+        /// `Some(pat)` for `guard let pat = cond else { .. }`.
+        let_pattern: Option<Pattern>,
+        /// The `else` body. Required; a missing one is a parse error.
+        els: Block,
+        span: Span,
+    },
+    /// Swift-style `defer { .. }`: the body runs when the enclosing scope
+    /// exits, whichever way it exits (`return`, `break`, `continue`, or
+    /// falling off the end), in reverse order of registration. A `defer`
+    /// only runs if control reached its line.
+    Defer { body: Block, span: Span },
     /// A bare block `{ .. }`.
     BlockStmt(Block),
     /// An expression in statement position.
@@ -362,7 +381,9 @@ impl Stmt {
             | Stmt::While { span, .. }
             | Stmt::Loop { span, .. }
             | Stmt::For { span, .. }
-            | Stmt::Unsafe { span, .. } => *span,
+            | Stmt::Unsafe { span, .. }
+            | Stmt::Guard { span, .. }
+            | Stmt::Defer { span, .. } => *span,
             Stmt::BlockStmt(b) => b.span,
             Stmt::Expr(e) => e.span,
         }
@@ -906,6 +927,26 @@ impl Parser {
                     ))
                 }
                 "!" => {
+                    // `name!(...)` in statement position is a macro call. The
+                    // prefix parser only folds a postfix `!` onto a callee it
+                    // already parsed; a bare statement (`println!("x")`) lands
+                    // here with the name still unconsumed. Treat it as a call.
+                    if self.pos > 0 {
+                        let prev = &self.toks[self.pos - 1];
+                        if matches!(
+                            prev.kind,
+                            TokenKind::Identifier | TokenKind::Keyword | TokenKind::Type
+                        ) && matches!(
+                            self.toks.get(self.pos + 1).map(|t| t.value.as_str()),
+                            Some("(") | Some("[") | Some("{")
+                        ) {
+                            let name = prev.value.clone();
+                            let name_span = span_of(prev);
+                            self.bump(); // !
+                            let callee = Expr::new(ExprKind::Ident(name), name_span);
+                            return Some(self.parse_call(callee, None));
+                        }
+                    }
                     self.bump();
                     let e = self.parse_expr_bp(bp_unary())?;
                     let s = Span::merge(span, e.span);
@@ -948,6 +989,10 @@ impl Parser {
                         s,
                     ))
                 }
+                // A `}` closes the enclosing block, not the expression. Leave
+                // it for the block parser; consuming it here swallows the
+                // block end and misparses everything after it.
+                "}" => None,
                 other => {
                     self.err(span, format!("unexpected token `{other}` in expression"));
                     self.bump();
@@ -1538,7 +1583,10 @@ impl Parser {
                 Some("return") => {
                     let sp = self.cur_span();
                     self.bump();
-                    let value = if self.at_stmt_end(to) {
+                    // A following `defer` is the next statement, not the
+                    // returned value — `return` then `defer` is how Swift
+                    // writes an exit that skips the deferred block.
+                    let value = if self.at_stmt_end(to) || self.peek_val() == Some("defer") {
                         None
                     } else {
                         self.parse_expr_bp(0)
@@ -1565,7 +1613,25 @@ impl Parser {
                     self.bump();
                     stmts.push(Stmt::Continue { span: sp });
                 }
+                // `name!(...)` at the start of a statement. The expression
+                // parser reads a leading `!` as negation, so `println!("x")`
+                // has to be recognised here, before it falls through.
+                Some("!")
+                    if self.pos > 0
+                        && matches!(
+                            self.toks[self.pos - 1].kind,
+                            TokenKind::Identifier | TokenKind::Keyword | TokenKind::Type
+                        )
+                        && matches!(next_is, Some("(") | Some("[") | Some("{")) =>
+                {
+                    let prev = &self.toks[self.pos - 1];
+                    let callee = Expr::new(ExprKind::Ident(prev.value.clone()), span_of(prev));
+                    self.bump(); // !
+                    stmts.push(Stmt::Expr(self.parse_call(callee, None)));
+                }
                 Some("if") => stmts.push(self.parse_if_stmt()),
+                Some("guard") => stmts.push(self.parse_guard_stmt()),
+                Some("defer") => stmts.push(self.parse_defer_stmt()),
                 Some("while") => stmts.push(self.parse_while_stmt()),
                 Some("loop") => stmts.push(self.parse_loop_stmt()),
                 Some("for") => stmts.push(self.parse_for_stmt()),
@@ -1730,6 +1796,50 @@ impl Parser {
             let_pattern,
             then,
             els,
+            span: Span::merge(start, end),
+        }
+    }
+
+    /// `guard cond else { exit }` / `guard let PAT = expr else { exit }`.
+    ///
+    /// Unlike `if`, the `else` is mandatory and its body must transfer control
+    /// out of the enclosing scope (`return` / `break` / `continue` /
+    /// `throw`-style). The happy path falls through, so a `guard let` binding
+    /// lives in the enclosing scope — that is enforced by the interpreter, not
+    /// by nesting the binding in a block here.
+    fn parse_guard_stmt(&mut self) -> Stmt {
+        let start = self.cur_span();
+        self.bump(); // guard
+        let let_pattern = self.parse_opt_let_pattern();
+        let saved = self.no_struct;
+        self.no_struct = true;
+        let cond = self
+            .parse_expr_bp(0)
+            .unwrap_or_else(|| Expr::new(ExprKind::Raw(String::new()), self.cur_span()));
+        self.no_struct = saved;
+        if !self.eat("else") {
+            let sp = self.cur_span();
+            self.err(sp, "`guard` requires an `else` block");
+        }
+        let els = self.parse_block_braced();
+        let end = self.span_at(self.pos.saturating_sub(1));
+        Stmt::Guard {
+            cond,
+            let_pattern,
+            els,
+            span: Span::merge(start, end),
+        }
+    }
+
+    /// `defer { body }` — registered now, executed when the enclosing scope
+    /// exits. The body is a block, so it can hold several statements.
+    fn parse_defer_stmt(&mut self) -> Stmt {
+        let start = self.cur_span();
+        self.bump(); // defer
+        let body = self.parse_block_braced();
+        let end = self.span_at(self.pos.saturating_sub(1));
+        Stmt::Defer {
+            body,
             span: Span::merge(start, end),
         }
     }

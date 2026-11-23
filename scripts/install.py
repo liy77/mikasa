@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Copper Language installer — one cross-platform script for Windows, Linux and
+Mikasa installer — one cross-platform script for Windows, Linux and
 macOS (it replaces the old install.bat / install.sh / install-mac.sh trio).
 
 What it does:
@@ -89,13 +89,13 @@ def resolve_scope(force):
 
 # --- build --------------------------------------------------------------
 def build_release():
-    exe = ROOT / "target" / "release" / ("cforge.exe" if SYS == "Windows" else "cforge")
+    exe = ROOT / "target" / "release" / ("mikasa.exe" if SYS == "Windows" else "mikasa")
     if exe.exists():
         step("Removing stale release binary to force a fresh link…")
         exe.unlink()
-    head("Building Copper in release mode (cargo build --release --workspace)")
+    head("Building Mikasa in release mode (cargo build --release --workspace)")
     # --workspace so all members build (alloy, copper-lsp, mui-lsp), not just the
-    # root cforge package. Without it cargo builds only the current package.
+    # root package. Without it cargo builds only the current package.
     if subprocess.run(["cargo", "build", "--release", "--workspace"], cwd=str(ROOT)).returncode != 0:
         fail("cargo build --release failed.")
         sys.exit(1)
@@ -165,7 +165,7 @@ def copy_payload(exe, install_dir, lson_bin=None):
         os.chmod(dst_exe, 0o755)
     ok(f"Installed {exe.name}")
 
-    # Alloy — the Copper interpreter (binary `alloy`, crate alloy-vm). It is a
+    # Astra — the Mikasa interpreter (binary `alloy`, crate alloy-vm). It is a
     # workspace member, so the release build above produced it for free. Ship it
     # in bin/ next to cforge so it lands on PATH via %COPPER_PATH%\bin.
     alloy_name = "alloy.exe" if SYS == "Windows" else "alloy"
@@ -343,7 +343,7 @@ def register_unix(install_dir, scope):
 
 # --- main ---------------------------------------------------------------
 def main():
-    ap = argparse.ArgumentParser(prog="install.py", description="Install the Copper compiler (cforge).")
+    ap = argparse.ArgumentParser(prog="install.py", description="Install the Mikasa compiler (mikasa).")
     grp = ap.add_mutually_exclusive_group()
     grp.add_argument("--local", action="store_const", const="local", dest="force",
                      help="force a per-user install (no admin needed)")
@@ -351,7 +351,7 @@ def main():
                      help="force an all-users install (needs admin/root)")
     args = ap.parse_args()
 
-    banner("Copper", "Language Installer")
+    banner("Mikasa", "Language Installer")
     check_prereqs()
 
     scope, install_dir = resolve_scope(args.force)
@@ -373,11 +373,11 @@ def main():
     print()
     print(c("  Next steps", f"{COPPER}"))
     info("Open a NEW terminal so the PATH change is picked up.")
-    info("Then run cforge from anywhere:")
-    print(c("      cforge run main.crs", DIM))
-    print(c("      cforge -c -i main.crs", DIM))
-    print(c("      cforge --version", DIM))
-    print(c("      alloy run main.crs", DIM))
+    info("Then run mikasa from anywhere:")
+    print(c("      mikasa run main.mika", DIM))
+    print(c("      mikasa build main.mika", DIM))
+    print(c("      mikasa --version", DIM))
+    print(c("      alloy run main.mika", DIM))
     uninst = install_dir / ("uninstall.bat" if SYS == "Windows" else "uninstall.py")
     info(f"Uninstall   : {uninst}" + ("  (run as Administrator)" if scope == "global" else ""))
     print()

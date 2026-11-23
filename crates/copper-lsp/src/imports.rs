@@ -179,7 +179,7 @@ pub fn resolve(module: &str, doc_dir: Option<&Path>) -> Resolution {
                 return Resolution::Local(local);
             }
         }
-        for ext in ["crs", "rs", "mui", "crm"] {
+        for ext in ["mika", "crs", "rs", "mui", "crm"] {
             if dir.join(format!("{root}.{ext}")).exists() {
                 return Resolution::Local(format!("{root}.{ext}"));
             }
@@ -194,7 +194,7 @@ pub fn resolve(module: &str, doc_dir: Option<&Path>) -> Resolution {
 /// Map `crate::math::vec2` / `./math/vec2.crs` / `math::vec2` to a file under `dir`.
 fn resolve_path_local(module: &str, dir: &Path) -> Option<String> {
     let mut p = module.trim().trim_matches('"').to_string();
-    for ext in [".crs", ".crm", ".rs", ".mui"] {
+    for ext in [".mika", ".crs", ".crm", ".rs", ".mui"] {
         if let Some(s) = p.strip_suffix(ext) {
             p = s.to_string();
             break;
@@ -215,7 +215,7 @@ fn resolve_path_local(module: &str, dir: &Path) -> Option<String> {
     while p.starts_with("./") {
         p = p[2..].to_string();
     }
-    for ext in ["crs", "rs", "crm", "mui"] {
+    for ext in ["mika", "crs", "rs", "crm", "mui"] {
         let cand = base.join(format!("{p}.{ext}"));
         if cand.exists() {
             return Some(cand.file_name()?.to_string_lossy().into_owned());

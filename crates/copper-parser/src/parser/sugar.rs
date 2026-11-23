@@ -24,7 +24,8 @@ pub(super) fn rewrite(tokens: Vec<Token>) -> Vec<Token> {
     let t1 = rewrite_funcs_and_calls(tokens);
     let t2 = rewrite_arrow_lambdas(t1);
     let t3 = rewrite_try_catch(t2);
-    rewrite_null_coalesce(t3)
+    let t4 = rewrite_null_coalesce(t3);
+    rewrite_defer(t4)
 }
 
 fn synth(kind: TokenKind, value: &str) -> Token {
@@ -863,6 +864,113 @@ fn rewrite_try_catch(tokens: Vec<Token>) -> Vec<Token> {
     out
 }
 
+// ============================================================================
+// 3b. `defer { body }` — Swift-style scope exit
+// ============================================================================
+
+/// Lower every `defer { body }` into a guard whose `Drop` runs the body.
+///
+/// Rust drops locals in reverse declaration order when a scope exits, which is
+/// exactly Swift's rule: later `defer`s run first, and a `defer` only runs if
+/// control reached its line (the guard is declared there). The closure is
+/// `move`, so it copies `Copy` bindings and owns the rest, and it is stashed
+/// in a `ManuallyDrop<Option>` the guard points at — the guard holds a raw
+/// pointer, so it never borrows the closure and the two can share a scope.
+///
+/// Runs last: the body is copied verbatim, so any sugar inside it (`?.`, `??`,
+/// `try`) has already been lowered.
+fn rewrite_defer(tokens: Vec<Token>) -> Vec<Token> {
+    // Innermost first. A `defer` body is copied verbatim, so a `defer` nested
+    // inside another must already be a guard binding by the time the outer one
+    // is wrapped — otherwise it lands inside the closure, where nothing lowers
+    // it, and rustc sees a bare `defer`.
+    let mut tokens = tokens;
+    loop {
+        let next = rewrite_defer_once(&tokens);
+        if next.len() == tokens.len() {
+            return tokens;
+        }
+        tokens = next;
+    }
+}
+
+fn rewrite_defer_once(tokens: &[Token]) -> Vec<Token> {
+    let mut out = Vec::with_capacity(tokens.len());
+    let mut i = 0usize;
+    let mut n = 0usize;
+    while i < tokens.len() {
+        if tokens[i].value == "defer" {
+            if let Some(open) = next_sig(&tokens, i + 1) {
+                if tokens[open].value == "{" {
+                    if let Some(close) = find_matching_brace(&tokens, open) {
+                        n += 1;
+                        let slot = format!("__defer{n}");
+                        let guard = format!("__deferg{n}");
+                        // `mut __deferN = std::mem::ManuallyDrop::new(Some(|| { body }));`
+                        // keeps the closure address stable, then
+                        // `mut __defergN = __CopperDefer(&mut *__deferN as *mut dyn FnMut());`
+                        // is the guard whose drop invokes it. Declared second, so
+                        // it is dropped first.
+                        out.push(synth(TokenKind::Keyword, "mut"));
+                        out.push(synth(TokenKind::Identifier, &slot));
+                        out.push(synth(TokenKind::Operator, "="));
+                        out.push(synth(TokenKind::Identifier, "std"));
+                        out.push(synth(TokenKind::Operator, "::"));
+                        out.push(synth(TokenKind::Identifier, "mem"));
+                        out.push(synth(TokenKind::Operator, "::"));
+                        out.push(synth(TokenKind::Identifier, "ManuallyDrop"));
+                        out.push(synth(TokenKind::Operator, "::"));
+                        out.push(synth(TokenKind::Identifier, "new"));
+                        out.push(synth(TokenKind::ParenthesesStart, "("));
+                        out.push(synth(TokenKind::Identifier, "Some"));
+                        out.push(synth(TokenKind::ParenthesesStart, "("));
+                        // `identity(...)` keeps the closure inside a call. A
+                        // bare `|| { ... }` is re-read by the expression-block
+                        // pass, which pulls the closing `}` out of the closure
+                        // and breaks the surrounding function.
+                        out.push(synth(TokenKind::Identifier, "identity"));
+                        out.push(synth(TokenKind::ParenthesesStart, "("));
+                        // `move` copies the captured bindings into the closure,
+                        // so the guard does not borrow them and the rest of the
+                        // scope can keep using them. Rust copies `Copy` types
+                        // and moves the rest; a non-`Copy` binding used after
+                        // the `defer` needs an explicit `.clone()`.
+                        out.push(synth(TokenKind::Keyword, "move"));
+                        out.push(synth(TokenKind::Operator, "|"));
+                        out.push(synth(TokenKind::Operator, "|"));
+                        out.extend(tokens[open..=close].iter().cloned());
+                        out.push(synth(TokenKind::ParenthesesEnd, ")"));
+                        out.push(synth(TokenKind::ParenthesesEnd, ")"));
+                        out.push(synth(TokenKind::ParenthesesEnd, ")"));
+                        out.push(nl_semi());
+                        // One opaque token. Spelling the cast as separate
+                        // tokens lets the streaming parser re-read the `}` and
+                        // the `*mut dyn` and mangle them; emitting the finished
+                        // Rust as a single identifier-shaped token passes
+                        // through untouched.
+                        out.push(synth(
+                            TokenKind::Identifier,
+                            &format!(
+                                "let mut {guard} = __CopperDefer({slot}.as_mut().unwrap() as *mut dyn FnMut());"
+                            ),
+                        ));
+                        i = close + 1;
+                        continue;
+                    }
+                }
+            }
+        }
+        out.push(tokens[i].clone());
+        i += 1;
+    }
+    out
+}
+
+/// A statement-terminating newline, matching what the tokenizer emits.
+fn nl_semi() -> Token {
+    synth(TokenKind::Newline, ";\n")
+}
+
 /// If the final statement inside a `try`/`catch` block looks like a tail expression
 /// (not `let`/`mut`/assignment/control-flow), strip the tokenizer's `;` so the
 /// block evaluates to that expression's value.
@@ -982,7 +1090,7 @@ fn find_coalesce_lhs_start(tokens: &[Token], q_pos: usize) -> usize {
             TokenKind::Keyword | TokenKind::In | TokenKind::Yield if depth == 0 => {
                 if matches!(
                     tok.value.as_str(),
-                    "return" | "yield" | "in" | "mut" | "let" | "if" | "else" | "match"
+                    "return" | "yield" | "in" | "mut" | "let" | "if" | "else" | "guard" | "defer" | "match"
                 ) {
                     return i + 1;
                 }
