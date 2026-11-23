@@ -1,0 +1,10 @@
+[workspace]
+
+[package]
+name = "mika-import-rs-example"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+mika-import = { path = "../../crates/mika-import" }

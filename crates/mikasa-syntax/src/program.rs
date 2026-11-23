@@ -84,6 +84,9 @@ pub enum ImportKind {
     Items(Vec<String>),
     /// `import * from path`.
     Glob,
+    /// `import("file.mika")` — include that source file (dynamic file import).
+    /// The path is stored on [`Item::Import::path`].
+    File,
 }
 
 /// A top-level item.
@@ -289,6 +292,23 @@ impl ItemParser {
     fn parse_import(&mut self) -> Option<Item> {
         let start = self.cur_span();
         self.bump(); // import / use
+
+        // Dynamic file form: `import("file.mika")` / `import('file.mika')`.
+        if self.eat("(") {
+            let path = self
+                .bump()
+                .map(|t| t.value.trim_matches('"').trim_matches('\'').to_string())
+                .unwrap_or_default();
+            self.eat(")");
+            let _ = self.eat(";");
+            let span = Span::merge(start, self.prev_end_span());
+            return Some(Item::Import {
+                kind: ImportKind::File,
+                path,
+                span,
+            });
+        }
+
         let kind;
         if self.eat("{") {
             // Inside an import list the tokenizer tags names as `ModuleVar`,
@@ -983,6 +1003,28 @@ mod tests {
         ));
         assert!(
             matches!(&p.items[2], Item::Import { kind: ImportKind::Alias(a), .. } if a == "fs")
+        );
+    }
+
+    #[test]
+    fn parses_file_import() {
+        let p = parse_program("import(\"util.mika\")\nfunc main() {}\n");
+        assert!(
+            p.errors.is_empty(),
+            "errors: {:?}",
+            p.errors
+        );
+        assert!(
+            matches!(
+                &p.items[0],
+                Item::Import {
+                    kind: ImportKind::File,
+                    path,
+                    ..
+                } if path == "util.mika"
+            ),
+            "items: {:?}",
+            p.items
         );
     }
 

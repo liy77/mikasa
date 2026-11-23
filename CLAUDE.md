@@ -42,7 +42,7 @@ src/                cforge entrypoint + re-exports from crates (historical; real
 astra-gui/          Dual-mode alloy GUI host (MUI; own workspace; links mocida)
 std/cstd.mika        Mikasa stdlib — single source for both cforge and alloy
 docs/superpowers/specs/   Design specs (astra-vm, bytecode, gui, check-miri, wasm-interop, mui-codegen)
-docs/TODO.md        Backlog with priorities
+docs/TODO.md        Backlog index → TODO-mikasa.md / TODO-astra.md
 ```
 
 ## MocidaUI files (`.mui`, and `.mika` with a `view`)

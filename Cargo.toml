@@ -1,9 +1,9 @@
 [workspace]
-members = [".", "crates/mikasa-syntax", "crates/mikasa-parser", "crates/mikasa-lsp", "crates/mui-syntax", "crates/mui-codegen", "crates/mui-lsp", "crates/astra-vm"]
+members = [".", "crates/mikasa-syntax", "crates/mikasa-parser", "crates/mikasa-lsp", "crates/mui-syntax", "crates/mui-codegen", "crates/mui-lsp", "crates/astra-vm", "crates/mika-import"]
 # `dist/rust` is the output dir for cforge-transpiled programs; it has its
 # own Cargo.toml that must NOT be a workspace member. The installer-gui
 # is its own self-contained Tauri app — also kept out.
-exclude = ["dist", "installer-gui", "lson-src", "alloy-gui"]
+exclude = ["dist", "installer-gui", "lson-src", "alloy-gui", "examples/mika-import-rs"]
 resolver = "2"
 
 [package]

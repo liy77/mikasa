@@ -1,0 +1,9 @@
+[package]
+name = "copper-syntax"
+version = "0.0.1-pre-alpha"
+edition = "2021"
+description = "Compatibility alias for mikasa-syntax (Copper → Mikasa rename). Kept so sibling mocida-rs keeps building."
+publish = false
+
+[dependencies]
+mikasa-syntax = { path = "../mikasa-syntax" }

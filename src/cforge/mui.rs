@@ -23,7 +23,6 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::tokenizer::tokenizer::Tokenizer;
 
 /// True if `file` is a MocidaUI document cforge should render rather than
 /// transpile: a `.mui`, the retired `.crm`, or a `.mika` that declares a
@@ -425,37 +424,7 @@ fn materialize_foreign_imports(file: &str, doc: &mui_syntax::ast::Document, src_
 /// the unconditional `fn main()` the parser emits is left private so it isn't
 /// re-exported.
 fn transpile_copper_module(source: &str) -> String {
-    let mut tokenizer = Tokenizer::new(source.to_string());
-    let tokens = tokenizer.tokenize();
-    if !tokenizer.errors.is_empty() {
-        for e in &tokenizer.errors {
-            eprintln!("⚠️  copper import: {e}");
-        }
-    }
-    let mut parser = crate::parser::Parser::new(tokens);
-    let code = parser.parse();
-    promote_top_level_pub(&code)
-}
-
-/// Prefix top-level item lines with `pub` so a module's items are visible
-/// through `use module::*`. Only column-0 `fn`/`struct`/`enum`/`trait` lines are
-/// touched (nested/indented items are left alone), and `fn main(` is skipped so
-/// the synthesized entry point stays private.
-fn promote_top_level_pub(code: &str) -> String {
-    let mut out = String::with_capacity(code.len() + 64);
-    for line in code.lines() {
-        let promote = (line.starts_with("fn ")
-            || line.starts_with("struct ")
-            || line.starts_with("enum ")
-            || line.starts_with("trait "))
-            && !line.starts_with("fn main(");
-        if promote {
-            out.push_str("pub ");
-        }
-        out.push_str(line);
-        out.push('\n');
-    }
-    out
+    mikasa_parser::promote_top_level_pub(&mikasa_parser::transpile_source(source))
 }
 
 /// Copy a sibling `app.bundle` and every asset it references into `out_root`,

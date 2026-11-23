@@ -1,0 +1,17 @@
+[package]
+name = "mika-import"
+version = "0.1.0"
+edition = "2021"
+description = "Proc-macro `mika_import!(\"file.mika\")` — transpile Mikasa into the enclosing Rust crate at compile time."
+license = "MIT OR Apache-2.0"
+
+[lib]
+proc-macro = true
+name = "mika_import"
+
+[dependencies]
+mikasa-syntax = { path = "../mikasa-syntax" }
+mikasa-parser = { path = "../mikasa-parser" }
+syn = { version = "2", features = ["full"] }
+quote = "1"
+proc-macro2 = "1"

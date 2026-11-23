@@ -366,7 +366,8 @@ impl Interpreter {
     }
 
     /// Marshals args into the wasm ABI, calls the export, and lifts the result
-    /// back to a [`Value`]. Prototype: `i64`/`bool` scalars only.
+    /// back to a [`Value`]. Scalars: `i64` / `bool` / `f64` (and `i32`/`f32`
+    /// at the wasm boundary).
     fn call_wasm(
         &mut self,
         rt: &Rc<RefCell<crate::wasm::WasmRuntime>>,
@@ -374,17 +375,19 @@ impl Interpreter {
         args: Vec<Value>,
         span: mikasa_syntax::ast::Span,
     ) -> Result<Value, RuntimeError> {
-        let mut ints = Vec::with_capacity(args.len());
+        use crate::wasm::{WasmArg, WasmRet};
+        let mut wa = Vec::with_capacity(args.len());
         for a in &args {
             match a {
-                Value::Int(n) => ints.push(*n),
-                Value::Bool(b) => ints.push(*b as i64),
+                Value::Int(n) => wa.push(WasmArg::Int(*n)),
+                Value::Bool(b) => wa.push(WasmArg::Bool(*b)),
+                Value::Float(f) => wa.push(WasmArg::Float(*f)),
                 other => {
                     return Err(RuntimeError::new(
                         format!(
-                        "wasm call `{name}`: only i64/bool args supported in the prototype, got {}",
-                        other.type_name()
-                    ),
+                            "wasm call `{name}`: only i64/bool/f64 args supported, got {}",
+                            other.type_name()
+                        ),
                         span,
                     ))
                 }
@@ -392,9 +395,13 @@ impl Interpreter {
         }
         let r = rt
             .borrow_mut()
-            .call_i64(name, &ints)
+            .call(name, &wa)
             .map_err(|e| RuntimeError::new(e, span))?;
-        Ok(Value::Int(r))
+        Ok(match r {
+            WasmRet::Unit => Value::Unit,
+            WasmRet::Int(n) => Value::Int(n),
+            WasmRet::Float(f) => Value::Float(f),
+        })
     }
 
     fn call_user(

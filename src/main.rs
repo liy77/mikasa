@@ -109,10 +109,10 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
             ])
         )
         .subcommand(ClapCommand::new("init")
-            .about("Scaffold a new Mikasa project (properties.kson, main.mika, .gitignore)")
+            .about("Scaffold a new Mikasa project (properties.kson, main.mika, .gitignore) — no cargo needed")
         )
         .subcommand(ClapCommand::new("install")
-            .about("Install dependencies. With no NAME, resolves + downloads every dependency in properties.kson and writes properties.lock. With a NAME, adds/pins that one.")
+            .about("Install dependencies into properties.kson / properties.lock (crates.io over HTTPS). No cargo required; optional cargo fetch when available.")
             .arg(Arg::new("package")
                 .help("Crate to install, optionally pinned: name or name@version. Omit to install everything in properties.kson.")
                 .value_name("NAME[@VERSION]")
@@ -200,7 +200,8 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
         // `cforge check <file.crs>` — real Rust verification (borrow + Miri),
         // with auto-provisioned toolchain (~/.alloy/rustup).
         .subcommand(ClapCommand::new("update")
-            .about("Download the latest cforge nightly from GitHub and replace this install")
+            .visible_alias("upgrade")
+            .about("Download the latest Mikasa nightly from GitHub and replace this install (no cargo needed)")
         )
         .subcommand(ClapCommand::new("check")
             .about("Check a .mika with real Rust (borrow checker + Miri), provisioning the toolchain automatically")
@@ -248,14 +249,14 @@ fn run_vm(sub: &str, file: &str) -> i32 {
         // Compile each imported `.rs` to wasm and embed it in the `.loy`.
         let mut modules = resolved.wasm_modules.clone();
         for imp in &resolved.rs_imports {
-            match astra_vm::wasm::compile_rs_to_wasm(&imp.rs_path) {
+            match astra_vm::wasm::compile_rs_to_wasm_named(&imp.rs_path, &imp.names) {
                 Ok(bytes) => modules.push(astra_vm::bytecode::WasmModule {
                     names: imp.names.clone(),
                     bytes,
                 }),
                 Err(e) => {
                     eprintln!(
-                        "cforge vm build: could not compile {} to wasm: {e}",
+                        "mikasa vm build: could not compile {} to wasm: {e}",
                         imp.rs_path.display()
                     );
                     return 1;
@@ -301,23 +302,22 @@ fn run_vm(sub: &str, file: &str) -> i32 {
             }
         }
         for imp in &resolved.rs_imports {
-            let rt = match astra_vm::wasm::WasmRuntime::from_rs(&imp.rs_path) {
-                Ok(rt) => rt,
-                Err(e) => {
-                    eprintln!(
-                        "cforge vm: could not run {} via wasm ({e}). \
-                         Use the native transpile: cforge run {file}",
-                        imp.rs_path.display()
-                    );
-                    return 1;
-                }
-            };
-            // Plain `pub fn` (no `#[no_mangle] pub extern "C"`) isn't a wasm
-            // export yet → point at the native transpile.
+            let rt =
+                match astra_vm::wasm::WasmRuntime::from_rs_named(&imp.rs_path, &imp.names) {
+                    Ok(rt) => rt,
+                    Err(e) => {
+                        eprintln!(
+                            "mikasa vm: could not run {} via wasm ({e}). \
+                             Use the native transpile: mikasa run {file}",
+                            imp.rs_path.display()
+                        );
+                        return 1;
+                    }
+                };
             if let Some(missing) = imp.names.iter().find(|n| !rt.exports(n)) {
                 eprintln!(
-                    "cforge vm: `{missing}` from {} isn't a wasm export \
-                     (needs `#[no_mangle] pub extern \"C\"`). Use: cforge run {file}",
+                    "mikasa vm: `{missing}` from {} isn't exported after wrap. \
+                     Use: mikasa run {file}",
                     imp.rs_path.display()
                 );
                 return 1;
@@ -604,20 +604,31 @@ fn parse_commands() -> ParsedCommands {
 
 #[tokio::main]
 async fn main() {
-    // Project-management subcommands run before the toolchain checks below:
-    // `init` only writes files, and `install` only talks to crates.io —
-    // neither needs cargo/rustc present.
-    match BASE_CMD.clone().get_matches().subcommand() {
+    let matches = BASE_CMD.clone().get_matches();
+
+    // `-v` / `--version` never needs cargo.
+    if matches.get_flag("version") {
+        println!(
+            "mikasa v{} (build {}, commit {})",
+            CFORGE_VERSION, BUILD_DATE, GIT_HASH
+        );
+        println!(
+            "Mikasa v{} (build {}, commit {})",
+            COPPER_VERSION, BUILD_DATE, GIT_HASH
+        );
+        return;
+    }
+
+    // Cargo-free commands — project mgmt, self-update, format, Astra VM.
+    // These must work with only the mikasa binary on PATH (no rustc/cargo).
+    match matches.subcommand() {
         Some(("init", _)) => {
             cforge::commands::init();
             return;
         }
         Some(("install", install_matches)) => {
             match install_matches.get_one::<String>("package") {
-                // `cforge install <name>` — add/pin a single dependency.
                 Some(package) => cforge::commands::install(package).await,
-                // `cforge install` — resolve + download everything in
-                // properties.kson and write properties.lock.
                 None => cforge::commands::install_all().await,
             }
             return;
@@ -642,7 +653,6 @@ async fn main() {
             cforge::cache::handle_cache_command(action, Some("./dist"));
             return;
         }
-        // `cforge format` only rewrites source text — no toolchain needed.
         Some(("format", fmt_matches)) => {
             let paths: Vec<String> = fmt_matches
                 .get_many::<String>("input")
@@ -652,12 +662,11 @@ async fn main() {
             let to_stdout = fmt_matches.get_flag("stdout");
             std::process::exit(cforge::mui_fmt::format_command(&paths, check, to_stdout));
         }
-        // `cforge vm run/build` (alias `virtual`) — Alloy interpreter, no toolchain.
         Some(("vm", vm_matches)) => {
             let (sub, sm) = match vm_matches.subcommand() {
                 Some(pair) => pair,
                 None => {
-                    eprintln!("usage: cforge vm <run|build> <file.mika>");
+                    eprintln!("usage: mikasa vm <run|build> <file.mika>");
                     std::process::exit(1);
                 }
             };
@@ -667,16 +676,31 @@ async fn main() {
                 .unwrap_or("");
             std::process::exit(run_vm(sub, file));
         }
+        // `mikasa run <file>` without cargo → Astra interpreter (same as `vm run`).
+        Some(("run", run_matches)) if !is_command_available("cargo") => {
+            let file = run_matches
+                .get_one::<String>("input")
+                .map(String::as_str)
+                .unwrap_or("main.mika");
+            eprintln!(
+                "ℹ️  cargo not on PATH — running via Astra (`mikasa vm run`). \
+                 Install Rust only if you need a native transpile."
+            );
+            std::process::exit(run_vm("run", file));
+        }
         _ => {}
     }
 
     if !is_command_available("cargo") {
-        println!("🦀 Cargo is not installed. Please install it to continue.");
+        println!("🦀 Cargo is not installed — needed for transpile/build/check.");
+        println!("   Cargo-free commands: mikasa init | install | upgrade | vm run | format");
+        println!("   Install Rust from https://rustup.rs/ when you want native builds.");
         return;
     }
 
     if !is_command_available("rustc") {
-        println!("🦀 Rust is not installed. Please install it to continue.");
+        println!("🦀 rustc is not installed — needed for transpile/build/check.");
+        println!("   Install Rust from https://rustup.rs/");
         return;
     }
 

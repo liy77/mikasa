@@ -5,41 +5,42 @@
 <h1 align="center">Astra</h1>
 
 <p align="center">
-  <em>Mikasa's fast-iteration VM — a tree-walking interpreter.</em>
+  <em>VM de iteração rápida do Mikasa — interpreter tree-walking.</em>
 </p>
 
-> **Alloy is now Astra.** The interpreter was renamed along with the language
-> (Copper → Mikasa). The binary is still `alloy`.
+> **Alloy → Astra** (branding). O binário da VM é **`astra`**. O nome de crate
+> `astra-vm` e o magic `ALLOYBC` do artefato ficam como estão.
+>
+> Backlog: [`docs/TODO-astra.md`](../../docs/TODO-astra.md)
 
 ---
 
-## What it is
+## O que é
 
-**Astra** is the [Mikasa](../../README.md) interpreter: a separate binary
-(`alloy`) that **executes `.mika` directly**, without transpiling to Rust or
-invoking `cargo`. It walks the same AST that the production transpiler (`cforge`)
-uses — so what runs in Astra is the same Mikasa that compiles natively.
+**Astra** executa `.mika` **na hora**, sem transpile e sem `cargo`. Usa a mesma
+AST do `mikasa-syntax` que o transpiler (`mikasa` / `cforge`) — o que roda aqui
+é o mesmo Mikasa que vira Rust nativo.
 
-Two targets, one language:
-
-| Tool | Path | Purpose |
+| Ferramenta | Caminho | Uso |
 | --- | --- | --- |
-| `cforge` | `.mika` → Rust → `cargo build` | native release build |
-| **`alloy`** | `.mika` → AST → interpretation | fast iteration, scripting, REPL |
+| `mikasa` / `cforge` | `.mika` → Rust → `cargo build` | release nativo |
+| **`astra`** | `.mika` → AST → interpret | script, playground, CI leve |
+| `mikasa vm run` | mesmo interpreter | via CLI Mikasa |
 
-Rust compatibility is the central invariant: **the same `.mika` produces the
-same behaviour** on both paths.
-
-## Usage
+## Comandos
 
 ```sh
-alloy run program.mika
+astra run program.mika          # interpreta
+astra build program.mika -o out.ast   # artefato portável (.ast / .loy)
+astra run out.ast               # roda artefato (magic ALLOYBC)
+astra check program.mika        # rustc + Miri (via mikasa/cforge)
+mikasa vm run program.mika      # mesmo engine
 ```
 
-Example (`examples/mikasa/alloy-hello.mika`):
+Exemplo:
 
-```rust
-func int sum_to(n: int) {
+```mika
+func sum_to(n: int) -> int {
     mut total = 0
     for i in 1..n {
         total += i
@@ -49,78 +50,66 @@ func int sum_to(n: int) {
 
 func main() {
     println("Astra VM")
-    mut s = sum_to(5)
-    println("sum 1..5 = ${s}")
+    println("sum 1..5 = ${sum_to(5)}")
 }
 ```
 
 ```sh
-$ alloy run examples/mikasa/alloy-hello.mika
+$ astra run examples/mikasa/alloy-hello.mika
 Astra VM
 sum 1..5 = 10
 ```
 
-## Supported today
+## Suporte hoje
 
-All 19 `examples/mikasa/*.mika` run under `alloy run`.
+- Literais, interpolação `"${…}"`, `println` / `print`
+- Controle de fluxo, funções, structs/classes/`impl`, enums, `match`, closures, tuples
+- Checagem de tipo de retorno no interpreter
+- Stdlib (`mika`/`cstd`, `fs`, `time`, `json`, `http`, …)
+- Imports locais `.mika` (merge) e **`import("arquivo.mika")`**
+- **`.rs` via wasm** (`wasmi`, cache `~/.alloy/cache`): `i64` / `i32` / `bool` / `f64`;
+  `pub fn` idiomático é auto-wrapped (não precisa `extern "C"`)
+- Artefato `.ast`/`.loy` com wasm embutido (`astra build`)
 
-- Scalar literals (`int`, `float`, `bool`, `str`) and `"${expr}"` interpolation;
-  `println!`/`print!` with `{}`/`{:?}` format args.
-- Binary/unary, ternary, assignment (`=`, `+=`, …), `++`/`--`.
-- Control flow: `if`/`else`, `while`, `loop`, `for x in a..b`, `break`/`continue`.
-- User functions, recursion, **return-type checking** (`func int f()` returning a
-  non-int errors); `func name()` with no return type = void.
-- **Structs / classes / `impl` / methods** + method chains, **enums**,
-  `Some/None/Ok/Err`, **`match` / `if let` / `while let`**, **closures**
-  (`.map`/`.filter`), **tuples** (literals, `.0`, nested destructuring), arrays +
-  indexing, `?` try, `as` cast, `unsafe` blocks.
-- ~30 built-in methods (`.len()`, `.iter().sum()`, `.unwrap()`, `.chars()`,
-  `.to_uppercase()`, `.parse()`, …).
-- **Stdlib** via `import`: `cstd` is **interpreted from `std/cstd.mika`** (the
-  single source shared with cforge — merged in by the loader, run via native
-  `std::` intrinsics; only `run`/`list_dir`/`append_file`/`rand_int` stay
-  native). `fs`, `time`, `url`, `net`, `ws` are pure Rust; `json`, `crypto`,
-  `http` use serde_json / sha2 / hmac / ureq.
-- Local `.mika` imports merged (and bundled into `.loy`). **`.rs` imports run via
-  embedded WebAssembly** — `rustc` compiles the `.rs` to wasm once (cached under
-  `~/.alloy/cache`), `wasmi` runs it, the interpreter calls its exports. Mikasa
-  stays interpreted; only the Rust leaves cross into wasm. Prototype: scalar
-  `i64`/`bool` with `#[no_mangle] pub extern "C"` exports (richer types coming);
-  non-exported `.rs` falls back to `cforge`. See the
-  [wasm-interop spec](../../docs/superpowers/specs/2026-06-22-alloy-wasm-interop-design.md).
-- `alloy build` → portable **`.loy`** artifact; `alloy check` → Miri/rustc verify.
+Aritmética **checked** (overflow / div-by-zero → `RuntimeError`). Sem borrow-check
+estático — use `mikasa` ou `astra check`.
 
-Integer arithmetic is **checked** (overflow and division/remainder by zero become
-runtime errors, never a panic). The interpreter does **not** do static
-borrow/ownership checking — that's `cforge` (rustc) or `alloy check` (Miri).
-
-## Roadmap
-
-See the full design in
-[`docs/superpowers/specs/2026-06-22-astra-vm-design.md`](../../docs/superpowers/specs/2026-06-22-astra-vm-design.md):
-
-1. ✅ Tree-walking core (expr, vars, control flow, functions, `println`).
-2. ✅ Composite types: struct/class/enum/impl/match/closures + tuples.
-3. ✅ Stdlib via `import` (registered natively) + return-type checking.
-4. ✅ `.loy` portable artifact (`alloy build`) + `alloy check` (Miri).
-5. Generics + traits (currently type-erased / lenient), `alloy repl`.
-6. *(future)* bytecode backend and/or Cranelift JIT as an optimisation.
-
-## Architecture
+## Layout
 
 ```
-crates/mikasa-syntax::program  (Program AST — parsed bodies)
-            │
-            ▼
-crates/astra-vm                bin: alloy
-(tree-walking interpreter)     (run / build / repl / check)
+crates/astra-vm/
+├── src/
+│   ├── lib.rs          re-exports
+│   ├── interp.rs       Interpreter
+│   ├── value.rs / env.rs / error.rs
+│   ├── loader.rs       imports (.mika / .rs / import("…"))
+│   ├── wasm.rs         Rust → wasm32 + wasmi
+│   ├── bytecode.rs     .ast / .loy
+│   ├── stdlib*.rs      nativos
+│   └── bin/astra.rs    CLI
+└── README.md           este arquivo
 ```
 
-- `value.rs` — runtime values (`Value`).
-- `env.rs` — chained scopes (`Env`).
-- `error.rs` — `RuntimeError` + control flow.
-- `interp.rs` — the interpreter (`Interpreter`).
-- `src/bin/alloy.rs` — the CLI.
+GUI nativa (playground): [`astra-gui/`](../../astra-gui/) — UI/backend em Mikasa,
+host mocida fino em Rust.
 
-The crate is **isolated**: `cforge` and the `mui-*` crates do not depend on it,
-so cross-platform CI is unaffected.
+## Roadmap (resumo)
+
+1. ✅ Core tree-walk + tipos compostos + stdlib + return-check  
+2. ✅ Artefato portável + `check` (Miri)  
+3. ✅ Wasm escalar + wrap de `pub fn` + `import("…")`  
+4. Wasm rica (strings / `Vec`) · short-circuit `&&`/`||` · `astra repl`  
+5. (futuro) bytecode / Cranelift JIT  
+
+Lista completa: [`docs/TODO-astra.md`](../../docs/TODO-astra.md).
+Spec: [`docs/superpowers/specs/2026-06-22-astra-vm-design.md`](../../docs/superpowers/specs/2026-06-22-astra-vm-design.md).
+
+## Build
+
+```sh
+cargo build -p astra-vm --bin astra
+# → target/debug/astra
+```
+
+A crate é isolada: `cforge` / `mui-*` não dependem dela no grafo principal de
+forma que quebre CI cross-platform.

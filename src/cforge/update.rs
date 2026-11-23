@@ -1,8 +1,5 @@
-//! `cforge update` — replace this install with the latest GitHub release.
-//!
-//! Looks at `liy77/copper-lang` releases whose tag starts with `nightly`
-//! (a stable release is used when no nightly exists). Downloads the asset
-//! whose name matches this OS and swaps it over the running binary.
+//! `mikasa update` / `mikasa upgrade` — replace this install with the latest
+//! GitHub release. Uses curl only — no cargo/rustc required.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -16,7 +13,7 @@ pub fn run() -> i32 {
         env!("COPPER_BUILD_DATE"),
         env!("GIT_COMMIT_HASH")
     );
-    println!("cforge {current}");
+    println!("mikasa {current}");
     println!("checking https://github.com/{REPO}/releases …");
 
     let body = match curl_get(&format!(
@@ -29,7 +26,7 @@ pub fn run() -> i32 {
         }
     };
     let Some((tag, url)) = pick_release(&body) else {
-        eprintln!("no cforge release for this platform yet.");
+        eprintln!("no Mikasa release for this platform yet.");
         eprintln!("looked for an asset named with {}", platform_key());
         return 1;
     };
@@ -53,9 +50,51 @@ pub fn run() -> i32 {
         eprintln!("could not replace {}: {e}", exe.display());
         return 1;
     }
+    // Keep `mikasa` and legacy `cforge` names in sync in the same bin dir.
+    sync_twin_names(&exe);
     println!("updated {}", exe.display());
-    println!("open a new terminal and run `cforge -v`");
+    println!("open a new terminal and run `mikasa -v`");
     0
+}
+
+/// After replacing `mikasa` (or legacy `cforge`), mirror the other name so
+/// both commands stay on PATH without a second download.
+fn sync_twin_names(exe: &Path) {
+    let stem = exe
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let twin_name = if stem == "mikasa" {
+        if cfg!(windows) {
+            "cforge.exe"
+        } else {
+            "cforge"
+        }
+    } else if stem == "cforge" {
+        if cfg!(windows) {
+            "mikasa.exe"
+        } else {
+            "mikasa"
+        }
+    } else {
+        return;
+    };
+    let twin = exe.with_file_name(twin_name);
+    if twin == exe {
+        return;
+    }
+    match std::fs::copy(exe, &twin) {
+        Ok(_) => {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(&twin, std::fs::Permissions::from_mode(0o755));
+            }
+            println!("also updated {}", twin.display());
+        }
+        Err(e) => eprintln!("note: could not sync {}: {e}", twin.display()),
+    }
 }
 
 fn platform_key() -> &'static str {
@@ -135,7 +174,14 @@ fn next_string(after_key: &str) -> Option<String> {
 
 fn curl_get(url: &str) -> Result<String, String> {
     let out = Command::new("curl")
-        .args(["-fsSL", "-H", "User-Agent: cforge-update", "-H", "Accept: application/vnd.github+json", url])
+        .args([
+            "-fsSL",
+            "-H",
+            "User-Agent: mikasa-update",
+            "-H",
+            "Accept: application/vnd.github+json",
+            url,
+        ])
         .output()
         .map_err(|e| e.to_string())?;
     if !out.status.success() {
@@ -153,7 +199,7 @@ fn curl_download(url: &str, dest: &Path) -> Result<(), String> {
             "-fL",
             "--no-cache",
             "-H",
-            "User-Agent: cforge-update",
+            "User-Agent: mikasa-update",
             "-H",
             "Accept: application/octet-stream",
             "-o",

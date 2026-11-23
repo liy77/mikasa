@@ -21,7 +21,7 @@ description = "Astra — GUI + dual-mode binary (playground, file runner, update
 
 # The shipped binary is named `alloy` (the dual-mode GUI/CLI executable).
 [[bin]]
-name = "astra"
+name = "alloy"
 path = "src/main.rs"
 
 [dependencies]

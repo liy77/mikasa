@@ -21,28 +21,13 @@ dependencies = [
 name = "alloy-gui"
 version = "0.1.0"
 dependencies = [
- "alloy-vm",
- "copper-syntax",
+ "astra-vm",
+ "mikasa-syntax",
  "mocida",
  "mui-runtime",
  "mui-syntax",
  "rfd",
  "winresource",
-]
-
-[[package]]
-name = "alloy-vm"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "clap",
- "copper-syntax",
- "hmac",
- "serde",
- "serde_json",
- "sha2",
- "ureq",
- "wasmi",
 ]
 
 [[package]]
@@ -111,6 +96,21 @@ dependencies = [
  "serde_repr",
  "url",
  "zbus",
+]
+
+[[package]]
+name = "astra-vm"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "clap",
+ "hmac",
+ "mikasa-syntax",
+ "serde",
+ "serde_json",
+ "sha2",
+ "ureq",
+ "wasmi",
 ]
 
 [[package]]
@@ -454,9 +454,7 @@ dependencies = [
 name = "copper-syntax"
 version = "0.0.1-pre-alpha"
 dependencies = [
- "once_cell",
- "regex",
- "serde",
+ "mikasa-syntax",
 ]
 
 [[package]]
@@ -997,6 +995,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "mikasa-syntax"
+version = "0.0.1-pre-alpha"
+dependencies = [
+ "once_cell",
+ "regex",
+ "serde",
+]
+
+[[package]]
 name = "minimal-lexical"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1039,7 +1046,7 @@ dependencies = [
 name = "mui-syntax"
 version = "0.0.1-pre-alpha"
 dependencies = [
- "copper-syntax",
+ "mikasa-syntax",
 ]
 
 [[package]]

@@ -165,9 +165,21 @@ def copy_payload(exe, install_dir, lson_bin=None):
         os.chmod(dst_exe, 0o755)
     ok(f"Installed {exe.name}")
 
+    # Legacy alias: keep `cforge` on PATH pointing at the same mikasa binary
+    # so old scripts/docs keep working. Windows gets a copy; Unix a relative symlink.
+    cforge_name = "cforge.exe" if SYS == "Windows" else "cforge"
+    dst_cforge = bin_dir / cforge_name
+    if dst_cforge.exists() or dst_cforge.is_symlink():
+        dst_cforge.unlink()
+    if SYS == "Windows":
+        shutil.copy2(dst_exe, dst_cforge)
+    else:
+        os.symlink(exe.name, dst_cforge)
+    ok(f"Installed {cforge_name} → {exe.name}")
+
     # Astra — the Mikasa interpreter (binary `alloy`, crate alloy-vm). It is a
     # workspace member, so the release build above produced it for free. Ship it
-    # in bin/ next to cforge so it lands on PATH via %COPPER_PATH%\bin.
+    # in bin/ next to mikasa so it lands on PATH via %COPPER_PATH%\bin.
     alloy_name = "alloy.exe" if SYS == "Windows" else "alloy"
     src_alloy = exe.parent / alloy_name
     if src_alloy.exists():

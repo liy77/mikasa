@@ -2093,7 +2093,7 @@ impl Parser {
         if p.is_empty() {
             return p;
         }
-        for ext in [".crs", ".crm", ".rs", ".mui"] {
+        for ext in [".mika", ".crs", ".crm", ".rs", ".mui"] {
             if let Some(stripped) = p.strip_suffix(ext) {
                 p = stripped.to_string();
                 break;

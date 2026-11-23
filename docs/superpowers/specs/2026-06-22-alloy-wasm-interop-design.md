@@ -73,10 +73,10 @@ and deleting the `.rs`: the `.loy` still runs the Rust.
 
 | Phase | Types | Mechanism |
 | --- | --- | --- |
-| **Prototype (done)** | `i64` / `bool` scalars | direct wasm `i64` params/results; the `.rs` exports `#[no_mangle] pub extern "C"`. Plain `pub fn` (no export) → graceful fallback to cforge. |
-| Next | `f64`, strings, `Vec`, slices | guest memory + an alloc/free ABI (pass ptr+len); host reads/writes linear memory. Requires `wasm32-wasip1` + `wasmi`'s WASI for I/O. |
+| **Prototype (done)** | `i64` / `i32` / `bool` / `f64` scalars | direct wasm params/results; the `.rs` may export `#[no_mangle] pub extern "C"` **or** ordinary `pub fn` (Astra auto-generates an export wrapper). |
+| Next | strings, `Vec`, slices | guest memory + an alloc/free ABI (pass ptr+len); host reads/writes linear memory. Requires `wasm32-wasip1` + `wasmi`'s WASI for I/O. |
 | Later | structs, `Option`/`Result`, traits | the WebAssembly **Component Model** + `wit-bindgen`, or a generated glue crate. |
-| Ergonomics | plain `pub fn` (no `extern "C"`) | auto-generate an export-wrapper crate from the imported signatures so users write idiomatic Rust. |
+| Ergonomics (done) | plain `pub fn` (no `extern "C"`) | auto-generate an export-wrapper cdylib from the imported signatures so users write idiomatic Rust. |
 
 ## Current implementation (prototype)
 

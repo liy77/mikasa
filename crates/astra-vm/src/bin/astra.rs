@@ -125,25 +125,23 @@ fn run(file: &Path) -> ExitCode {
         }
     }
 
-    // `.rs` imports — compile to wasm (cached) and instantiate.
+    // `.rs` imports — compile to wasm (cached; plain `pub fn` auto-wrapped)
+    // and instantiate.
     for imp in &resolved.rs_imports {
-        let rt = match astra_vm::wasm::WasmRuntime::from_rs(&imp.rs_path) {
+        let rt = match astra_vm::wasm::WasmRuntime::from_rs_named(&imp.rs_path, &imp.names) {
             Ok(rt) => rt,
             Err(e) => {
                 // Couldn't compile/run the Rust as wasm → fall back to cforge.
                 eprintln!(
-                    "alloy: could not run {} via wasm ({e}); delegating to cforge…",
+                    "astra: could not run {} via wasm ({e}); delegating to cforge…",
                     imp.rs_path.display()
                 );
                 return delegate_to_cforge(file);
             }
         };
-        // Every imported name must be a wasm export. Plain `pub fn` (no
-        // `#[no_mangle] pub extern \"C\"`) isn't exported — those `.rs` files
-        // need the richer ABI that isn't in the prototype yet, so delegate.
         if let Some(missing) = imp.names.iter().find(|n| !rt.exports(n)) {
             eprintln!(
-                "alloy: `{missing}` from {} isn't a wasm export (needs `#[no_mangle] pub extern \"C\"`); delegating to cforge…",
+                "astra: `{missing}` from {} isn't exported after wrap; delegating to cforge…",
                 imp.rs_path.display()
             );
             return delegate_to_cforge(file);
@@ -176,14 +174,14 @@ fn build(file: &Path, output: Option<&Path>) -> ExitCode {
     // artifact is self-contained (runs on any `alloy` without rustc).
     let mut modules = resolved.wasm_modules.clone();
     for imp in &resolved.rs_imports {
-        match astra_vm::wasm::compile_rs_to_wasm(&imp.rs_path) {
+        match astra_vm::wasm::compile_rs_to_wasm_named(&imp.rs_path, &imp.names) {
             Ok(bytes) => modules.push(astra_vm::bytecode::WasmModule {
                 names: imp.names.clone(),
                 bytes,
             }),
             Err(e) => {
                 eprintln!(
-                    "alloy build: could not compile {} to wasm: {e}",
+                    "astra build: could not compile {} to wasm: {e}",
                     imp.rs_path.display()
                 );
                 return ExitCode::FAILURE;

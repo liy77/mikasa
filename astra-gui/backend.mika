@@ -1,15 +1,45 @@
-// Astra GUI backend, written in Mikasa.
+// Astra GUI backend — 100% Mikasa.
 //
-// Pure logic: no imports. The host (src/main.rs) transpiles this file and
-// calls the functions; it does the IO (reading files, HTTP, running a
-// program) and asks this module to decide what the results mean.
+// Pure decisions: version compare, release JSON, run/update copy.
+// The thin Rust host (src/main.rs) does I/O and asks this module what it means.
 
-// The version this build reports. The host passes the real one in.
 func String current_version() {
     return "0.1.0"
 }
 
-// True when `latest` (vX.Y.Z) is strictly newer than `current`.
+func String default_source() {
+    return "func main() {\n    println(\"hello from Astra\")\n}\n"
+}
+
+func String ready_message() {
+    return "ready — write Mikasa and hit Run"
+}
+
+func String running_status() {
+    return "running…"
+}
+
+// Shown text after a run. `error` is "" when the run succeeded.
+func String format_run_output(output: &str, error: &str) {
+    if error.is_empty() {
+        if output.is_empty() {
+            return "(no output)"
+        }
+        return output.to_string()
+    }
+    if output.is_empty() {
+        return error.to_string()
+    }
+    return format!("{}{}", output, error)
+}
+
+func String format_run_status(failed: bool) {
+    if failed {
+        return "failed"
+    }
+    return "ran"
+}
+
 func bool is_newer(latest: &str, current: &str) {
     mut a = version_nums(latest)
     mut b = version_nums(current)
@@ -23,7 +53,6 @@ func bool is_newer(latest: &str, current: &str) {
     return false
 }
 
-// The first three numeric parts of a version tag. "v1.2.3-pre" -> [1, 2, 3].
 func Vec<i64> version_nums(v: &str) {
     mut clean = v.trim_start_matches('v')
     mut out = vec![0, 0, 0]
@@ -49,7 +78,6 @@ func Vec<i64> version_nums(v: &str) {
     return out
 }
 
-// The first `"field": "value"` string in `json`. "" when it is absent.
 func String json_string(text: &str, field: &str) {
     mut needle = format!("\"{}\"", field)
     mut at = text.find(&needle)
@@ -73,8 +101,6 @@ func String json_string(text: &str, field: &str) {
     return body[..end.unwrap()].to_string()
 }
 
-// The download URL for this operating system, from a GitHub release body.
-// `os_key` is "windows", "apple" or "linux".
 func String pick_asset(text: &str, os_key: &str) {
     mut needle = "\"browser_download_url\""
     mut from = 0
@@ -96,8 +122,7 @@ func String pick_asset(text: &str, os_key: &str) {
     return String::new()
 }
 
-// "current|latest|yes|asset" or "current|latest|no|asset". The host fetches
-// the release JSON and passes it here; this decides whether to update.
+// "current|latest|yes|asset" or "current|latest|no|asset"
 func String describe_update(release_json: &str, current: &str, os_key: &str) {
     mut latest = json_string(release_json, "tag_name")
     mut asset = pick_asset(release_json, os_key)
@@ -106,4 +131,24 @@ func String describe_update(release_json: &str, current: &str, os_key: &str) {
         available = "yes"
     }
     return format!("{}|{}|{}|{}", current, latest, available, asset)
+}
+
+func String update_checking() {
+    return "Checking GitHub for a newer build…"
+}
+
+func String update_applied(latest: &str) {
+    return format!("Updated to {} — restart Astra.", latest)
+}
+
+func String update_failed(err: &str) {
+    return format!("Update failed: {}", err)
+}
+
+func String update_current(latest: &str) {
+    return format!("Already up to date ({}).", latest)
+}
+
+func String update_blurb() {
+    return "Astra checks GitHub releases for a newer nightly build."
 }

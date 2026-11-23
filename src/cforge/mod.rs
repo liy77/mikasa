@@ -710,6 +710,19 @@ pub fn compile(
 
         let c = fs::read(&file).unwrap();
         let c = String::from_utf8(c).unwrap();
+        // `import("sibling.mika")` — splice the file in before tokenizing so
+        // the streaming emit pass never sees the call form.
+        let source_path_pre = path::PathBuf::from(&file);
+        let base_dir = source_path_pre
+            .parent()
+            .unwrap_or_else(|| path::Path::new("."));
+        let c = match mikasa_syntax::file_import::expand_file_imports(&c, base_dir) {
+            Ok(expanded) => expanded,
+            Err(e) => {
+                eprintln!("Error: {e}");
+                std::process::exit(1);
+            }
+        };
 
         let mut tokenizer = Tokenizer::new(c);
         let tokens = tokenizer.tokenize();

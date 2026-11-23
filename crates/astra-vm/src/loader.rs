@@ -1,12 +1,12 @@
-//! Import resolution for Alloy.
+//! Import resolution for Astra.
 //!
 //! - `import { f } from cstd|http|fs|...` → native stdlib (resolved at runtime).
-//! - `import { f } from mod` with a sibling `mod.crs` → the `.crs` is parsed and
-//!   its items are **merged** into the program (recursive, with cycle guard). This
-//!   is what lets multi-file projects run instantly, without rustc.
-//! - `import { f } from mod` with a sibling `mod.rs` → the interpreter **does not
-//!   run Rust**; signals [`LoadOutcome::NeedsCforge`] so the caller delegates to
-//!   `cforge` (transpile + native compile).
+//! - `import { f } from mod` with a sibling `mod.mika` / `mod.crs` → parsed and
+//!   **merged** into the program (recursive, with cycle guard).
+//! - `import { f } from mod` with a sibling `mod.rs` → collected as
+//!   [`RsImport`] for the wasm bridge (plain `pub fn` or `extern "C"`). The
+//!   legacy [`LoadOutcome::NeedsCforge`] path remains for callers that don't
+//!   collect Rust imports.
 
 use crate::bytecode;
 use mikasa_syntax::program::{parse_program, ImportKind, Item, Program};
@@ -151,7 +151,42 @@ fn collect(
         } = &item
         {
             // item imports with a simple module (not path/url, not "./x.rs")
-            let module = module.trim_matches('"');
+            let module = module.trim_matches('"').trim_matches('\'');
+
+            // `import("file.mika")` — merge that source file (dynamic file import).
+            if matches!(kind, ImportKind::File) {
+                let path = mikasa_syntax::file_import::resolve_import_path(base, module)?;
+                let canon = path.canonicalize().unwrap_or_else(|_| path.clone());
+                if visited.insert(canon) {
+                    let sub_src = std::fs::read_to_string(&path).map_err(|e| {
+                        format!(
+                            "import({module:?}): could not read {}: {e}",
+                            path.display()
+                        )
+                    })?;
+                    let sub = parse_program(&sub_src);
+                    if !sub.errors.is_empty() {
+                        return Err(format!(
+                            "errors in {}: {} syntax error(s)",
+                            path.display(),
+                            sub.errors.len()
+                        ));
+                    }
+                    let sub_base = path.parent().unwrap_or(base).to_path_buf();
+                    if let Some(rs) = collect(
+                        sub.items,
+                        &sub_base,
+                        out,
+                        visited,
+                        rs_imports.as_deref_mut(),
+                    )? {
+                        return Ok(Some(rs));
+                    }
+                }
+                // Don't keep the `import("…")` item — contents are already merged.
+                continue;
+            }
+
             if is_stdlib(module) {
                 // `cstd` is interpreted from its Copper source (single source of
                 // truth) — merge the imported functions so the interpreter runs
@@ -165,16 +200,34 @@ fn collect(
                 out.push(item);
                 continue;
             }
-            // `import ... from "./foo.rs"` ou `from foors` com foors.rs irmão.
+            // `import ... from "./foo.rs"` / `from foo` with sibling `foo.rs`.
             let rs_candidate = sibling(base, module, "rs");
             if let Some(rs) = &rs_candidate {
                 if rs.is_file() {
                     // In wasm mode, collect the Rust import (the caller compiles
-                    // it to wasm and runs it embedded). Otherwise signal cforge.
+                    // it to wasm — wrapping plain `pub fn` when needed).
                     match (rs_imports.as_deref_mut(), kind) {
                         (Some(acc), ImportKind::Items(names)) => {
                             acc.push(RsImport {
                                 names: names.clone(),
+                                rs_path: rs.clone(),
+                            });
+                            out.push(item);
+                            continue;
+                        }
+                        (Some(acc), ImportKind::Glob | ImportKind::Alias(_)) => {
+                            let names = crate::wasm::list_wrappable_fns(rs).map_err(|e| {
+                                format!("import * from {module}: {e}")
+                            })?;
+                            if names.is_empty() {
+                                return Err(format!(
+                                    "import * from {module}: no wrappable pub fn \
+                                     (scalars only: i64/i32/bool/f64) in {}",
+                                    rs.display()
+                                ));
+                            }
+                            acc.push(RsImport {
+                                names,
                                 rs_path: rs.clone(),
                             });
                             out.push(item);
@@ -242,7 +295,7 @@ fn collect(
 fn merge_cstd(kind: &ImportKind, out: &mut Vec<Item>) {
     let wanted: Option<&[String]> = match kind {
         ImportKind::Items(names) => Some(names),
-        ImportKind::Glob | ImportKind::Alias(_) => None, // None = take all eligible
+        ImportKind::Glob | ImportKind::Alias(_) | ImportKind::File => None, // None = take all eligible
     };
     let prog = parse_program(CSTD_SRC);
     for it in prog.items {

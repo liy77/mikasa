@@ -341,7 +341,7 @@ pub fn read_properties(file: &str) -> (bool, Value) {
         file = file.replace("properties.kson", "Cargo.toml");
         c = fs::read(&file);
         if c.is_err() {
-            println!("Error: Missing properties.kson. Run `cforge init` to create one.");
+            println!("Error: Missing properties.kson. Run `mikasa init` to create one.");
             exit(1);
         }
     }

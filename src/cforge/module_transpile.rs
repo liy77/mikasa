@@ -809,6 +809,12 @@ fn pre_fix_copper(rust: &str) -> String {
 }
 
 pub fn transpile(module: &str, src: &str) -> String {
+    // Expand `import("…")` when the caller didn't already (path-less: relative
+    // to CWD — prefer the path-aware entry points for real projects).
+    let expanded =
+        mikasa_syntax::file_import::expand_file_imports(src, std::path::Path::new("."))
+            .unwrap_or_else(|_| src.to_string());
+    let src = expanded.as_str();
     if matches!(module, "graph_view" | "scene_view" | "main") {
         return convert_crs_host_to_rust(src);
     }

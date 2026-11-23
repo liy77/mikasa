@@ -1,8 +1,12 @@
-// Mixing Rust + Copper. `import { fib } from math` resolves to the sibling
-// `math.rs`, which cforge links into the build.
+// Mixing Rust + Mikasa. `import { fib } from math` resolves to the sibling
+// `math.rs`. Astra compiles it to wasm (plain `pub fn` is auto-wrapped);
+// `mikasa run` also links it natively via the transpile path.
 //
-//   cforge run examples/rust-interop
+//   astra run examples/mikasa/rust-interop/main.mika
+//   mikasa vm run examples/mikasa/rust-interop/main.mika
 import { fib } from math
 
-n = 10
-println!("fib($n) = ${fib(n)}")
+func main() {
+    mut n = 10
+    println("fib(${n}) = ${fib(n)}")
+}

@@ -21,6 +21,7 @@
 pub mod ast;
 pub mod ext;
 pub mod expr;
+pub mod file_import;
 pub mod lexicon;
 pub mod program;
 pub mod tokenizer;

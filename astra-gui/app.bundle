@@ -3,7 +3,6 @@
   "id": "net.liy77.alloy",
   "assets": {
     "icon": "assets/astra-icon-mac.png",
-    "astra-logo.png": "../assets/astra-logo.png",
     "icons/play.png": "assets/icons/play.png",
     "icons/split.png": "assets/icons/split.png",
     "icons/code.png": "assets/icons/code.png",
