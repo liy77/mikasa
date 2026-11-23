@@ -26,6 +26,10 @@ use crate::tokenizer::tokens::Token;
 pub struct Program {
     pub items: Vec<Item>,
     pub errors: Vec<ProgramError>,
+    /// The source that was parsed, so a byte span can be mapped back to a
+    /// line. Empty for a program built by hand.
+    #[serde(default)]
+    pub source: String,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -160,6 +164,7 @@ pub fn parse_program(source: &str) -> Program {
     Program {
         items,
         errors: p.errors,
+        source: source.to_string(),
     }
 }
 

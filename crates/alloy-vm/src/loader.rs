@@ -85,6 +85,7 @@ pub fn resolve_runnable_wasm(path: &Path) -> Result<Resolved, String> {
         program: Program {
             items: merged,
             errors: Vec::new(),
+            source: src,
         },
         rs_imports,
         wasm_modules: Vec::new(),
@@ -131,6 +132,7 @@ pub fn resolve_source(src: &str, path: &Path) -> Result<LoadOutcome, String> {
     Ok(LoadOutcome::Program(Program {
         items: merged,
         errors: Vec::new(),
+        source: src.to_string(),
     }))
 }
 

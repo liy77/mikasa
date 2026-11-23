@@ -88,6 +88,7 @@ pub fn load(bytes: &[u8]) -> Result<(Program, Vec<WasmModule>), String> {
         Program {
             items,
             errors: Vec::new(),
+            source: String::new(),
         },
         wasm,
     ))

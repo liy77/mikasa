@@ -92,6 +92,24 @@ fn run(file: &Path) -> ExitCode {
 
     let mut interp = Interpreter::new();
 
+    // A sibling `<file>.breakpoints` (one 1-based line per row) pauses the
+    // run on those lines and prints each stop. This is the line-level
+    // breakpoint the interpreter grew; the editor drives the same API.
+    let bp_file = file.with_extension("breakpoints");
+    if let Ok(text) = std::fs::read_to_string(&bp_file) {
+        let lines: Vec<usize> = text
+            .lines()
+            .filter_map(|l| l.trim().parse().ok())
+            .collect();
+        if !lines.is_empty() {
+            interp.set_breakpoints(lines);
+            interp.on_break(std::rc::Rc::new(|info| {
+                eprintln!("breakpoint: line {}", info.line);
+                alloy_vm::interp::BreakAction::Continue
+            }));
+        }
+    }
+
     // Wasm already embedded in a `.loy` — no rustc needed.
     for m in &resolved.wasm_modules {
         if let Err(e) = interp.register_wasm_bytes(&m.names, &m.bytes) {

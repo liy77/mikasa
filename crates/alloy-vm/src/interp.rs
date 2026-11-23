@@ -57,6 +57,35 @@ pub struct Interpreter {
     /// first (Swift's reverse order). A scope pushes a frame on entry and
     /// drains it — running each body — on every exit path.
     defers: Vec<Vec<Block>>,
+    /// Source lines (1-based) where execution should pause. Empty unless a
+    /// debugger attached breakpoints.
+    breakpoints: std::collections::HashSet<usize>,
+    /// Called with the 1-based line when execution reaches a breakpoint,
+    /// before the statement runs. The hook decides whether to continue.
+    on_break: Option<BreakHook>,
+    /// The source being executed, so a byte span maps back to a line.
+    source: String,
+}
+
+/// What a debugger tells the interpreter to do when a breakpoint fires.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BreakAction {
+    /// Run on.
+    Continue,
+    /// Stop the program. Surfaces as a [`RuntimeError`].
+    Stop,
+}
+
+/// Receives the 1-based line and the source text of that line.
+pub type BreakHook = Rc<dyn Fn(BreakInfo) -> BreakAction>;
+
+/// Where execution paused.
+#[derive(Debug, Clone)]
+pub struct BreakInfo {
+    /// 1-based source line.
+    pub line: usize,
+    /// The text of that line, trimmed.
+    pub text: String,
 }
 
 impl Interpreter {
@@ -71,6 +100,56 @@ impl Interpreter {
             out: Sink::Buffer(buf),
             ..Self::default()
         }
+    }
+
+    /// Pause on these 1-based source lines. A line only pauses once per
+    /// statement that starts on it, so a breakpoint inside a loop fires on
+    /// every iteration.
+    pub fn set_breakpoints(&mut self, lines: impl IntoIterator<Item = usize>) {
+        self.breakpoints = lines.into_iter().collect();
+    }
+
+    /// Install the hook called when execution reaches a breakpoint. Without
+    /// one, a breakpoint is reported and execution continues.
+    pub fn on_break(&mut self, hook: BreakHook) {
+        self.on_break = Some(hook);
+    }
+
+    /// Stop before `stmt` if its line carries a breakpoint. A hook that
+    /// returns [`BreakAction::Stop`] aborts the run.
+    fn check_break(&self, span: copper_syntax::ast::Span) -> Result<(), RuntimeError> {
+        if self.breakpoints.is_empty() {
+            return Ok(());
+        }
+        let line = self.line_of(span);
+        if !self.breakpoints.contains(&line) {
+            return Ok(());
+        }
+        let action = match &self.on_break {
+            Some(hook) => hook(BreakInfo {
+                line,
+                text: String::new(),
+            }),
+            None => BreakAction::Continue,
+        };
+        match action {
+            BreakAction::Continue => Ok(()),
+            BreakAction::Stop => Err(RuntimeError::new(
+                format!("stopped at breakpoint on line {line}"),
+                span,
+            )),
+        }
+    }
+
+    /// 1-based line of a span. The parser records a span as
+    /// `(offset + token_length + 1, …)`, so `start` lands two bytes past the
+    /// token's first character. Count newlines up to the byte before that.
+    fn line_of(&self, span: copper_syntax::ast::Span) -> usize {
+        if self.source.is_empty() {
+            return 1;
+        }
+        let at = (span.start as usize).saturating_sub(2).min(self.source.len());
+        self.source[..=at].bytes().filter(|b| *b == b'\n').count() + 1
     }
 
     fn emit(&mut self, text: &str, newline: bool) {
@@ -246,6 +325,7 @@ impl Interpreter {
     }
 
     pub fn run_program(&mut self, prog: &Program) -> Result<Value, RuntimeError> {
+        self.source = prog.source.clone();
         self.load_program(prog);
         let globals = Env::new();
         self.globals = Some(Rc::clone(&globals));
@@ -1233,6 +1313,7 @@ impl Interpreter {
     }
 
     fn exec_stmt(&mut self, stmt: &Stmt, env: &Rc<RefCell<Env>>) -> Result<Outcome, RuntimeError> {
+        self.check_break(stmt.span())?;
         match stmt {
             Stmt::Let { name, value, .. } => {
                 let v = match value {
@@ -2169,6 +2250,35 @@ mod tests {
     }
 
     #[test]
+    fn breakpoint_fires_on_its_line_and_can_stop_the_run() {
+        let hits = Rc::new(RefCell::new(Vec::new()));
+        let seen = Rc::clone(&hits);
+        let mut interp = Interpreter::new();
+        interp.set_breakpoints([2]);
+        interp.on_break(Rc::new(move |info| {
+            seen.borrow_mut().push(info.line);
+            BreakAction::Stop
+        }));
+        let prog = parse_program("mut x = 1\nx = x + 1\nx = x + 1");
+        let err = interp.run_program(&prog).expect_err("breakpoint must stop");
+        assert!(err.message.contains("line 2"), "{}", err.message);
+        assert_eq!(hits.borrow().as_slice(), &[2]);
+    }
+
+    fn breakpoint_inside_a_loop_fires_each_iteration() {
+        let hits = Rc::new(RefCell::new(0));
+        let seen = Rc::clone(&hits);
+        let mut interp = Interpreter::new();
+        interp.set_breakpoints([3]);
+        interp.on_break(Rc::new(move |_| {
+            *seen.borrow_mut() += 1;
+            BreakAction::Continue
+        }));
+        let prog = parse_program("mut i = 0\nwhile i < 3 {\ni = i + 1\n}");
+        interp.run_program(&prog).expect("continues through breakpoints");
+        assert_eq!(*hits.borrow(), 3);
+    }
+
     fn with_output_captures_println_and_print() {
         let buf = Rc::new(RefCell::new(String::new()));
         let prog = parse_program("println(\"a\")\nprint(\"b\")");
