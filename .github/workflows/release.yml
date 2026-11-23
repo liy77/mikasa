@@ -1,104 +1,175 @@
 name: Release
 
+# Tag-driven release. Nightlies: tag `nightly-YYYY-MM-DD` (prerelease).
+# Stables: tag `v*` (full release).
 on:
   push:
     tags:
-      - 'v*'
-      - 'nightly*'
+      - "v*"
+      - "nightly*"
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-and-release:
-    name: Build and Release ${{ matrix.target }}
+  # ---------------------------------------------------------------------------
+  # Build every SDK binary on every platform. Upload as Actions artifacts so a
+  # single follow-up job can assemble the GitHub Release without the classic
+  # softprops matrix race (only one platform's assets surviving).
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_name: cforge
-            asset_name: cforge-linux-x86_64
+            suffix: linux-x86_64
+            exe_ext: ""
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact_name: cforge.exe
-            asset_name: cforge-windows-x86_64.exe
+            suffix: windows-x86_64
+            exe_ext: ".exe"
           - os: macos-latest
             target: x86_64-apple-darwin
-            artifact_name: cforge
-            asset_name: cforge-macos-x86_64
+            suffix: macos-x86_64
+            exe_ext: ""
           - os: macos-latest
             target: aarch64-apple-darwin
-            artifact_name: cforge
-            asset_name: cforge-macos-arm64
+            suffix: macos-arm64
+            exe_ext: ""
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        targets: ${{ matrix.target }}
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
 
-    - name: Cache cargo registry
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: release-${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: release-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            release-${{ matrix.target }}-
 
-    - name: Build release
-      run: cargo build --release --target ${{ matrix.target }}
+      - name: Build mikasa + astra + mikasa-lsp
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release --target "${{ matrix.target }}" -p mikasa --bin mikasa
+          cargo build --release --target "${{ matrix.target }}" -p astra-vm --bin astra
+          cargo build --release --target "${{ matrix.target }}" -p mikasa-lsp --bin mikasa-lsp
 
-    - name: Strip binary (Linux and macOS)
-      if: matrix.os != 'windows-latest'
-      run: strip target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+      - name: Stage named assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXT="${{ matrix.exe_ext }}"
+          SUF="${{ matrix.suffix }}"
+          TDIR="target/${{ matrix.target }}/release"
+          OUT="dist-assets"
+          mkdir -p "$OUT"
 
-    - name: Name the asset for this platform
-      shell: bash
-      run: cp "target/${{ matrix.target }}/release/${{ matrix.artifact_name }}" "${{ matrix.asset_name }}"
+          cp "$TDIR/mikasa${EXT}" "$OUT/mikasa-${SUF}${EXT}"
+          # Legacy twin name so `mikasa update` / old docs keep working.
+          cp "$TDIR/mikasa${EXT}" "$OUT/cforge-${SUF}${EXT}"
+          # Also ship the historical "apple-aarch64" spelling for arm64 macOS
+          # (previous nightlies used it; updater matches "apple"/"aarch64").
+          if [ "$SUF" = "macos-arm64" ]; then
+            cp "$TDIR/mikasa${EXT}" "$OUT/mikasa-apple-aarch64"
+            cp "$TDIR/mikasa${EXT}" "$OUT/cforge-apple-aarch64"
+            cp "$TDIR/astra${EXT}"  "$OUT/astra-apple-aarch64"
+            cp "$TDIR/mikasa-lsp${EXT}" "$OUT/mikasa-lsp-apple-aarch64"
+          fi
+          cp "$TDIR/astra${EXT}"       "$OUT/astra-${SUF}${EXT}"
+          cp "$TDIR/mikasa-lsp${EXT}"  "$OUT/mikasa-lsp-${SUF}${EXT}"
 
-    - name: Get version from tag
-      id: get_version
-      shell: bash
-      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          if [ "${{ matrix.os }}" != "windows-latest" ]; then
+            strip "$OUT"/* || true
+            chmod +x "$OUT"/*
+          fi
+          ls -la "$OUT"
 
-    - name: Create Release and Upload Asset
-      uses: softprops/action-gh-release@v2
-      with:
-        files: ${{ matrix.asset_name }}
-        name: CForge ${{ steps.get_version.outputs.VERSION }}
-        prerelease: ${{ startsWith(github.ref_name, 'nightly') }}
-        body: |
-          ## CForge ${{ steps.get_version.outputs.VERSION }}
-          
-          ### What's New
-          - CForge command-line tool (cforge) built from the Copper project
-          - Cross-platform support (Windows, Linux, macOS)
-          - Build tools and project utilities for Copper language
-          
-          ### Downloads
-          Choose the appropriate binary for your platform:
-          
-          - **Windows (64-bit)**: `cforge-windows-x86_64.exe`
-          - **Linux (64-bit)**: `cforge-linux-x86_64`
-          - **macOS (Intel)**: `cforge-macos-x86_64`
-          - **macOS (Apple Silicon)**: `cforge-macos-arm64`
-          
-          ### Installation
-          1. Download the binary for your platform
-          2. Make it executable (Linux/macOS): `chmod +x cforge-*`
-          3. Move to a directory in your PATH or run directly
-          
-          ### Usage
-          ```bash
-          # Run cforge
-          cforge --help
-          ```
-        draft: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload platform artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-${{ matrix.suffix }}
+          path: dist-assets/*
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Single job: download every platform's SDK, create/update the GitHub Release.
+  # ---------------------------------------------------------------------------
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all SDK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          pattern: sdk-*
+          merge-multiple: true
+
+      - name: List assets
+        run: ls -la release-assets
+
+      - name: Get version from tag
+        id: ver
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Create / update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.VERSION }}
+          name: Mikasa ${{ steps.ver.outputs.VERSION }}
+          prerelease: ${{ startsWith(github.ref_name, 'nightly') }}
+          draft: false
+          fail_on_unmatched_files: true
+          files: release-assets/*
+          body: |
+            ## Mikasa ${{ steps.ver.outputs.VERSION }}
+
+            Cross-platform SDK build from `${{ github.sha }}`.
+
+            ### What's included (per platform)
+            | Asset | Role |
+            | --- | --- |
+            | `mikasa-*` | Toolchain CLI (transpile / run / update / vm) |
+            | `cforge-*` | Legacy alias of `mikasa` (same binary) |
+            | `astra-*` | Astra interpreter (instant `.mika` run) |
+            | `mikasa-lsp-*` | Language server |
+
+            ### Platforms
+            - **Linux x86_64** — `*-linux-x86_64`
+            - **Windows x86_64** — `*-windows-x86_64.exe`
+            - **macOS Intel** — `*-macos-x86_64`
+            - **macOS Apple Silicon** — `*-macos-arm64` (also `*-apple-aarch64`)
+
+            ### Install
+            ```bash
+            # example: macOS Apple Silicon
+            curl -fsSL -o mikasa \
+              https://github.com/${{ github.repository }}/releases/download/${{ steps.ver.outputs.VERSION }}/mikasa-macos-arm64
+            chmod +x mikasa
+            ./mikasa -v
+            ```
+
+            Or, with an existing install: `mikasa update` / `mikasa upgrade`.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

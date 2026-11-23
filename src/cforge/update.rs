@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const REPO: &str = "liy77/copper-lang";
+const REPO: &str = "liy77/mikasa";
 
 pub fn run() -> i32 {
     let current = format!(
