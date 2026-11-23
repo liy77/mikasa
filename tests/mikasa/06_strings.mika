@@ -1,0 +1,11 @@
+import("harness.mika")
+
+func main() {
+    mut s = "Hello"
+    check_eq("len", s.len(), 5)
+    check_eq_str("upper", s.to_uppercase(), "HELLO")
+    check_eq_str("interp", "x=${1 + 1}", "x=2")
+    mut name = "mika"
+    check_eq_str("dollar", "hi $name", "hi mika")
+    summary()
+}

@@ -1,0 +1,5 @@
+import("nested_leaf.mika")
+
+func mid_value() -> int {
+    return leaf_value() + 3
+}

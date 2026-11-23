@@ -53,3 +53,4 @@
 | `import("arquivo.mika")` | include dinâmico de arquivo |
 | `mika_import!("arquivo.mika")` | crate `crates/mika-import` para hosts Rust |
 | Branding Mikasa (bin `mikasa`) | `cforge` permanece como alias/histórico |
+| Suite `tests/mikasa/` + `tests/run_all.py` | linguagem, stdlib, file import, rust wasm |

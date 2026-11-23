@@ -1,0 +1,55 @@
+import("harness.mika")
+
+func main() {
+    mut a = 0
+    if true {
+        a = 1
+    } else {
+        a = 2
+    }
+    check_eq("if true", a, 1)
+
+    mut b = 0
+    if false {
+        b = 1
+    } else {
+        b = 2
+    }
+    check_eq("if false", b, 2)
+
+    mut i = 0
+    mut sum = 0
+    while i < 5 {
+        sum = sum + i
+        i = i + 1
+    }
+    check_eq("while sum", sum, 10)
+
+    mut total = 0
+    for j in 1..5 {
+        total = total + j
+    }
+    check_eq("for range", total, 10)
+
+    mut k = 0
+    loop {
+        k = k + 1
+        if k >= 3 {
+            break
+        }
+    }
+    check_eq("loop break", k, 3)
+
+    mut skipped = 0
+    mut kept = 0
+    for n in 0..5 {
+        if n == 2 {
+            skipped = skipped + 1
+            continue
+        }
+        kept = kept + 1
+    }
+    check_eq("continue skipped", skipped, 1)
+    check_eq("continue kept", kept, 4)
+    summary()
+}

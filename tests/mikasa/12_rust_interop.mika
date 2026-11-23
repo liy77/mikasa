@@ -1,0 +1,10 @@
+// Rust module via wasm (plain pub fn auto-wrapped by Astra).
+import("harness.mika")
+import { fib } from "./fixtures/fib"
+
+func main() {
+    check_eq("fib(0)", fib(0), 0)
+    check_eq("fib(1)", fib(1), 1)
+    check_eq("fib(10)", fib(10), 55)
+    summary()
+}

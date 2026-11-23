@@ -1,0 +1,18 @@
+import("harness.mika")
+
+func main() {
+    check_eq("int add", 1 + 2, 3)
+    check_eq("int sub", 10 - 4, 6)
+    check_eq("int mul", 6 * 7, 42)
+    check_eq("int div", 20 / 4, 5)
+    check_eq("int rem", 10 % 3, 1)
+    check("true lit", true)
+    check("false lit", !false)
+    check_eq_str("str lit", "hi", "hi")
+    mut x = 5
+    x = x + 1
+    check_eq("assign", x, 6)
+    x += 2
+    check_eq("plus assign", x, 8)
+    summary()
+}

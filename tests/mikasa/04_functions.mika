@@ -1,0 +1,23 @@
+import("harness.mika")
+
+func double(n: int) -> int {
+    return n * 2
+}
+
+func add3(a: int, b: int, c: int) -> int {
+    return a + b + c
+}
+
+func fact(n: int) -> int {
+    if n <= 1 {
+        return 1
+    }
+    return n * fact(n - 1)
+}
+
+func main() {
+    check_eq("call", double(21), 42)
+    check_eq("multi arg", add3(1, 2, 3), 6)
+    check_eq("recurse", fact(5), 120)
+    summary()
+}

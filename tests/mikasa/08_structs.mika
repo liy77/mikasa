@@ -1,0 +1,15 @@
+import("harness.mika")
+
+struct Point {
+    x: int,
+    y: int,
+}
+
+func main() {
+    mut p = Point { x: 3, y: 4 }
+    check_eq("field x", p.x, 3)
+    check_eq("field y", p.y, 4)
+    p.x = 10
+    check_eq("field set", p.x, 10)
+    summary()
+}
