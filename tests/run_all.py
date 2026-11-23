@@ -6,7 +6,8 @@ Usage:
     python tests/run_all.py
     python tests/run_all.py --quick          # cargo lib tests only (no astra .mika)
     python tests/run_all.py --lang-only      # only tests/mikasa/*.mika
-    python tests/run_all.py --examples      # also run examples/mikasa/*.mika
+    python tests/run_all.py --examples       # also run examples/mikasa/*.mika
+    python tests/run_all.py --no-build       # reuse existing astra (newest mtime)
 
 Exit code 0 only if every selected step passes.
 """
@@ -27,75 +28,143 @@ from _pretty import banner, fail, info, ok, step, warn  # noqa: E402
 SUITE = ROOT / "tests" / "mikasa"
 EXAMPLES = ROOT / "examples" / "mikasa"
 
+# Prefer an isolated target dir (MCUDevDisk can corrupt incremental builds).
+DEFAULT_TARGET = Path(os.environ.get("CARGO_TARGET_DIR", "/tmp/copper-target"))
 
-def run(cmd: list[str], *, cwd: Path | None = None, env: dict | None = None) -> int:
+# astra stdout/stderr that mean the test failed even if exit code is weird.
+FAIL_MARKERS = (
+    "runtime error",
+    "function `",
+    "not defined",
+    "isn't a wasm export",
+    "delegating to cforge",
+    "Build failed",
+    "could not compile",
+    "sintaxe @",
+    "\nFAIL ",
+    "FAIL ",
+)
+
+
+def run(
+    cmd: list[str],
+    *,
+    cwd: Path | None = None,
+    env: dict | None = None,
+    capture: bool = False,
+) -> tuple[int, str]:
     print(f"  $ {' '.join(cmd)}")
-    return subprocess.run(cmd, cwd=str(cwd or ROOT), env=env).returncode
+    if capture:
+        p = subprocess.run(
+            cmd,
+            cwd=str(cwd or ROOT),
+            env=env,
+            text=True,
+            capture_output=True,
+        )
+        out = (p.stdout or "") + (p.stderr or "")
+        if out.strip():
+            sys.stdout.write(out)
+            if not out.endswith("\n"):
+                sys.stdout.write("\n")
+        return p.returncode, out
+    return subprocess.run(cmd, cwd=str(cwd or ROOT), env=env).returncode, ""
 
 
-def find_astra() -> Path | None:
-    env_bin = os.environ.get("ASTRA_BIN")
-    if env_bin:
-        p = Path(env_bin)
-        if p.is_file():
-            return p
-    candidates = [
-        ROOT / "target" / "debug" / "astra",
-        ROOT / "target" / "release" / "astra",
-        Path("/tmp/copper-target/debug/astra"),
-        Path("/tmp/copper-target/release/astra"),
-    ]
-    which = shutil.which("astra")
-    if which:
-        candidates.insert(0, Path(which))
-    for c in candidates:
-        if c.is_file() and os.access(c, os.X_OK):
-            return c
+def find_cargo() -> str | None:
+    cargo = shutil.which("cargo")
+    if cargo:
+        return cargo
+    home = Path.home()
+    for p in home.glob(".rustup/toolchains/*/bin/cargo"):
+        return str(p)
     return None
 
 
-def ensure_astra(build: bool) -> Path | None:
-    existing = find_astra()
-    if existing:
-        return existing
-    if not build:
-        return None
-    step("building astra")
-    cargo = shutil.which("cargo")
-    if not cargo:
-        # rustup toolchain path (CI / minimal PATH)
-        home = Path.home()
-        for p in home.glob(".rustup/toolchains/*/bin/cargo"):
-            cargo = str(p)
-            break
-    if not cargo:
-        fail("cargo not found — cannot build astra")
-        return None
+def cargo_env() -> dict:
     env = os.environ.copy()
-    env.setdefault("CARGO_TARGET_DIR", "/tmp/copper-target")
-    rc = run([cargo, "build", "-p", "astra-vm", "--bin", "astra", "-j", "2"], env=env)
-    if rc != 0:
-        fail("failed to build astra")
+    env["CARGO_TARGET_DIR"] = str(DEFAULT_TARGET)
+    cargo = find_cargo()
+    if cargo:
+        env["PATH"] = f"{Path(cargo).parent}:{env.get('PATH', '')}"
+    return env
+
+
+def astra_candidates() -> list[Path]:
+    """Newest usable astra first — never silently prefer a stale tree binary."""
+    env_bin = os.environ.get("ASTRA_BIN")
+    out: list[Path] = []
+    if env_bin:
+        out.append(Path(env_bin))
+    out.extend(
+        [
+            DEFAULT_TARGET / "debug" / "astra",
+            DEFAULT_TARGET / "release" / "astra",
+            ROOT / "target" / "debug" / "astra",
+            ROOT / "target" / "release" / "astra",
+        ]
+    )
+    which = shutil.which("astra")
+    if which:
+        out.append(Path(which))
+    # unique, existing, executable, sorted by mtime desc
+    seen: set[Path] = set()
+    existing: list[Path] = []
+    for c in out:
+        try:
+            c = c.resolve()
+        except OSError:
+            continue
+        if c in seen or not c.is_file() or not os.access(c, os.X_OK):
+            continue
+        seen.add(c)
+        existing.append(c)
+    existing.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return existing
+
+
+def ensure_astra(*, rebuild: bool) -> Path | None:
+    env = cargo_env()
+    built = DEFAULT_TARGET / "debug" / "astra"
+    if rebuild:
+        cargo = find_cargo()
+        if not cargo:
+            fail("cargo not found — cannot build astra")
+            return None
+        step(f"building fresh astra → {built}")
+        rc, _ = run(
+            [cargo, "build", "-p", "astra-vm", "--bin", "astra", "-j", "2"],
+            env=env,
+        )
+        if rc != 0:
+            fail("failed to build astra")
+            return None
+        if built.is_file():
+            info(f"using {built}")
+            return built
+
+    cands = astra_candidates()
+    if not cands:
         return None
-    return find_astra()
+    chosen = cands[0]
+    info(f"using astra {chosen} (mtime newest)")
+    if len(cands) > 1:
+        older = cands[1]
+        if older.stat().st_mtime < chosen.stat().st_mtime:
+            warn(
+                f"ignored older binary {older} — "
+                f"rebuild with default (omit --no-build) if tests look stale"
+            )
+    return chosen
 
 
 def cargo_tests() -> int:
     step("cargo test (mikasa-syntax, mikasa-parser, astra-vm, mika-import)")
-    cargo = shutil.which("cargo")
-    if not cargo:
-        home = Path.home()
-        for p in home.glob(".rustup/toolchains/*/bin/cargo"):
-            cargo = str(p)
-            break
+    cargo = find_cargo()
     if not cargo:
         fail("cargo not found")
         return 1
-    env = os.environ.copy()
-    env.setdefault("CARGO_TARGET_DIR", "/tmp/copper-target")
-    # Ensure PATH has rustc next to cargo
-    cargo_path = Path(cargo)
-    env["PATH"] = f"{cargo_path.parent}:{env.get('PATH', '')}"
+    env = cargo_env()
     pkgs = [
         ["-p", "mikasa-syntax"],
         ["-p", "mikasa-parser"],
@@ -104,18 +173,33 @@ def cargo_tests() -> int:
     ]
     failed = 0
     for args in pkgs:
-        rc = run([cargo, "test", *args, "--", "--test-threads=4"], env=env)
+        rc, _ = run([cargo, "test", *args, "--", "--test-threads=4"], env=env)
         if rc != 0:
             failed += 1
     return 1 if failed else 0
 
 
+def output_indicates_failure(text: str) -> str | None:
+    lower = text.lower()
+    for marker in FAIL_MARKERS:
+        if marker.lower() in lower:
+            return marker
+    # harness summary
+    if "failed --" in text and not text.strip().endswith("0 failed --"):
+        # e.g. "-- 3 passed, 2 failed --"
+        for line in text.splitlines():
+            if "passed" in line and "failed" in line and not line.strip().startswith("-- 0"):
+                if ", 0 failed" in line or "0 failed --" in line:
+                    continue
+                if "failed --" in line:
+                    return line.strip()
+    return None
+
+
 def lang_tests(astra: Path) -> int:
     step(f"language suite under {SUITE.relative_to(ROOT)} (via {astra})")
     files = sorted(
-        p
-        for p in SUITE.glob("*.mika")
-        if p.name != "harness.mika"
+        p for p in SUITE.glob("*.mika") if p.name != "harness.mika"
     )
     if not files:
         fail("no tests/mikasa/*.mika found")
@@ -123,9 +207,11 @@ def lang_tests(astra: Path) -> int:
     failed = 0
     for f in files:
         info(f"astra run {f.relative_to(ROOT)}")
-        rc = run([str(astra), "run", str(f)])
-        if rc != 0:
-            fail(f"{f.name} failed (exit {rc})")
+        rc, out = run([str(astra), "run", str(f)], capture=True)
+        marker = output_indicates_failure(out)
+        if rc != 0 or marker:
+            why = f"exit {rc}" if rc != 0 else f"marker {marker!r}"
+            fail(f"{f.name} failed ({why})")
             failed += 1
         else:
             ok(f"{f.name}")
@@ -140,38 +226,26 @@ def example_tests(astra: Path) -> int:
         "net.mika",
         "ws.mika",
     }
-    files = []
+    files: list[Path] = []
     for p in sorted(EXAMPLES.rglob("*.mika")):
         if p.name in skip:
             continue
-        # entrypoints only: main.mika or top-level *.mika (not fixtures)
-        if p.parent.name in {"fixtures"}:
+        if p.parent.name == "fixtures":
             continue
-        if p.name in {"util.mika", "math.mika", "mathwasm.rs"}:
+        if p.name in {"util.mika", "math.mika"}:
             continue
-        if p.suffix != ".mika":
-            continue
-        # Prefer *main* / top-level scripts
-        if p.parent == EXAMPLES or p.name == "main.mika" or p.name.endswith(".mika"):
-            if p.parent.name in {"rust-interop", "rust-interop-wasm", "file-import", "multifile"}:
-                if p.name != "main.mika" and p.name not in {"sieve.mika", "app.mika"}:
-                    continue
-            files.append(p)
-    # de-dup while keeping order
-    seen = set()
-    uniq = []
-    for f in files:
-        if f in seen:
-            continue
-        seen.add(f)
-        uniq.append(f)
+        if p.parent.name in {"rust-interop", "rust-interop-wasm", "file-import", "multifile"}:
+            if p.name not in {"main.mika", "sieve.mika", "app.mika"}:
+                continue
+        files.append(p)
 
     failed = 0
-    for f in uniq:
+    for f in files:
         info(f"astra run {f.relative_to(ROOT)}")
-        rc = run([str(astra), "run", str(f)], cwd=f.parent)
-        if rc != 0:
-            warn(f"{f.relative_to(ROOT)} failed (exit {rc}) — counted")
+        rc, out = run([str(astra), "run", str(f)], cwd=f.parent, capture=True)
+        marker = output_indicates_failure(out)
+        if rc != 0 or marker:
+            warn(f"{f.relative_to(ROOT)} failed — counted")
             failed += 1
         else:
             ok(str(f.relative_to(ROOT)))
@@ -183,7 +257,11 @@ def main() -> int:
     ap.add_argument("--quick", action="store_true", help="cargo tests only")
     ap.add_argument("--lang-only", action="store_true", help="only tests/mikasa/*.mika")
     ap.add_argument("--examples", action="store_true", help="also run examples/mikasa")
-    ap.add_argument("--no-build", action="store_true", help="do not cargo-build astra")
+    ap.add_argument(
+        "--no-build",
+        action="store_true",
+        help="do not rebuild astra (use newest existing binary)",
+    )
     args = ap.parse_args()
 
     banner("Mikasa", "Test Suite")
@@ -200,7 +278,9 @@ def main() -> int:
             fail("quick suite had failures")
         return rc
 
-    astra = ensure_astra(build=not args.no_build)
+    # Always rebuild by default so we never run language tests on a stale
+    # target/debug/astra that predates import("…") / wasm wrap.
+    astra = ensure_astra(rebuild=not args.no_build)
     if not astra:
         fail("astra binary not found (set ASTRA_BIN or install toolchain)")
         return 1
