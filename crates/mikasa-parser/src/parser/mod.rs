@@ -29,6 +29,7 @@ const WS_SOURCE: &str = include_str!("../../../../std/ws.mika");
 const REFLECT_SOURCE: &str = include_str!("../../../../std/reflect.mika");
 mod async_sugar;
 mod autoborrow;
+mod phantom;
 pub mod result;
 pub mod scope;
 pub mod scope_manager;
@@ -197,6 +198,10 @@ pub struct Parser {
     /// True for top-level file compilation; false for inner method-body sub-parsers
     /// so module-level preludes (e.g. `__CopperVecExt`) are never emitted inside methods.
     emit_prelude: bool,
+    /// Unused generic params that should be marked with `phantom T` — printed by mikasa on run/build.
+    phantom_hints: Vec<String>,
+    /// `phantom T` sugar was lowered — emit `use std::marker::PhantomData`.
+    uses_phantom: bool,
 }
 
 /// Drop the `;` from a statement-terminating newline when the next
@@ -483,10 +488,16 @@ impl Parser {
         // Lower `cond ? then : else` ternaries into `if cond { then } else { else }`
         // before the main parser dispatch sees them.
         let ternaried = ternary::rewrite(sugared);
+        // Unused-generic hints before `phantom T` is lowered away.
+        let phantom_hints = phantom::collect_hints(&ternaried);
+        let phantomed = phantom::rewrite(ternaried);
         // Apply call-site auto-borrow / auto-clone, `for` preservation, and
         // string `+` concatenation.
-        let lowered = autoborrow::rewrite(ternaried);
+        let lowered = autoborrow::rewrite(phantomed);
         let uses_defer = lowered.iter().any(|t| t.value.contains("__CopperDefer"));
+        let uses_phantom = lowered
+            .iter()
+            .any(|t| t.value.starts_with("_phantom_") || t.value == "PhantomData");
         let uses_keypath = lowered.iter().any(|t| t.value.contains("__MikaKeyPath"));
         let needs_async = lowered.iter().any(|t| {
             t.value == "await"
@@ -532,7 +543,14 @@ impl Parser {
             source_path: None,
             project_root: None,
             emit_prelude: true,
+            phantom_hints,
+            uses_phantom,
         }
+    }
+
+    /// Hints recommending `phantom T` for unused generic parameters.
+    pub fn phantom_hints(&self) -> &[String] {
+        &self.phantom_hints
     }
 
     /// Attach filesystem context so relative `from "./x.crs"` imports can be
@@ -5217,6 +5235,20 @@ impl Parser {
     /// and Rust drops locals in reverse declaration order, so two `defer`s in
     /// one scope run last-registered first. The closure is `FnMut` so the body
     /// may mutate captured bindings.
+    fn prepend_phantom_use_if_used(&mut self) {
+        if !self.uses_phantom || !self.emit_prelude {
+            return;
+        }
+        let haystack = format!("{}{}", self.result.value, self.result.main_function_code);
+        if haystack.contains("use std::marker::PhantomData")
+            || haystack.contains("use core::marker::PhantomData")
+        {
+            return;
+        }
+        self.result
+            .prepend_value("#[allow(unused_imports)]\nuse std::marker::PhantomData;\n\n");
+    }
+
     fn prepend_defer_guard_if_used(&mut self) {
         if !self.uses_defer {
             return;
@@ -5269,6 +5301,7 @@ impl Parser {
                 self.result.add_data_type_aliases();
                 self.prepend_vec_ext_if_used();
                 self.prepend_defer_guard_if_used();
+                self.prepend_phantom_use_if_used();
                 self.prepend_keypath_helper_if_used();
                 self.prepend_used_std_modules();
                 self.result.append_codable_impls();

@@ -1,0 +1,31 @@
+// Phantom markers — unused type parameters stay intentional without rustc E0392.
+//
+// Inside a struct/class body, write:
+//   phantom T
+//   phantom T, U
+// mikasa lowers that to PhantomData and imports it for you.
+//
+// If you forget, mikasa run prints a warning recommending the mark.
+
+struct Token<T> {
+    phantom T
+    id: i64
+}
+
+struct Dual<A, B> {
+    phantom A, B
+    tag: string
+}
+
+func void main() {
+    t = Token::<i32> {
+        id: 1,
+        _phantom_t: PhantomData
+    }
+    d = Dual::<bool, String> {
+        tag: "ok".into(),
+        _phantom_a: PhantomData,
+        _phantom_b: PhantomData
+    }
+    println!("token {} dual {}", t.id, d.tag)
+}

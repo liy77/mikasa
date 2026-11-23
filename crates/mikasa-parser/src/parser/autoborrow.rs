@@ -111,6 +111,7 @@ fn classify_type_str(raw: &str) -> ParamMode {
         if inner == "str" || inner.ends_with(" str") {
             return ParamMode::RefStr;
         }
+        // `&[T]`, `&Path`, `&String`, …
         return ParamMode::Ref;
     }
     let rust = convert_type(t);
@@ -118,6 +119,8 @@ fn classify_type_str(raw: &str) -> ParamMode {
         "String" => ParamMode::OwnedString,
         "i8" | "i16" | "i32" | "i64" | "i128" | "isize" | "u8" | "u16" | "u32" | "u64"
         | "u128" | "usize" | "f32" | "f64" | "bool" | "char" | "()" => ParamMode::Copy,
+        // Bare `str` in a signature is almost always meant as `&str`.
+        "str" => ParamMode::RefStr,
         _ => ParamMode::OwnedOther,
     }
 }
@@ -487,18 +490,23 @@ fn rewrite_scopes(tokens: Vec<Token>, sigs: &HashMap<String, FuncSig>) -> Vec<To
             }
         }
 
-        // Skip struct / class / impl / trait / enum declarations at top-level.
-        // (`impl` / `class` bodies contain methods; rewrite inside `impl` `func`s by
-        // only skipping `struct`/`enum`/`trait`/`class` headers or leaving `impl` to
-        // hit `func` inside it!)
-        if matches!(
-            tokens[i].kind,
-            TokenKind::Struct | TokenKind::Trait
-        ) || (tokens[i].kind == TokenKind::Keyword
-            && matches!(tokens[i].value.as_str(), "class" | "enum"))
+        // `class` / `impl`: rewrite method bodies (including `Ret name(` forms without
+        // `func`). Plain `struct` / `enum` / `trait` bodies are copied as-is.
+        if let Some((close, brace, _owner, _kind)) = method_block_at(&tokens, i) {
+            out.extend_from_slice(&tokens[i..=brace]);
+            let rewritten = rewrite_type_body(&tokens[brace + 1..close], sigs);
+            out.extend(rewritten);
+            out.push(tokens[close].clone());
+            i = close + 1;
+            continue;
+        }
+
+        if matches!(tokens[i].kind, TokenKind::Struct | TokenKind::Trait)
+            || (tokens[i].kind == TokenKind::Keyword && tokens[i].value == "enum")
         {
             let mut j = i;
-            while j < tokens.len() && tokens[j].value != "{" && tokens[j].kind != TokenKind::Semicolon {
+            while j < tokens.len() && tokens[j].value != "{" && tokens[j].kind != TokenKind::Semicolon
+            {
                 j += 1;
             }
             if j < tokens.len() && tokens[j].value == "{" {
@@ -507,19 +515,6 @@ fn rewrite_scopes(tokens: Vec<Token>, sigs: &HashMap<String, FuncSig>) -> Vec<To
                     i = cb + 1;
                     continue;
                 }
-            }
-        }
-
-        // `impl` block: emit header up to `{`, then let the loop enter and handle inner `func`s.
-        if tokens[i].kind == TokenKind::Impl {
-            let mut j = i;
-            while j < tokens.len() && tokens[j].value != "{" {
-                j += 1;
-            }
-            if j < tokens.len() {
-                out.extend_from_slice(&tokens[i..=j]);
-                i = j + 1;
-                continue;
             }
         }
 
@@ -554,6 +549,78 @@ fn rewrite_scopes(tokens: Vec<Token>, sigs: &HashMap<String, FuncSig>) -> Vec<To
     }
 
     out
+}
+
+/// Rewrite method bodies inside a `class` / `impl` block.
+fn rewrite_type_body(body: &[Token], sigs: &HashMap<String, FuncSig>) -> Vec<Token> {
+    let mut out = Vec::with_capacity(body.len());
+    let mut i = 0usize;
+    while i < body.len() {
+        // Nested braces (field initializers / nested types) — copy through.
+        if body[i].value == "{" && !is_method_head_before_brace(body, i) {
+            if let Some(close) = find_matching_brace(body, i) {
+                out.extend_from_slice(&body[i..=close]);
+                i = close + 1;
+                continue;
+            }
+        }
+
+        let is_static = body[i].kind == TokenKind::Keyword && body[i].value == "static";
+        let is_func = body[i].kind == TokenKind::Keyword && body[i].value == "func";
+        let is_ret = body[i].kind == TokenKind::Identifier
+            && next_sig(body, i + 1).is_some_and(|n| {
+                body[n].kind == TokenKind::Identifier
+                    && next_sig(body, n + 1).is_some_and(|p| body[p].value == "(")
+            });
+
+        if is_static || is_func || is_ret {
+            // `parse_func_sig` starts at `head + 1`. For `Ret name(` pass the
+            // return-type index so the name/`(` scan still works at body start.
+            if let Some((_name, sig, end_paren)) = parse_func_sig(body, i) {
+                out.extend_from_slice(&body[i..=end_paren]);
+                let mut j = end_paren + 1;
+                while j < body.len() {
+                    if body[j].value == "{" {
+                        break;
+                    }
+                    out.push(body[j].clone());
+                    j += 1;
+                }
+                if j < body.len() && body[j].value == "{" {
+                    if let Some(cb) = find_matching_brace(body, j) {
+                        out.push(body[j].clone());
+                        let mut fn_vars = HashMap::new();
+                        for (pname, pmode) in &sig.params {
+                            fn_vars.insert(pname.clone(), VarKind::from_param_mode(*pmode));
+                        }
+                        fn_vars
+                            .entry("self".to_string())
+                            .or_insert(VarKind::Borrowed);
+                        let rewritten =
+                            rewrite_block_tokens(&body[j + 1..cb], sigs, &mut fn_vars, 0);
+                        out.extend(rewritten);
+                        out.push(body[cb].clone());
+                        i = cb + 1;
+                        continue;
+                    }
+                }
+                i = end_paren + 1;
+                continue;
+            }
+        }
+
+        out.push(body[i].clone());
+        i += 1;
+    }
+    out
+}
+
+fn is_method_head_before_brace(tokens: &[Token], brace: usize) -> bool {
+    // Walk back for `) {` that closes a method signature.
+    let Some(p) = prev_sig(tokens, brace) else {
+        return false;
+    };
+    tokens[p].value == ")"
 }
 
 fn rewrite_block_tokens(
@@ -782,6 +849,7 @@ fn rewrite_call_args(
         let already_ref = non_ws[0].1.value == "&" || non_ws[0].1.value == "&&";
         let already_mut_ref = already_ref
             && non_ws.get(1).is_some_and(|(_, t)| t.value == "mut");
+        let already_as_ref = ends_with_as_ref(&non_ws);
         let is_plain_str_lit =
             non_ws.len() == 1 && non_ws[0].1.kind == TokenKind::String && !non_ws[0].1.value.starts_with("b\"");
         let is_interp_str =
@@ -806,6 +874,7 @@ fn rewrite_call_args(
         match param_mode {
             ParamMode::RefStr => {
                 if already_ref
+                    || already_as_ref
                     || is_plain_str_lit
                     || matches!(
                         ident_kind,
@@ -813,9 +882,7 @@ fn rewrite_call_args(
                     )
                 {
                     out.extend(inner_rewritten);
-                } else if single_ident.is_some()
-                    || is_simple_place(&non_ws)
-                {
+                } else if single_ident.is_some() || is_simple_place(&non_ws) {
                     out.push(synth(TokenKind::Operator, "&"));
                     out.extend(inner_rewritten);
                 } else if is_interp_str {
@@ -830,11 +897,15 @@ fn rewrite_call_args(
             }
             ParamMode::Ref => {
                 if already_ref
+                    || already_as_ref
                     || matches!(
                         ident_kind,
                         Some(VarKind::Borrowed | VarKind::BorrowedStr | VarKind::MutBorrowed)
                     )
                 {
+                    out.extend(inner_rewritten);
+                } else if single_ident.is_some() || is_simple_place(&non_ws) {
+                    out.push(synth(TokenKind::Operator, "&"));
                     out.extend(inner_rewritten);
                 } else {
                     out.push(synth(TokenKind::Operator, "&"));
@@ -845,7 +916,22 @@ fn rewrite_call_args(
                 if already_mut_ref || matches!(ident_kind, Some(VarKind::MutBorrowed)) {
                     out.extend(inner_rewritten);
                 } else if already_ref {
-                    out.extend(inner_rewritten);
+                    // Upgrade `&x` → `&mut x` when the callee needs exclusive access.
+                    if non_ws.get(1).is_some_and(|(_, t)| t.value != "mut") {
+                        out.push(synth(TokenKind::Operator, "&"));
+                        out.push(synth(TokenKind::Keyword, "mut"));
+                        // Skip the leading `&` already present.
+                        let skip = non_ws[0].0;
+                        out.extend(inner_rewritten.iter().enumerate().filter_map(|(idx, t)| {
+                            if idx == skip {
+                                None
+                            } else {
+                                Some(t.clone())
+                            }
+                        }));
+                    } else {
+                        out.extend(inner_rewritten);
+                    }
                 } else {
                     out.push(synth(TokenKind::Operator, "&"));
                     out.push(synth(TokenKind::Keyword, "mut"));
@@ -860,7 +946,7 @@ fn rewrite_call_args(
                     out.push(synth(TokenKind::ParenthesesStart, "("));
                     out.push(synth(TokenKind::ParenthesesEnd, ")"));
                 } else if let Some(ref name) = single_ident {
-                    if matches!(ident_kind, Some(VarKind::Borrowed)) {
+                    if matches!(ident_kind, Some(VarKind::Borrowed | VarKind::MutBorrowed)) {
                         out.extend(inner_rewritten);
                         out.push(synth(TokenKind::Dot, "."));
                         out.push(synth(TokenKind::Identifier, "to_string"));
@@ -881,6 +967,17 @@ fn rewrite_call_args(
             }
             ParamMode::OwnedOther => {
                 if let Some(ref name) = single_ident {
+                    if matches!(
+                        ident_kind,
+                        Some(VarKind::Borrowed | VarKind::BorrowedStr | VarKind::MutBorrowed)
+                    ) {
+                        out.extend(inner_rewritten);
+                        out.push(synth(TokenKind::Dot, "."));
+                        out.push(synth(TokenKind::Identifier, "clone"));
+                        out.push(synth(TokenKind::ParenthesesStart, "("));
+                        out.push(synth(TokenKind::ParenthesesEnd, ")"));
+                        continue;
+                    }
                     if matches!(
                         ident_kind,
                         Some(VarKind::OwnedOther | VarKind::OwnedString) | None
@@ -906,10 +1003,69 @@ fn rewrite_call_args(
     out
 }
 
+fn ends_with_as_ref(non_ws: &[(usize, &Token)]) -> bool {
+    // `… .as_str()` / `.as_ref()` / `.borrow()` / `.as_slice()`
+    if non_ws.len() < 4 {
+        return false;
+    }
+    let n = non_ws.len();
+    non_ws[n - 4].1.value == "."
+        && matches!(
+            non_ws[n - 3].1.value.as_str(),
+            "as_str" | "as_ref" | "borrow" | "as_slice" | "as_bytes"
+        )
+        && non_ws[n - 2].1.value == "("
+        && non_ws[n - 1].1.value == ")"
+}
+
 fn is_simple_place(non_ws: &[(usize, &Token)]) -> bool {
-    non_ws
-        .iter()
-        .all(|(_, t)| matches!(t.kind, TokenKind::Identifier | TokenKind::Dot))
+    if non_ws.is_empty() {
+        return false;
+    }
+    // `ident`, `a.b.c`, `arr[i]`, `*ptr`, `self.field`
+    let mut i = 0usize;
+    if non_ws[0].1.value == "*" {
+        i = 1;
+        if i >= non_ws.len() {
+            return false;
+        }
+    }
+    if !matches!(
+        non_ws[i].1.kind,
+        TokenKind::Identifier | TokenKind::Keyword
+    ) && non_ws[i].1.value != "self"
+    {
+        return false;
+    }
+    i += 1;
+    while i < non_ws.len() {
+        match non_ws[i].1.value.as_str() {
+            "." => {
+                i += 1;
+                if i >= non_ws.len()
+                    || !matches!(non_ws[i].1.kind, TokenKind::Identifier | TokenKind::Keyword)
+                {
+                    return false;
+                }
+                i += 1;
+            }
+            "[" => {
+                // Skip balanced `[…]`
+                let mut depth = 1i32;
+                i += 1;
+                while i < non_ws.len() && depth > 0 {
+                    match non_ws[i].1.value.as_str() {
+                        "[" => depth += 1,
+                        "]" => depth -= 1,
+                        _ => {}
+                    }
+                    i += 1;
+                }
+            }
+            _ => return false,
+        }
+    }
+    true
 }
 
 fn is_binding_at(tokens: &[Token], idx: usize) -> bool {
@@ -1030,8 +1186,16 @@ fn infer_rhs_var_kind(rhs: &[&Token]) -> VarKind {
     }
     if rhs.iter().any(|t| t.kind == TokenKind::InterpolatedString)
         || rhs.windows(2).any(|w| {
-            w[0].value == "." && matches!(w[1].value.as_str(), "to_string" | "to_owned")
+            w[0].value == "."
+                && matches!(
+                    w[1].value.as_str(),
+                    "to_string" | "to_owned" | "into" | "clone"
+                )
         })
+        || (rhs.len() >= 2
+            && rhs[0].value == "String"
+            && (rhs[1].value == "::" || rhs[1].value == "."))
+        || (rhs.len() >= 2 && rhs[0].value == "format" && rhs[1].value == "!")
     {
         return VarKind::OwnedString;
     }
@@ -1041,8 +1205,13 @@ fn infer_rhs_var_kind(rhs: &[&Token]) -> VarKind {
         return VarKind::Copy;
     }
     if rhs.iter().all(|t| {
-        matches!(t.kind, TokenKind::Number | TokenKind::Operator | TokenKind::ParenthesesStart | TokenKind::ParenthesesEnd)
-            && !matches!(t.value.as_str(), "&" | "?")
+        matches!(
+            t.kind,
+            TokenKind::Number
+                | TokenKind::Operator
+                | TokenKind::ParenthesesStart
+                | TokenKind::ParenthesesEnd
+        ) && !matches!(t.value.as_str(), "&" | "?")
     }) {
         return VarKind::Copy;
     }

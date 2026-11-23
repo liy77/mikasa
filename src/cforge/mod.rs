@@ -141,6 +141,11 @@ pub(crate) fn cargo_with_spinner(
         if !err_out.is_empty() {
             print!("{err_out}");
         }
+        if combined.contains("E0392") || combined.contains("never used") {
+            pretty::warn(
+                "unused type parameter — mark it with `phantom T` inside the struct/class body",
+            );
+        }
     }
     (ok, combined)
 }
@@ -742,6 +747,9 @@ pub fn compile(
             .or_else(|| source_path.parent().map(|p| p.to_path_buf()));
         let mut parser =
             parser::Parser::new(tokens).with_paths(Some(source_path.clone()), project_root);
+        for hint in parser.phantom_hints() {
+            pretty::warn(hint);
+        }
         let mut result_code = parser.parse();
         // Non-entry modules must export their types/fns so
         // `use crate::math::vec2::{Vec2}` resolves.
