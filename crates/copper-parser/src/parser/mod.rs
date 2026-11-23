@@ -10,7 +10,7 @@ use std::vec;
 /// The Copper source for the embedded `cstd` standard library, baked into
 /// the compiler at build time. Updates to `std/cstd.crs` ship with the
 /// next `cargo build`.
-const CSTD_SOURCE: &str = include_str!("../../../../std/cstd.crs");
+const CSTD_SOURCE: &str = include_str!("../../../../std/cstd.mika");
 
 // Native-Rust helpers for things Copper cannot yet express cleanly
 // (a raw `&[T]` parameter). `cfg!(...)` lowers as a macro invocation.
@@ -18,15 +18,15 @@ const CSTD_SOURCE: &str = include_str!("../../../../std/cstd.crs");
 // Additional native std modules, bundled on demand when imported
 // (`import { ... } from net` / `from http`). Each has a Copper-written
 // `.crs` surface plus a native `.rs` of helpers.
-const NET_SOURCE: &str = include_str!("../../../../std/net.crs");
-const HTTP_SOURCE: &str = include_str!("../../../../std/http.crs");
-const URL_SOURCE: &str = include_str!("../../../../std/url.crs");
-const JSON_SOURCE: &str = include_str!("../../../../std/json.crs");
-const CRYPTO_SOURCE: &str = include_str!("../../../../std/crypto.crs");
-const TIME_SOURCE: &str = include_str!("../../../../std/time.crs");
-const FS_SOURCE: &str = include_str!("../../../../std/fs.crs");
-const WS_SOURCE: &str = include_str!("../../../../std/ws.crs");
-const REFLECT_SOURCE: &str = include_str!("../../../../std/reflect.crs");
+const NET_SOURCE: &str = include_str!("../../../../std/net.mika");
+const HTTP_SOURCE: &str = include_str!("../../../../std/http.mika");
+const URL_SOURCE: &str = include_str!("../../../../std/url.mika");
+const JSON_SOURCE: &str = include_str!("../../../../std/json.mika");
+const CRYPTO_SOURCE: &str = include_str!("../../../../std/crypto.mika");
+const TIME_SOURCE: &str = include_str!("../../../../std/time.mika");
+const FS_SOURCE: &str = include_str!("../../../../std/fs.mika");
+const WS_SOURCE: &str = include_str!("../../../../std/ws.mika");
+const REFLECT_SOURCE: &str = include_str!("../../../../std/reflect.mika");
 mod autoborrow;
 pub mod result;
 pub mod scope;

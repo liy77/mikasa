@@ -76,7 +76,7 @@ All 19 `examples/copper/*.mika` run under `alloy run`.
   indexing, `?` try, `as` cast, `unsafe` blocks.
 - ~30 built-in methods (`.len()`, `.iter().sum()`, `.unwrap()`, `.chars()`,
   `.to_uppercase()`, `.parse()`, …).
-- **Stdlib** via `import`: `cstd` is **interpreted from `std/cstd.crs`** (the
+- **Stdlib** via `import`: `cstd` is **interpreted from `std/cstd.mika`** (the
   single source shared with cforge — merged in by the loader, run via native
   `std::` intrinsics; only `run`/`list_dir`/`append_file`/`rand_int` stay
   native). `fs`, `time`, `url`, `net`, `ws` are pure Rust; `json`, `crypto`,

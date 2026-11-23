@@ -40,7 +40,7 @@ crates/
   mui-lsp/          MUI language server
 src/                cforge entrypoint + re-exports from crates (historical; real code is in crates/)
 astra-gui/          Dual-mode alloy GUI host (MUI; own workspace; links mocida)
-std/cstd.crs        Mikasa stdlib — single source for both cforge and alloy
+std/cstd.mika        Mikasa stdlib — single source for both cforge and alloy
 docs/superpowers/specs/   Design specs (alloy-vm, bytecode, gui, check-miri, wasm-interop, mui-codegen)
 docs/TODO.md        Backlog with priorities
 ```
@@ -71,7 +71,7 @@ v1 = `Vec<Item>` (AST). v2 = `Vec<Item>` + `Vec<WasmModule { names, bytes }>` (w
 | `import { x } from …` | Resolution |
 | --- | --- |
 | `fs`, `time`, `url`, `net`, `ws`, `json`, `crypto`, `http` | Native Rust in `stdlib.rs` / `stdlib_ext.rs` |
-| `cstd` | Interpreted from `std/cstd.crs` (merged); 4 native exceptions: `run`, `list_dir`, `append_file`, `rand_int` (`CSTD_NATIVE`) |
+| `cstd` | Interpreted from `std/cstd.mika` (merged); 4 native exceptions: `run`, `list_dir`, `append_file`, `rand_int` (`CSTD_NATIVE`) |
 | `math` (sibling `.crs`) | Parsed + merged recursively; bundled into `.loy` |
 | `foo` (sibling `.rs`) | Compiled to wasm32 once (cached in `~/.alloy/cache` by hash), run via `wasmi`. Prototype ABI: `i64`/`bool`, requires `#[no_mangle] pub extern "C"`. Plain `pub fn` → `LoadOutcome::NeedsCforge`. |
 
@@ -151,7 +151,7 @@ Required env vars: `MOCIDA_INCLUDE_DIR`, `MOCIDA_LIB_DIR`, `MOCIDA_LIB_NAME=moci
 ## What NOT to change without asking
 
 - Parser stub → don't echo-stub it (see cd22d82).
-- `main.crs` location → `cforge run` defaults to `./main.crs`.
+- `main.mika` location → `mikasa run` defaults to `./main.mika`.
 - `match`-block separator switch in `line_break_token` → makes arms use `,` not `;`.
 - Stacked `if`s in `symbol_token` → see tokenizer invariants.
 - `cforge_tokenizer_debug.log` → keep gitignored, not a feature.
@@ -160,13 +160,13 @@ Required env vars: `MOCIDA_INCLUDE_DIR`, `MOCIDA_LIB_DIR`, `MOCIDA_LIB_NAME=moci
 ## cstd standard library
 
 `import { ... } from cstd` → sets `result.cstd_used = true` → `Parser::transpile_cstd_module()`:
-1. `include_str!` of `std/cstd.crs` → tokenize + sub-parse.
+1. `include_str!` of `std/cstd.mika` → tokenize + sub-parse.
 2. Strip trailing `fn main() {}`.
 3. Promote `fn ` → `pub fn ` (auto; `pub func` doesn't work — `pub` leaks to next stmt).
 4. Append `std/cstd_native.rs` (deprecated; see policy below).
 5. Wrap in `#[allow(dead_code)] pub mod cstd { ... }` and prepend to `result.value`.
 
-**Constraints for `std/cstd.crs`:**
+**Constraints for `std/cstd.mika`:**
 - No multi-line method chains — tokenizer terminates at newlines; use temp vars.
 - No `&[T]` slice params — tokenized as vec literal (`&vec![T]`). Use `Vec<T>` or native.
 - `cfg!(...)` is a macro invocation. `parse_var` must not inject `let` before the `=` inside it (paren-depth guard + the `cfg!` lookahead).

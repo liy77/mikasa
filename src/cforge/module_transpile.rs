@@ -111,7 +111,7 @@ pub fn transpile_crs_project(project_dir: &Path) -> Result<PathBuf, String> {
             has_main_crs = true;
             continue;
         }
-        if name == "main_host" && crs_dir.join("main.crs").is_file() {
+        if name == "main_host" && crs_dir.join("main.mika").is_file() {
             continue;
         }
 
@@ -144,10 +144,10 @@ pub fn transpile_crs_project(project_dir: &Path) -> Result<PathBuf, String> {
         &format!("pub const CRS_MODULES: &[&str] = &[\n{list}];\n"),
     );
 
-    // 4. Generate `src/lib.rs` if `crs/lib.crs` exists
+    // 4. Generate `src/lib.rs` if `crs/lib.mika` exists
     if has_lib_crs {
         let lib_src =
-            std::fs::read_to_string(crs_dir.join("lib.crs")).map_err(|e| e.to_string())?;
+            std::fs::read_to_string(crs_dir.join("lib.mika")).map_err(|e| e.to_string())?;
         let mut lib_rust = transpile("lib", &lib_src);
         lib_rust = rewrite_manifest_and_out_dir(&lib_rust, &project_dir_str, &src_dir_str);
         let mut mod_decls = String::from(
@@ -162,9 +162,9 @@ pub fn transpile_crs_project(project_dir: &Path) -> Result<PathBuf, String> {
         let _ = write_if_changed(src_dir.join("lib.rs"), &mod_decls);
     }
 
-    // 5. Generate `src/main.rs` if `crs/main.crs` exists
+    // 5. Generate `src/main.rs` if `crs/main.mika` exists
     if has_main_crs {
-        let main_path = crs_dir.join("main.crs");
+        let main_path = crs_dir.join("main.mika");
         let main_src = std::fs::read_to_string(&main_path).map_err(|e| e.to_string())?;
         let key = main_path.to_string_lossy().replace('\\', "/");
         let src_hash = hash_source(&main_src, &compiler_ver);

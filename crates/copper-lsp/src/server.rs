@@ -1654,7 +1654,7 @@ struct CstdFn {
     signature: String,
 }
 
-const CSTD_SOURCE: &str = include_str!("../../../std/cstd.crs");
+const CSTD_SOURCE: &str = include_str!("../../../std/cstd.mika");
 
 /// Brace-delimited ranges the editor can fold. A `defer` or `guard` block
 /// folds like any other block — the tokenizer already knows where each brace

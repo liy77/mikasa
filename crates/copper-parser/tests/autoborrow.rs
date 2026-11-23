@@ -69,7 +69,7 @@ fn class_instance_method_borrows_arg_not_receiver() {
 
 #[test]
 fn cstd_run_keeps_cfg_windows_branch() {
-    let src = include_str!("../../../std/cstd.crs");
+    let src = include_str!("../../../std/cstd.mika");
     let rust = transpile(src);
     assert!(
         rust.contains("cfg!(target_os = \"windows\")") || rust.contains("cfg ! ( target_os"),

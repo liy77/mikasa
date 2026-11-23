@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 
 /// The `cstd` module source — the single source of truth, shared with cforge.
 /// Bundled so Alloy interprets the *same* code instead of duplicating it.
-const CSTD_SRC: &str = include_str!("../../../std/cstd.crs");
+const CSTD_SRC: &str = include_str!("../../../std/cstd.mika");
 
 /// `cstd` functions whose bodies use Rust-std builder/iterator chains (or `<<`
 /// shifts) the interpreter can't walk — these stay implemented natively in

@@ -45,13 +45,13 @@ Restart your terminal after installation so the new `PATH` is picked up.
 
 ```sh
 # Compile and run
-mikasa run main.crs
+mikasa run main.mika
 
-# Run the default file (main.crs in cwd)
+# Run the default file (main.mika in cwd)
 cforge run
 
 # Compile only
-mikasa build main.crs
+mikasa build main.mika
 
 # Compile every .mika in a directory
 cforge -c -i src/

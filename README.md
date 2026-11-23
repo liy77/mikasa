@@ -226,7 +226,7 @@ Available functions: `input`, `readln`, `read_int`, `read_float`, `to_int`,
 `now_ms`, `env`, `args`, `read_file`, `write_file`, `append_file`, `exists`,
 `is_file`, `is_dir`, `list_dir`, `run`, `rand_int`.
 
-The library lives in [`std/cstd.crs`](./std/cstd.crs) — written in Mikasa,
+The library lives in [`std/cstd.mika`](./std/cstd.mika) — written in Mikasa,
 shared between the transpiler and Astra (single source of truth).
 
 ## Project layout
@@ -249,10 +249,10 @@ copper-lang/
 │   └── mui/            # MocidaUI demos (hello, counter, keyboard, app, ...)
 ├── scripts/            # Python tooling: install / build / cleanup / diagnose / hooks
 ├── docs/               # INSTALL.md, TODO.md, design specs
-├── std/                # Mikasa standard library (cstd.crs)
+├── std/                # Mikasa standard library (cstd.mika)
 ├── lson/               # LSON parser binaries (per-OS)
 ├── assets/             # Logos
-├── main.crs            # Default file for `mikasa run` with no argument
+├── main.mika            # Default file for `mikasa run` with no argument
 ├── properties.kson     # Project metadata + dependencies
 ├── Cargo.toml          # Workspace root
 └── build.rs            # Stamps the build date into pre-release versions
@@ -303,7 +303,7 @@ Full backlog with details: [`docs/TODO.md`](./docs/TODO.md).
 
 **Astra interpreter**
 - [x] Tree-walking interpreter for the full `copper-syntax` AST
-- [x] `cstd` interpreted from `std/cstd.crs` (single source, no Rust reimplementation)
+- [x] `cstd` interpreted from `std/cstd.mika` (single source, no Rust reimplementation)
 - [x] Portable `.loy` artifacts (`alloy build` / `alloy run`)
 - [x] Imported `.rs` files run via embedded WebAssembly (wasm cache, embedded in `.loy`)
 - [x] `alloy check` — auto-provisioned Miri/rustc verification
