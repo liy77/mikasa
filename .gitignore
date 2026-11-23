@@ -43,3 +43,5 @@ example.html
 alloy-gui/target/
 
 astra-gui/target/
+
+.DS_Store
