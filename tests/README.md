@@ -8,6 +8,10 @@ python tests/run_all.py
 python scripts/test.py
 ```
 
+Por padrão o runner **recompila** `astra` em `CARGO_TARGET_DIR` (default
+`/tmp/copper-target`) e usa esse binário — evita cair num `target/debug/astra`
+antigo sem `import("…")` / wrap de `pub fn`.
+
 Flags:
 
 | Flag | Efeito |
@@ -15,9 +19,10 @@ Flags:
 | `--quick` | só `cargo test` das crates |
 | `--lang-only` | só `tests/mikasa/*.mika` via `astra run` |
 | `--examples` | também `examples/mikasa/**/*.mika` (pula stdin/rede) |
-| `--no-build` | não tenta `cargo build -p astra-vm` |
+| `--no-build` | não recompila; escolhe o `astra` mais novo por mtime |
 
-`ASTRA_BIN=/path/to/astra` força o binário.
+`ASTRA_BIN=/path/to/astra` força o binário. Falhas no stderr (`runtime error`,
+`delegating to cforge`, …) contam mesmo se o exit code vier 0.
 
 ## Suite de linguagem (`tests/mikasa/`)
 

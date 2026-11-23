@@ -1,8 +1,9 @@
 <img src="./assets/mikasa.png" width="128"/>
 
 > **Copper is now Mikasa.** The language was renamed: Copper → **Mikasa**, and
-> its interpreter Alloy → **Astra**. The toolchain binary is `mikasa` (it used
-> to be `cforge`) and the interpreter binary is still `alloy`.
+> its interpreter Alloy → **Astra**. The toolchain binary is `mikasa` (formerly
+> `cforge`); the interpreter binary is `astra` (the `alloy` name still works
+> where installed as an alias).
 >
 > File extensions were renamed too. The old ones still open, they are just no
 > longer the recommended spelling:
@@ -21,13 +22,15 @@
 A high-level language that transpiles to Rust. Mikasa aims to keep Rust's
 performance while giving you a syntax that reads like a modern scripting
 language — string interpolation, optional chaining, ternaries, and JS-style
-loop / match / closure forms — backed by `cforge`, the Mikasa toolchain.
+loop / match / closure forms — backed by the `mikasa` toolchain.
 
-```crs
-import * from std.io
+```mika
+import { trim } from mika
 
-name = input!("What's your name?")
-println!("Your name is $name")
+func main() {
+    mut name = trim("  Ada  ")
+    println("Your name is $name")
+}
 ```
 
 <p align="center">
@@ -39,11 +42,11 @@ println!("Your name is $name")
 | Path | Tool | How it works | When to use |
 | --- | --- | --- | --- |
 | **Transpile → Rust** | `mikasa` | `.mika` → Rust source → `cargo build` | Production, full Rust semantics |
-| **Interpreter** | `alloy` (Astra) | tree-walks the AST directly, no compile step | Fast iteration, scripting, CI |
+| **Interpreter** | `astra` | tree-walks the AST directly, no compile step | Fast iteration, scripting, CI |
 
-`alloy run file.mika` is instant — like `python` or `node`. `mikasa run file.mika`
-gives you native speed after the first compile. Both share the same
-`mikasa-syntax` AST so behaviour is identical.
+`astra run file.mika` is instant — like `python` or `node`. `mikasa run file.mika`
+gives you native speed after the first compile (or `mikasa vm run` for the same
+Astra engine without cargo). Both share the same `mikasa-syntax` AST.
 
 ## Install
 
@@ -64,7 +67,7 @@ On Windows you can also double-click `scripts\install.bat`; on Unix run
 `bash scripts/install.sh`. Both just forward to `install.py`. The installer
 auto-detects admin / root and picks a global or per-user install accordingly.
 
-Pass `--workspace` to also build and install `alloy`, `lson`, and the LSP
+Pass `--workspace` to also build and install `astra`, `lson`, and the LSP
 servers in one shot.
 
 ## Compile and run (mikasa)
@@ -102,15 +105,16 @@ mikasa update                  # install the latest GitHub nightly
     <img src="./assets/astra-logo.png" width="180" alt="Astra" />
 </p>
 
-Astra (binary `alloy`) interprets `.mika` files directly with no compile step
+Astra (binary `astra`) interprets `.mika` files directly with no compile step
 and can also produce a portable `.ast` artifact that runs anywhere without a
 Rust toolchain.
 
 ```sh
-alloy run file.mika            # instant — no compile
-alloy build file.mika          # compile to a portable .ast artifact
-alloy run app.ast              # run the artifact (no rustc needed)
-alloy check file.mika          # verify with real Rust + Miri
+astra run file.mika            # instant — no compile
+astra build file.mika          # compile to a portable .ast artifact
+astra run app.ast              # run the artifact (no rustc needed)
+astra check file.mika          # verify with real Rust + Miri
+mikasa vm run file.mika        # same engine via the mikasa CLI
 ```
 
 ### Portable `.ast` artifacts
@@ -119,34 +123,39 @@ An `.ast` is a self-contained binary (magic header + bincoded AST). The older
 `.loy` spelling still loads. If the
 program imports sibling `.rs` files Astra compiles them to WebAssembly once
 (cached by content hash in `~/.alloy/cache`) and embeds the wasm into the
-artifact — so the final `.loy` runs on any platform with no rustc and no
+artifact — so the final `.ast` runs on any platform with no rustc and no
 `.rs` files on disk.
 
 ```sh
-alloy build myapp.mika -o myapp.ast  # bundles sibling .rs as wasm
-alloy run myapp.ast                  # works anywhere, no rustc
+astra build myapp.mika -o myapp.ast  # bundles sibling .rs as wasm
+astra run myapp.ast                  # works anywhere, no rustc
 ```
 
 ### Importing Rust from Mikasa
 
 Astra can call into sibling `.rs` files via WebAssembly — the Mikasa stays
-interpreted (instant); only the Rust crosses into wasm:
+interpreted (instant); only the Rust crosses into wasm. Plain `pub fn` is
+auto-wrapped (no `extern "C"` required for scalar ABI):
 
-```crs
-// math.rs  (sibling file)
-// #[no_mangle] pub extern "C" fn fib(n: i64) -> i64 { ... }
+```mika
+// math.rs (sibling):  pub fn fib(n: i64) -> i64 { ... }
 
 import { fib } from math
 
-println!("{}", fib(10))   // → 55, runs via embedded wasm
+func main() {
+    println("${fib(10)}")   // → 55, via embedded wasm
+}
 ```
 
-Current prototype ABI: `i64`/`bool` scalars with `#[no_mangle] pub extern "C"`.
-Richer types (strings, `Vec`, structs) are the next phase.
+You can also splice another `.mika` file with `import("util.mika")`, or from
+Rust hosts use `mika_import!("util.mika")` (`crates/mika-import`).
+
+Current scalar ABI: `i64` / `i32` / `bool` / `f64`. Strings / `Vec` / structs
+are the next phase.
 
 ### Astra GUI playground
 
-`astra-gui/` is a dual-mode `alloy` binary that adds a MUI playground — open
+`astra-gui/` is a dual-mode `astra` binary that adds a MUI playground — open
 a `.mika` file, edit it, and see output live. Hot-reload re-evaluates on save;
 resize splits output to the right on wide screens.
 
@@ -154,42 +163,44 @@ resize splits output to the right on wide screens.
 
 ### Classes
 
-```crs
+```mika
 class Greeter {
-    name: String
+    name: string
 
-    Greeter(name: String) {
+    Greeter(name: string) {
         self.name = name
     }
 
     void hello(self) {
-        println!("Hello, {}!", self.name)
+        println("Hello, ${self.name}!")
     }
 }
 
-Greeter::new("Brian".to_string()).hello()
+func main() {
+    Greeter::new("Brian").hello()
+}
 ```
 
 The class lowers to a Rust `struct` + `impl`. The constructor (same name
 as the class) becomes `pub fn new(...) -> Self`, and methods declared as
-`void name(self)` become `pub fn name(&self)`. Use `cforge run main.mika`
-to see it print `Hello, Brian!`.
+`void name(self)` become `pub fn name(&self)`. Use `mikasa run main.mika`
+(or `astra run main.mika`) to see it print `Hello, Brian!`.
 
 ### Loops, match, optional chaining, ternary
 
-```crs
+```mika
 mut count = 0
 loop {
     count++
     if count == 3 { break }
 }
 
-mut user: Option<User> = Some(User { name: "Brian".to_string(), age: 30 })
+mut user: Option<User> = Some(User { name: "Brian", age: 30 })
 mut age = user?.age              // Some(30)
 
 mut grade = score >= 9 ? "A" : "B"
 
-match n {
+mut kind = match n {
     0 => 0,
     1 | 2 | 3 => 1,
     n if n < 0 => -1,
@@ -197,28 +208,31 @@ match n {
 }
 ```
 
-See [`examples/`](./examples) for runnable demos of each feature.
+See [`examples/mikasa/`](./examples/mikasa) for runnable demos of each feature.
+Run the automated suite with `python tests/run_all.py`.
 
-### Built-in `cstd` standard library
+### Built-in `mika` standard library
 
 Rust's standard library is powerful but verbose for everyday scripting tasks
 (reading a line of input, sleeping, getting the current time, running a shell
-command). Mikasa ships an embedded `cstd` module — import what you need and
-the compiler injects only the helpers you used:
+command). Mikasa ships an embedded `mika` module (`cstd` is the deprecated
+alias) — import what you need:
 
-```copper
-import { input, read_int, sleep_ms, now_ms, run, exit, env, exists } from cstd
+```mika
+import { trim, sleep_ms, now_ms, run, env, exists } from mika
 
-name = input("Your name? ")
-age  = read_int("Age: ")
-println!("Hello $name ($age)")
+func main() {
+    mut name = trim("  Ada  ")
+    println("Hello $name")
 
-started = now_ms()
-sleep_ms(100)
-println!("slept ~{}ms", now_ms() - started)
+    mut started = now_ms()
+    sleep_ms(100)
+    println("slept ~${now_ms() - started}ms")
 
-println!("HOME = {}", env("HOME"))
-println!("ls -> {}", run("ls"))
+    println("HOME = ${env("HOME")}")
+    println("exists Cargo.toml? ${exists("Cargo.toml")}")
+    println("echo -> ${trim(run("echo hi"))}")
+}
 ```
 
 Available functions: `input`, `readln`, `read_int`, `read_float`, `to_int`,
