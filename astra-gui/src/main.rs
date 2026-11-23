@@ -13,9 +13,10 @@
 //! (needs MOCIDA_INCLUDE_DIR / MOCIDA_LIB_DIR — see mocida-sys).
 
 // The GUI itself is Mikasa (`astra.mui`). This host is the one piece that has
-// to be Rust: it links mocida and drives the window. The logic it calls lives
-// in `backend.mika`, which the build script lowers to Rust before linking.
-#[path = "../backend.mika"]
+// to be Rust: it links mocida and drives the window. The decisions it asks
+// about — version comparison, reading the release JSON — live in
+// `backend.mika` and are transpiled into the module below.
+#[path = "backend_gen.rs"]
 mod backend;
 
 use std::path::Path;
@@ -26,8 +27,8 @@ fn main() -> ExitCode {
 
     match args.first().map(String::as_str) {
         None | Some("gui") => run_gui(),
-        Some("update") => match backend::check_update() {
-            info if info.available => match backend::apply_update(&info.asset_url) {
+        Some("update") => match check_for_update() {
+            info if info.available => match apply_release(&info.asset_url) {
                 Ok(()) => {
                     println!("Astra updated to {}", info.latest);
                     ExitCode::SUCCESS
@@ -38,7 +39,7 @@ fn main() -> ExitCode {
                 }
             },
             info => {
-                println!("Astra {} is already the latest version ({})", info.current, info.latest);
+                println!("Astra is already the latest version ({})", info.latest);
                 ExitCode::SUCCESS
             }
         },
@@ -136,6 +137,110 @@ fn register_assets(manifest_dir: &std::path::Path) {
                 &format!("mocida://icons/{name}.png"),
                 &path.to_string_lossy(),
             );
+        }
+    }
+}
+
+/// Run editor source through the interpreter. The backend decides nothing
+/// here — running is the host's job because it owns the interpreter.
+fn run_editor_source(src: &str) -> backend_run::RunResult {
+    backend_run::run(src)
+}
+
+struct ReleaseInfo {
+    latest: String,
+    available: bool,
+    asset_url: String,
+}
+
+/// Ask GitHub, then let the Mikasa backend decide whether the release is
+/// newer and which asset matches this OS.
+fn check_for_update() -> ReleaseInfo {
+    let current = backend::current_version();
+    let body = std::process::Command::new("curl")
+        .args([
+            "-sSL",
+            "-H",
+            "User-Agent: astra",
+            "https://api.github.com/repos/liy77/mikasa/releases/latest",
+        ])
+        .output()
+        .ok()
+        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
+        .unwrap_or_default();
+    let os_key = if cfg!(target_os = "windows") {
+        "windows"
+    } else if cfg!(target_os = "macos") {
+        "apple"
+    } else {
+        "linux"
+    };
+    // "current|latest|yes|asset" — the format backend.mika's describe_update
+    // returns.
+    let described = backend::describe_update(&body, &current, os_key);
+    let parts: Vec<&str> = described.splitn(4, '|').collect();
+    ReleaseInfo {
+        latest: parts.get(1).unwrap_or(&"").to_string(),
+        available: parts.get(2).copied() == Some("yes"),
+        asset_url: parts.get(3).unwrap_or(&"").to_string(),
+    }
+}
+
+/// Download a release and swap it over the running executable.
+fn apply_release(url: &str) -> Result<(), String> {
+    if url.is_empty() {
+        return Err("no release asset for this platform".into());
+    }
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let tmp = exe.with_extension("new");
+    let status = std::process::Command::new("curl")
+        .args(["-sSL", "-o"])
+        .arg(&tmp)
+        .arg(url)
+        .status()
+        .map_err(|e| e.to_string())?;
+    if !status.success() {
+        return Err("download failed".into());
+    }
+    std::fs::rename(&tmp, &exe).map_err(|e| e.to_string())
+}
+
+/// The interpreter, kept in its own module so the Mikasa backend stays free
+/// of it. `backend.mika` answers questions; this runs programs.
+mod backend_run {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use alloy_vm::interp::Interpreter;
+    use copper_syntax::program::parse_program;
+
+    pub struct RunResult {
+        pub output: String,
+        pub error: Option<String>,
+    }
+
+    pub fn run(src: &str) -> RunResult {
+        let prog = parse_program(src);
+        if !prog.errors.is_empty() {
+            let msg = prog
+                .errors
+                .iter()
+                .map(|e| format!("syntax @ {}..{}: {}", e.span.start, e.span.end, e.message))
+                .collect::<Vec<_>>()
+                .join("\n");
+            return RunResult {
+                output: String::new(),
+                error: Some(msg),
+            };
+        }
+        let buf: Rc<RefCell<String>> = Rc::new(RefCell::new(String::new()));
+        let result = Interpreter::with_output(Rc::clone(&buf)).run_program(&prog);
+        let output = buf.borrow().clone();
+        RunResult {
+            output,
+            error: result
+                .err()
+                .map(|e| format!("runtime @ {}..{}: {}", e.span.start, e.span.end, e.message)),
         }
     }
 }
@@ -403,11 +508,13 @@ fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
                 // file; otherwise run the editor `source` (Playground).
                 let path = r.get_str("path_field").unwrap_or_default();
                 let src = if !path.is_empty() && std::path::Path::new(&path).is_file() {
-                    backend::read_file(&path).unwrap_or_default()
+                    std::fs::read_to_string(&path).unwrap_or_default()
                 } else {
                     r.get_str("source").unwrap_or_default()
                 };
-                let res = backend::run_source(&src);
+                // The decision to run is the host's (it owns the interpreter);
+                // the backend only answers questions about the result.
+                let res = run_editor_source(&src);
                 let failed = res.error.is_some();
                 let shown = match res.error {
                     Some(err) => format!("{}{}", res.output, err),
@@ -427,13 +534,13 @@ fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
                     .pick_file()
                 {
                     let p = path.to_string_lossy().into_owned();
-                    match backend::read_file(&p) {
+                    match std::fs::read_to_string(&p) {
                         Ok(src) => {
                             r.set_str("source", &src);
                             r.set_str("path_field", &p);
                             r.set_str("output", "");
                         }
-                        Err(e) => r.set_str("output", &e),
+                        Err(e) => r.set_str("output", &e.to_string()),
                     }
                 }
             }
@@ -442,9 +549,9 @@ fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
             let upd_n = r.get("update_trigger").unwrap_or(0);
             if upd_n != *last_update.borrow() {
                 *last_update.borrow_mut() = upd_n;
-                let info = backend::check_update();
+                let info = check_for_update();
                 let msg = if info.available {
-                    match backend::apply_update(&info.asset_url) {
+                    match apply_release(&info.asset_url) {
                         Ok(()) => format!("Updated to {} — restart Astra.", info.latest),
                         Err(e) => format!("Update failed: {e}"),
                     }
