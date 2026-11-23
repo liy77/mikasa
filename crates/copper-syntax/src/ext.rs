@@ -109,6 +109,25 @@ pub fn source_is_mui(src: &str) -> bool {
     false
 }
 
+/// The standard library module. `import { x } from mika` is the current
+/// spelling; `cstd` still resolves to the same module.
+pub const STDLIB: &str = "mika";
+/// The original standard library module name. Deprecated, still accepted.
+pub const STDLIB_LEGACY: &str = "cstd";
+
+/// True for the standard library module, under either name.
+pub fn is_stdlib(module: &str) -> bool {
+    let module = module.trim_matches('"');
+    module == STDLIB || module == STDLIB_LEGACY
+}
+
+/// The warning for an `import … from cstd`. `None` for `mika`.
+pub fn stdlib_deprecation(module: &str) -> Option<String> {
+    (module.trim_matches('"') == STDLIB_LEGACY).then(|| {
+        format!("Deprecated: `cstd` is no longer recommended. Import from `{STDLIB}` instead.")
+    })
+}
+
 /// The warning `mikasa build` and `mikasa run` print for a legacy extension.
 ///
 /// The file still builds and runs — the old spelling is deprecated, not
@@ -170,6 +189,15 @@ mod tests {
         assert!(legacy_note("mika").is_none());
         assert!(legacy_note("ast").is_none());
         assert!(legacy_note("crm").unwrap().contains("retired"));
+    }
+
+    #[test]
+    fn cstd_is_the_deprecated_spelling_of_mika() {
+        assert!(is_stdlib("mika"));
+        assert!(is_stdlib("cstd"));
+        assert!(!is_stdlib("fs"));
+        assert!(stdlib_deprecation("cstd").unwrap().contains("mika"));
+        assert!(stdlib_deprecation("mika").is_none());
     }
 
     #[test]

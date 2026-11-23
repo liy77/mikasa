@@ -31,7 +31,7 @@ pub fn dispatch(
     // interpreter cannot execute (`run`, `list_dir`, `append_file`, `rand_int`)
     // are implemented natively here; everything else returns `None` so the
     // dispatcher falls through to the interpreted Copper definition.
-    if module == "cstd" {
+    if copper_syntax::ext::is_stdlib(module) {
         return cstd(name, args, span);
     }
     let r = match module {
@@ -47,7 +47,8 @@ pub fn dispatch(
 
 /// Set of modules handled by this layer (for import registration).
 pub fn handles(module: &str) -> bool {
-    matches!(module, "cstd" | "fs" | "time" | "url" | "net" | "ws")
+    copper_syntax::ext::is_stdlib(module)
+        || matches!(module, "fs" | "time" | "url" | "net" | "ws")
 }
 
 // --- helpers de extração de argumentos ------------------------------------

@@ -80,6 +80,13 @@ fn run(file: &Path) -> ExitCode {
             eprintln!("note: {note}");
         }
     }
+    if let Ok(src) = std::fs::read_to_string(file) {
+        if src.contains("from cstd") {
+            if let Some(warning) = alloy_vm::source_ext::stdlib_deprecation("cstd") {
+                eprintln!("warning: {warning}");
+            }
+        }
+    }
     // Resolve the program + Rust to run via wasm (`.rs` to compile, or modules
     // already embedded in an `.ast` / `.loy`).
     let resolved = match loader::resolve_runnable_wasm(file) {

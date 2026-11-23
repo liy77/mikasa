@@ -157,7 +157,7 @@ fn collect(
                 // truth) — merge the imported functions so the interpreter runs
                 // them. The few native-only ones (CSTD_NATIVE) resolve through
                 // the stdlib dispatch instead and are skipped here.
-                if module == "cstd" {
+                if copper_syntax::ext::is_stdlib(module) {
                     if let Item::Import { kind, .. } = &item {
                         merge_cstd(kind, out);
                     }

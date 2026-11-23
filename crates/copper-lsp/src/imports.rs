@@ -170,7 +170,7 @@ pub fn resolve(module: &str, doc_dir: Option<&Path>) -> Resolution {
             }
             return Resolution::Stdlib;
         }
-        "cstd" => return Resolution::Cstd,
+        "cstd" | "mika" => return Resolution::Cstd,
         _ => {}
     }
     if let Some(dir) = doc_dir {

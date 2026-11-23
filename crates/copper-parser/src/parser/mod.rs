@@ -2014,7 +2014,15 @@ impl Parser {
                     self.project_root.as_deref(),
                 );
                 let root = module.split("::").next().unwrap_or(module.as_str());
-                if root == "cstd" || module == "cstd" {
+                if copper_syntax::ext::is_stdlib(root) || copper_syntax::ext::is_stdlib(&module)
+                {
+                    // `cstd` is the deprecated name. Both spellings land on the
+                    // one stdlib crate, which is aliased as `mika`.
+                    if module == "cstd" {
+                        let cut = self.result.value.len().saturating_sub(module.len());
+                        self.result.value.truncate(cut);
+                        self.result.append("mika", false);
+                    }
                     for var in &self.current_import_vars {
                         self.result.mark_cstd_used(var);
                     }
@@ -4529,7 +4537,10 @@ impl Parser {
         // `use <name>::{X}` references resolve against the crate.
         let mut targets: Vec<(String, &'static str, &'static str)> = Vec::new();
         if self.result.cstd_is_used() {
-            targets.push(("cstd".to_string(), CSTD_SOURCE, ""));
+            // The crate keeps the `cstd` name internally; the alias is `mika`,
+            // which is what new code imports. `cstd` still resolves because the
+            // import was rewritten to `mika` before it reached here.
+            targets.push(("mika".to_string(), CSTD_SOURCE, ""));
         }
         for name in self.result.used_std_modules() {
             if let Some((crs, native)) = Self::std_module_sources(&name) {

@@ -215,11 +215,18 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
 /// `mikasa run` call this; the file still works, the spelling is what aged.
 fn warn_deprecated_extension(file: Option<&String>) {
     let Some(file) = file else { return };
-    let Some(ext) = path::Path::new(file).extension().and_then(|e| e.to_str()) else {
-        return;
-    };
-    if let Some(warning) = copper_syntax::ext::deprecation_warning(ext) {
-        eprintln!("warning: {warning}");
+    if let Some(ext) = path::Path::new(file).extension().and_then(|e| e.to_str()) {
+        if let Some(warning) = copper_syntax::ext::deprecation_warning(ext) {
+            eprintln!("warning: {warning}");
+        }
+    }
+    // `import { … } from cstd` still resolves, but `mika` is the name now.
+    if let Ok(src) = std::fs::read_to_string(file) {
+        if src.contains("from cstd") {
+            if let Some(warning) = copper_syntax::ext::stdlib_deprecation("cstd") {
+                eprintln!("warning: {warning}");
+            }
+        }
     }
 }
 
