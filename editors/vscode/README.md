@@ -1,15 +1,17 @@
 # Mikasa for VSCode
 
-Language support for [Mikasa](https://github.com/liy77/copper-lang) (`.crs`).
-Mikasa was formerly called Copper.
+Language support for [Mikasa](https://github.com/liy77/mikasa) (`.mika`, and the
+legacy `.crs`). Mikasa was formerly called Copper.
 
 ## Features
 
-- Syntax highlighting (TextMate grammar).
-- Diagnostics (syntax errors, brace/paren/bracket balance).
-- Document symbols (functions, structs, classes, impls, imports).
-- Hover hints for built-in keywords and type aliases.
+- Syntax highlighting, including `guard`, `defer`, and MocidaUI markup inside a `.mika`.
+- Snippets: `guard`, `guardlet`, `defer`, `func`, `struct`, `impl`, `match`, `import`.
+- Diagnostics (syntax errors, unresolved imports).
+- Document symbols, go to definition, hover, signature help.
 - Completion: keywords, file-local symbols, `cstd::*` helpers.
+- Semantic tokens, folding, and format document.
+- Run and debug the current file (Astra interprets it; `mikasa` transpiles it).
 
 ## Requirements
 
@@ -27,6 +29,9 @@ cargo build --release -p copper-lsp
 |---------|---------|--------------|
 | `copper.serverPath` | `copper-lsp` | Executable to launch as the LSP server. |
 | `copper.trace.server` | `off` | LSP message tracing — `off` / `messages` / `verbose`. |
+| `mikasa.runtime` | `astra` | `astra` interprets, `mikasa` transpiles to Rust. |
+| `mikasa.astraPath` | `alloy` | Path to the Astra interpreter. |
+| `mikasa.mikasaPath` | `mikasa` | Path to the transpiler. |
 
 ## Building the extension
 

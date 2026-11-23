@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { registerDebugger } from './debug';
 import {
   LanguageClient,
   LanguageClientOptions,
@@ -44,7 +45,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: 'file', language: 'copper' }],
     synchronize: {
-      fileEvents: vscode.workspace.createFileSystemWatcher('**/*.crs'),
+      fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{mika,crs}'),
     },
   };
 
@@ -62,6 +63,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       `Could not start copper-lsp at "${serverPath}". Set "copper.serverPath" or install the binary on PATH. (${err})`
     );
   }
+
+  registerDebugger(context);
 
   context.subscriptions.push(
     vscode.commands.registerCommand('copper.restartLanguageServer', async () => {

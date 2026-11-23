@@ -71,11 +71,11 @@
         {
           "comment": "Visibility / memory / safety / linkage / async modifiers.",
           "name": "storage.modifier.copper",
-          "match": "\\b(pub|public|unsafe|extern|async|await|static|const|dyn|where|mut|ref|move)\\b"
+          "match": "\\b(pub|public|unsafe|extern|async|await|static|const|dyn|where|mut|ref|move|own)\\b"
         },
         {
           "name": "keyword.declaration.copper",
-          "match": "\\b(func|struct|class|impl|trait|enum|let|import|from|as|use)\\b"
+          "match": "\\b(func|struct|class|impl|trait|enum|let|import|from|as|use|type|mod)\\b"
         },
         {
           "name": "constant.language.copper",

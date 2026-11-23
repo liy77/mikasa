@@ -108,6 +108,31 @@ impl LanguageServer for Backend {
                     work_done_progress_options: Default::default(),
                 }),
                 definition_provider: Some(OneOf::Left(true)),
+                folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
+                document_formatting_provider: Some(OneOf::Left(true)),
+                semantic_tokens_provider: Some(
+                    SemanticTokensServerCapabilities::SemanticTokensOptions(
+                        SemanticTokensOptions {
+                            legend: SemanticTokensLegend {
+                                token_types: vec![
+                                    SemanticTokenType::KEYWORD,
+                                    SemanticTokenType::FUNCTION,
+                                    SemanticTokenType::TYPE,
+                                    SemanticTokenType::VARIABLE,
+                                    SemanticTokenType::NUMBER,
+                                    SemanticTokenType::STRING,
+                                    SemanticTokenType::COMMENT,
+                                    SemanticTokenType::OPERATOR,
+                                    SemanticTokenType::MACRO,
+                                ],
+                                token_modifiers: vec![],
+                            },
+                            full: Some(SemanticTokensFullOptions::Bool(true)),
+                            range: Some(false),
+                            ..Default::default()
+                        },
+                    ),
+                ),
                 ..Default::default()
             },
         })
@@ -202,6 +227,56 @@ impl LanguageServer for Backend {
             .collect();
 
         Ok(Some(DocumentSymbolResponse::Nested(symbols)))
+    }
+
+    async fn folding_range(
+        &self,
+        params: FoldingRangeParams,
+    ) -> Result<Option<Vec<FoldingRange>>> {
+        let Some(doc) = self.docs.get(&params.text_document.uri) else {
+            return Ok(None);
+        };
+        let text = doc.text.to_string();
+        drop(doc);
+        Ok(Some(folding_ranges(&text)))
+    }
+
+    async fn formatting(&self, params: DocumentFormattingParams) -> Result<Option<Vec<TextEdit>>> {
+        let Some(doc) = self.docs.get(&params.text_document.uri) else {
+            return Ok(None);
+        };
+        let text = doc.text.to_string();
+        let end = doc.byte_to_position_pub(text.len());
+        drop(doc);
+        let formatted = format_source(&text);
+        if formatted == text {
+            return Ok(Some(vec![]));
+        }
+        Ok(Some(vec![TextEdit {
+            range: Range {
+                start: Position {
+                    line: 0,
+                    character: 0,
+                },
+                end,
+            },
+            new_text: formatted,
+        }]))
+    }
+
+    async fn semantic_tokens_full(
+        &self,
+        params: SemanticTokensParams,
+    ) -> Result<Option<SemanticTokensResult>> {
+        let Some(doc) = self.docs.get(&params.text_document.uri) else {
+            return Ok(None);
+        };
+        let text = doc.text.to_string();
+        drop(doc);
+        Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
+            result_id: None,
+            data: semantic_tokens(&text),
+        })))
     }
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
@@ -1580,6 +1655,140 @@ struct CstdFn {
 }
 
 const CSTD_SOURCE: &str = include_str!("../../../std/cstd.crs");
+
+/// Brace-delimited ranges the editor can fold. A `defer` or `guard` block
+/// folds like any other block — the tokenizer already knows where each brace
+/// opens and closes.
+fn folding_ranges(text: &str) -> Vec<FoldingRange> {
+    let mut tokenizer = copper_syntax::tokenizer::tokenizer::Tokenizer::new(text.to_string());
+    let tokens = tokenizer.tokenize();
+    let mut stack: Vec<u32> = Vec::new();
+    let mut ranges = Vec::new();
+    for token in &tokens {
+        let Some(loc) = &token.location_data else {
+            continue;
+        };
+        let line = loc.first_line.max(0) as u32;
+        match token.kind {
+            copper_syntax::tokenizer::kind::TokenKind::BraceStart => stack.push(line),
+            copper_syntax::tokenizer::kind::TokenKind::BraceEnd => {
+                if let Some(start) = stack.pop() {
+                    if line > start {
+                        ranges.push(FoldingRange {
+                            start_line: start,
+                            start_character: None,
+                            end_line: line,
+                            end_character: None,
+                            kind: Some(FoldingRangeKind::Region),
+                            collapsed_text: None,
+                        });
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    ranges
+}
+
+/// Re-indent on braces and trim trailing whitespace. Conservative on purpose:
+/// it never rewrites a token, so a formatted file parses the same as before.
+fn format_source(text: &str) -> String {
+    let mut out = String::new();
+    let mut indent: usize = 0;
+    for raw in text.split_inclusive('\n') {
+        let line = raw.trim_end_matches(['\n', '\r']);
+        let trimmed = line.trim();
+        if trimmed.starts_with('}') || trimmed.starts_with(']') || trimmed.starts_with(')') {
+            indent = indent.saturating_sub(1);
+        }
+        if !trimmed.is_empty() {
+            for _ in 0..indent {
+                out.push_str("    ");
+            }
+            out.push_str(trimmed);
+        }
+        if raw.ends_with('\n') {
+            out.push('\n');
+        }
+        let opens = trimmed.matches('{').count() + trimmed.matches('[').count();
+        let closes = trimmed.matches('}').count() + trimmed.matches(']').count();
+        if opens > closes {
+            indent += opens - closes;
+        }
+    }
+    out
+}
+
+/// Semantic token type indexes — must match the legend advertised in
+/// `initialize`.
+const ST_KEYWORD: u32 = 0;
+const ST_FUNCTION: u32 = 1;
+const ST_TYPE: u32 = 2;
+const ST_VARIABLE: u32 = 3;
+const ST_NUMBER: u32 = 4;
+const ST_STRING: u32 = 5;
+const ST_COMMENT: u32 = 6;
+const ST_OPERATOR: u32 = 7;
+const ST_MACRO: u32 = 8;
+
+fn token_type(kind: &copper_syntax::tokenizer::kind::TokenKind, value: &str) -> Option<u32> {
+    use copper_syntax::tokenizer::kind::TokenKind::*;
+    Some(match kind {
+        Keyword | For | Loop | While | Break | Continue | In | Yield | From | Import | As
+        | Public | Own => ST_KEYWORD,
+        Number => ST_NUMBER,
+        String | InterpolatedString => ST_STRING,
+        Comment | DocComment => ST_COMMENT,
+        Operator | OptionalChain => ST_OPERATOR,
+        Identifier if value.ends_with('!') => ST_MACRO,
+        Identifier if value
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_uppercase()) =>
+        {
+            ST_TYPE
+        }
+        Identifier => ST_VARIABLE,
+        ReturnType => ST_TYPE,
+        _ => return None,
+    })
+}
+
+/// Encode the token stream as LSP semantic tokens (delta-encoded).
+fn semantic_tokens(text: &str) -> Vec<SemanticToken> {
+    let mut tokenizer = copper_syntax::tokenizer::tokenizer::Tokenizer::new(text.to_string());
+    let tokens = tokenizer.tokenize();
+    let mut out = Vec::new();
+    let mut prev_line: u32 = 0;
+    let mut prev_col: u32 = 0;
+    for token in &tokens {
+        let Some(ty) = token_type(&token.kind, &token.value) else {
+            continue;
+        };
+        let Some(loc) = &token.location_data else {
+            continue;
+        };
+        let line = loc.first_line.max(0) as u32;
+        let col = loc.first_column as u32;
+        let delta_line = line - prev_line;
+        let delta_start = if delta_line == 0 {
+            col - prev_col
+        } else {
+            col
+        };
+        out.push(SemanticToken {
+            delta_line,
+            delta_start,
+            length: token.length as u32,
+            token_type: ty,
+            token_modifiers_bitset: 0,
+        });
+        prev_line = line;
+        prev_col = col;
+    }
+    out
+}
 
 static CSTD_FNS: Lazy<Vec<CstdFn>> = Lazy::new(|| {
     let parsed = copper_syntax::ast::parse(CSTD_SOURCE);

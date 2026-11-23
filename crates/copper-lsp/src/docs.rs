@@ -43,6 +43,10 @@ impl Document {
         }
     }
 
+    pub fn byte_to_position_pub(&self, byte: usize) -> Position {
+        self.byte_to_position(byte)
+    }
+
     fn byte_to_position(&self, byte: usize) -> Position {
         let byte = byte.min(self.text.len_bytes());
         let char_idx = self.text.byte_to_char(byte);

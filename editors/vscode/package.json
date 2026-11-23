@@ -6,7 +6,7 @@
   "publisher": "copper-lang",
   "repository": {
     "type": "git",
-    "url": "https://github.com/liy77/copper-lang"
+    "url": "https://github.com/liy77/mikasa"
   },
   "engines": {
     "vscode": "^1.85.0"
@@ -46,7 +46,76 @@
         "command": "copper.restartLanguageServer",
         "title": "Restart Language Server",
         "category": "Mikasa"
+      },
+      {
+        "command": "mikasa.runFile",
+        "title": "Run Current File",
+        "category": "Mikasa"
+      },
+      {
+        "command": "mikasa.debugFile",
+        "title": "Debug Current File",
+        "category": "Mikasa"
       }
+    ],
+    "snippets": [
+      {
+        "language": "copper",
+        "path": "./snippets/mikasa.code-snippets"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "mikasa",
+        "label": "Mikasa",
+        "languages": ["copper"],
+        "configurationAttributes": {
+          "launch": {
+            "required": ["program"],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "The .mika file to run.",
+                "default": "${file}"
+              },
+              "args": {
+                "type": "array",
+                "description": "Arguments passed to the program.",
+                "items": { "type": "string" },
+                "default": []
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Break on the first line.",
+                "default": false
+              },
+              "runtime": {
+                "type": "string",
+                "enum": ["astra", "mikasa"],
+                "description": "astra interprets instantly; mikasa transpiles to Rust and runs the binary.",
+                "default": "astra"
+              }
+            }
+          }
+        },
+        "configurationSnippets": [
+          {
+            "label": "Mikasa: run the current file",
+            "description": "Interpret the open .mika with Astra and break on the first line.",
+            "body": {
+              "name": "Run ${fileBasename}",
+              "type": "mikasa",
+              "request": "launch",
+              "program": "${file}",
+              "runtime": "astra",
+              "stopOnEntry": true
+            }
+          }
+        ]
+      }
+    ],
+    "breakpoints": [
+      { "language": "copper" }
     ],
     "grammars": [
       {
@@ -73,6 +142,22 @@
           "enum": ["off", "messages", "verbose"],
           "default": "off",
           "description": "Traces the LSP communication."
+        },
+        "mikasa.runtime": {
+          "type": "string",
+          "enum": ["astra", "mikasa"],
+          "default": "astra",
+          "description": "How Run and the debugger execute a .mika: astra interprets it, mikasa transpiles it to Rust."
+        },
+        "mikasa.mikasaPath": {
+          "type": "string",
+          "default": "mikasa",
+          "description": "Path to the mikasa transpiler, used when mikasa.runtime is mikasa."
+        },
+        "mikasa.astraPath": {
+          "type": "string",
+          "default": "alloy",
+          "description": "Path to the Astra interpreter (binary name alloy)."
         }
       }
     }
