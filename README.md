@@ -72,7 +72,7 @@ servers in one shot.
 ```sh
 mikasa run ./main.mika         # transpile + cargo run
 mikasa build ./src             # compile only, directory input
-mikasa run examples/copper/loops.mika
+mikasa run examples/mikasa/loops.mika
 ```
 
 `mikasa run` and `mikasa build` warn when the file uses a legacy extension
@@ -262,19 +262,19 @@ copper-lang/
 
 ```sh
 # cforge (transpile → Rust)
-mikasa run examples/copper/loops.mika           # loop / while / for / break / continue
-mikasa run examples/copper/interpolation.mika   # "Hello $name", "${expr}"
-mikasa run examples/copper/collections.mika     # vec literals, closures, ?
-mikasa run examples/copper/matching.mika        # match arms, if let, while let
-mikasa run examples/copper/optional.mika        # `?.` optional chaining
-mikasa run examples/copper/ternary.mika         # `cond ? a : b`
-mikasa run examples/copper/cstd.mika            # built-in stdlib (input, sleep, env, ...)
-mikasa run examples/copper/unsafe.mika          # `unsafe func` and `unsafe { ... }` blocks
+mikasa run examples/mikasa/loops.mika           # loop / while / for / break / continue
+mikasa run examples/mikasa/interpolation.mika   # "Hello $name", "${expr}"
+mikasa run examples/mikasa/collections.mika     # vec literals, closures, ?
+mikasa run examples/mikasa/matching.mika        # match arms, if let, while let
+mikasa run examples/mikasa/optional.mika        # `?.` optional chaining
+mikasa run examples/mikasa/ternary.mika         # `cond ? a : b`
+mikasa run examples/mikasa/cstd.mika            # built-in stdlib (input, sleep, env, ...)
+mikasa run examples/mikasa/unsafe.mika          # `unsafe func` and `unsafe { ... }` blocks
 
 # Astra (interpreter — instant)
-alloy run examples/copper/loops.mika
-alloy run examples/copper/cstd.mika
-alloy build examples/copper/collections.mika -o collections.loy
+alloy run examples/mikasa/loops.mika
+alloy run examples/mikasa/cstd.mika
+alloy build examples/mikasa/collections.mika -o collections.loy
 alloy run collections.loy
 
 # MUI examples (need mui-dev on PATH):

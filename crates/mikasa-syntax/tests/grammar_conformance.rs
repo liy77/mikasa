@@ -150,7 +150,7 @@ fn statement_snippets_parse_clean() {
 /// by the language authors, so they are the truest drift signal.
 #[test]
 fn example_interpolations_parse() {
-    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/copper");
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/mikasa");
     let mut checked = 0;
     let mut failures = Vec::new();
     let entries = match std::fs::read_dir(dir) {

@@ -36,7 +36,7 @@ same behaviour** on both paths.
 alloy run program.mika
 ```
 
-Example (`examples/copper/alloy-hello.mika`):
+Example (`examples/mikasa/alloy-hello.mika`):
 
 ```rust
 func int sum_to(n: int) {
@@ -55,14 +55,14 @@ func main() {
 ```
 
 ```sh
-$ alloy run examples/copper/alloy-hello.mika
+$ alloy run examples/mikasa/alloy-hello.mika
 Astra VM
 sum 1..5 = 10
 ```
 
 ## Supported today
 
-All 19 `examples/copper/*.mika` run under `alloy run`.
+All 19 `examples/mikasa/*.mika` run under `alloy run`.
 
 - Scalar literals (`int`, `float`, `bool`, `str`) and `"${expr}"` interpolation;
   `println!`/`print!` with `{}`/`{:?}` format args.

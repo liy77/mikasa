@@ -73,7 +73,7 @@ CalVer scheme (`0.YY.M`, stamped from the build date).
   `func Option<T> find(self, xs: Vec<T>)` no longer silently drops the method.
   `process_impl_methods` now gobbles the `<…>` after the return-type base (so it
   finds the real method name) and on param types (so `Vec<T>` isn't split at the
-  inner comma). New example: `examples/copper/methods.crs`.
+  inner comma). New example: `examples/mikasa/methods.crs`.
 - **Copper: `impl` method bodies now lower through the real statement machinery**
   (a sub-parser) instead of a naive token-join. Multi-statement bodies get `let`
   injection and `;` terminators, instead of collapsing onto one invalid line
@@ -116,7 +116,7 @@ top of the mocida toolkit.
 - **VS Code extension** for Mikasa + MUI.
 - **MUI-based GUI installer** (declarative `.mui`, no Tauri/webview shell) with a
   scope-detecting install flow.
-- **Examples** under `examples/copper/` (language features) and `examples/mui/`
+- **Examples** under `examples/mikasa/` (language features) and `examples/mui/`
   (hello, counter, keyboard, styled, app, card, dashboard, bundle-demo, crm,
   video, webview).
 - Cross-platform Python tooling (`scripts/`), CalVer + git-hash versioning, and

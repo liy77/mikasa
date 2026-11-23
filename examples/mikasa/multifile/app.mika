@@ -1,4 +1,4 @@
-// Importa um .crs irmão — o Alloy funde os itens e roda instantâneo.
+// Imports a sibling .mika — Astra merges the items and runs them instantly.
 import { dobro, quadrado } from math
 
 func main() {

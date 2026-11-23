@@ -143,9 +143,9 @@ Required env vars: `MOCIDA_INCLUDE_DIR`, `MOCIDA_LIB_DIR`, `MOCIDA_LIB_NAME=moci
 ## Adding a new feature
 
 1. **Where does it live?** Tokenizer = atomic syntactic forms (`?.`, `$ident`). Token rewrite = macro-like context-local rewrites (`ternary.rs`). Parser dispatch = emission that needs result state.
-2. **New TokenKind:** add to `kind.rs`, emit in tokenizer, add dispatch arm in `parser/mod.rs`, add to `is_chain_breaker`, add `examples/copper/<feature>.crs`.
+2. **New TokenKind:** add to `kind.rs`, emit in tokenizer, add dispatch arm in `parser/mod.rs`, add to `is_chain_breaker`, add `examples/mikasa/<feature>.crs`.
 3. **Token rewrite:** `Vec<Token>` → `Vec<Token>`, iterate-until-fixed-point, synthetic tokens via `Token::new(..., generated: true)`, wire into `Parser::new` after whitespace filter.
-4. **Regression suite:** `for f in examples/copper/*.crs; do ./target/debug/cforge run "$f"; done`
+4. **Regression suite:** `for f in examples/mikasa/*.crs; do ./target/debug/cforge run "$f"; done`
 5. **Preserve `cforge --version`** output after touching `build.rs` or `main.rs`.
 
 ## What NOT to change without asking
@@ -203,7 +203,7 @@ cargo build --release          # release (what install.py runs)
 cargo fmt -- --check
 cargo clippy -- -D warnings
 cargo test                     # tests in mikasa-syntax interpolation
-for f in examples/copper/*.crs; do ./target/debug/cforge run "$f"; done
+for f in examples/mikasa/*.crs; do ./target/debug/cforge run "$f"; done
 python scripts/install.py      # reinstall; open NEW terminal after
 ```
 
