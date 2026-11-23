@@ -342,12 +342,12 @@ pub enum Stmt {
     },
     /// `unsafe { .. }` block in statement position.
     Unsafe { body: Block, span: Span },
-    /// Swift-style `guard` early exit.
+    /// `guard` early exit.
     ///
     /// `guard cond else { exit }` continues only when `cond` holds; the `else`
     /// block must leave the enclosing scope. `guard let PAT = expr else { .. }`
-    /// binds `PAT` in the *enclosing* scope (not inside the guard), exactly
-    /// like Swift — the happy path falls through with the binding in scope.
+    /// binds `PAT` in the *enclosing* scope (not inside the guard) — the happy
+    /// path falls through with the binding in scope.
     Guard {
         cond: Expr,
         /// `Some(pat)` for `guard let pat = cond else { .. }`.
@@ -356,10 +356,10 @@ pub enum Stmt {
         els: Block,
         span: Span,
     },
-    /// Swift-style `defer { .. }`: the body runs when the enclosing scope
-    /// exits, whichever way it exits (`return`, `break`, `continue`, or
-    /// falling off the end), in reverse order of registration. A `defer`
-    /// only runs if control reached its line.
+    /// `defer { .. }`: the body runs when the enclosing scope exits, whichever
+    /// way it exits (`return`, `break`, `continue`, or falling off the end),
+    /// in reverse order of registration. A `defer` only runs if control
+    /// reached its line.
     Defer { body: Block, span: Span },
     /// A bare block `{ .. }`.
     BlockStmt(Block),
@@ -1584,8 +1584,8 @@ impl Parser {
                     let sp = self.cur_span();
                     self.bump();
                     // A following `defer` is the next statement, not the
-                    // returned value — `return` then `defer` is how Swift
-                    // writes an exit that skips the deferred block.
+                    // returned value — `return` then `defer` skips that
+                    // deferred block because control never reached it.
                     let value = if self.at_stmt_end(to) || self.peek_val() == Some("defer") {
                         None
                     } else {

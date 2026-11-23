@@ -1,0 +1,58 @@
+// Actors: isolated state behind `Arc<Mutex<_>>`. Methods take `&self` and
+// lock internally — safe to share across clones without `mut`.
+
+actor Counter {
+    count: int
+
+    func void inc(self) {
+        self.count += 1
+    }
+
+    func void add(self, n: int) {
+        self.count += n
+    }
+
+    func int get(self) {
+        return self.count
+    }
+}
+
+actor BankAccount {
+    balance: int
+
+    func bool deposit(self, amount: int) {
+        if amount <= 0 {
+            return false
+        }
+        self.balance += amount
+        return true
+    }
+
+    func bool withdraw(self, amount: int) {
+        if amount <= 0 || amount > self.balance {
+            return false
+        }
+        self.balance -= amount
+        return true
+    }
+
+    func int balance(self) {
+        return self.balance
+    }
+}
+
+// Counter — clone shares the same inner mutex.
+c = Counter::new(0)
+c.inc()
+c.inc()
+c2 = c.clone()
+c2.add(3)
+println!("counter shared = {} (via clone = {})", c.get(), c2.get())
+
+// Bank account — deposits / withdrawals under the lock.
+acct = BankAccount::new(100)
+ok1 = acct.deposit(50)
+ok2 = acct.withdraw(30)
+ok3 = acct.withdraw(999)
+println!("deposit50 = {}  withdraw30 = {}  withdraw999 = {}", ok1, ok2, ok3)
+println!("balance = {}", acct.balance())

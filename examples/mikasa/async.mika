@@ -1,0 +1,37 @@
+// Implicit Tokio — no `tokio::` in source. `async func`, `.await`, `sleep`,
+// `spawn`, `timeout`, and `join!` pull the runtime and wrap main with
+// `#[tokio::main]`.
+
+async func int tick(n: int) {
+    sleep(n)
+    return n
+}
+
+async func string greet(name: string) {
+    sleep(5)
+    return format!("hello, {}", name)
+}
+
+async func main() {
+    println!("-- sleep / spawn --")
+    sleep(20)
+
+    h = spawn({
+        sleep(10)
+        println!("spawned task done")
+    })
+    h.await.unwrap()
+
+    println!("-- join! --")
+    (a, b) = join!(tick(5), tick(8))
+    println!("joined = {} + {}", a, b)
+
+    println!("-- timeout --")
+    ok = timeout(100, tick(1))
+    slow = timeout(5, tick(50))
+    println!("fast  = {:?}", ok)
+    println!("slow  = {:?}", slow)
+
+    msg = greet("mikasa").await
+    println!("greet = {}", msg)
+}

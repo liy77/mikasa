@@ -215,7 +215,8 @@ const COPPER_KEYWORDS: &[&str] = &[
     "class", "extends", // Struct and Impl Keywords
     "struct", "impl", "trait", "for", // Data Format Types
     "json", "xml", "toml", // Visibility (alias for `pub`)
-    "public",
+    "public", // Language features
+    "codable", "actor", "willSet", "didSet",
 ];
 
 pub struct Tokenizer {
@@ -610,6 +611,40 @@ impl Tokenizer {
                     self.token(TokenKind::Attribute, attr);
                     return Consumed::Consumed(len as isize);
                 }
+            }
+        }
+
+        // `@Name` — property wrappers / result builders (`@Clamped`, `@resultBuilder`).
+        if self.current_char() == '@' {
+            let rest = &self.chunk[self.chunk_column..];
+            let mut end = 1usize; // skip '@'
+            let bytes = rest.as_bytes();
+            while end < bytes.len() {
+                let c = bytes[end] as char;
+                if c.is_ascii_alphanumeric() || c == '_' {
+                    end += 1;
+                } else {
+                    break;
+                }
+            }
+            if end > 1 {
+                let attr = rest[..end].to_string();
+                self.chunk_column += end;
+                self.token(TokenKind::AtIdent, attr);
+                return Consumed::Consumed(end as isize);
+            }
+        }
+
+        // KeyPath introducer `\Type.field`
+        if self.current_char() == '\\' {
+            let next = self.chunk[self.chunk_column..]
+                .chars()
+                .nth(1)
+                .unwrap_or('\0');
+            if next.is_ascii_alphabetic() || next == '_' {
+                self.chunk_column += 1;
+                self.token(TokenKind::KeyPathStart, "\\".to_string());
+                return Consumed::Consumed(1);
             }
         }
 

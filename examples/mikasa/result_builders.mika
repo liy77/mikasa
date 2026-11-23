@@ -1,0 +1,37 @@
+// Result builders: annotate a function with `@Builder` and write bare
+// expressions in the body — they become `Builder::buildBlock(vec![…])`.
+
+@resultBuilder
+struct IntList {}
+
+impl IntList {
+    func Vec<i64> buildBlock(parts: Vec<i64>) {
+        return parts
+    }
+}
+
+@resultBuilder
+struct StrList {}
+
+impl StrList {
+    func Vec<String> buildBlock(parts: Vec<String>) {
+        return parts
+    }
+}
+
+@IntList
+func Vec<i64> odds() {
+    1
+    3
+    5
+    7
+}
+
+@StrList
+func Vec<String> greet() {
+    "hello".to_string()
+    "mikasa".to_string()
+}
+
+println!("odds  = {:?}", odds())
+println!("greet = {:?}", greet())

@@ -25,7 +25,16 @@ pub(super) fn rewrite(tokens: Vec<Token>) -> Vec<Token> {
     let t2 = rewrite_arrow_lambdas(t1);
     let t3 = rewrite_try_catch(t2);
     let t4 = rewrite_null_coalesce(t3);
-    rewrite_defer(t4)
+    // Language sugar (observers, wrappers, builders, keypaths) before `defer`
+    // so deferred bodies are already lowered.
+    let t5 = super::mika_sugar::rewrite_observers(t4);
+    let t6 = super::mika_sugar::rewrite_property_wrappers(t5);
+    let t7 = super::mika_sugar::rewrite_result_builders(t6);
+    let t8 = super::mika_sugar::rewrite_keypaths(t7);
+    let t9 = super::mika_sugar::rewrite_json_literals(t8);
+    let t10 = super::mika_sugar::rewrite_decode_calls(t9);
+    let t11 = super::async_sugar::rewrite_async_builtins(t10);
+    rewrite_defer(t11)
 }
 
 fn synth(kind: TokenKind, value: &str) -> Token {
@@ -865,17 +874,17 @@ fn rewrite_try_catch(tokens: Vec<Token>) -> Vec<Token> {
 }
 
 // ============================================================================
-// 3b. `defer { body }` — Swift-style scope exit
+// 3b. `defer { body }` — scope-exit cleanup
 // ============================================================================
 
 /// Lower every `defer { body }` into a guard whose `Drop` runs the body.
 ///
-/// Rust drops locals in reverse declaration order when a scope exits, which is
-/// exactly Swift's rule: later `defer`s run first, and a `defer` only runs if
-/// control reached its line (the guard is declared there). The closure is
-/// `move`, so it copies `Copy` bindings and owns the rest, and it is stashed
-/// in a `ManuallyDrop<Option>` the guard points at — the guard holds a raw
-/// pointer, so it never borrows the closure and the two can share a scope.
+/// Rust drops locals in reverse declaration order when a scope exits, so later
+/// `defer`s run first, and a `defer` only runs if control reached its line
+/// (the guard is declared there). The closure is `move`, so it copies `Copy`
+/// bindings and owns the rest, and it is stashed in a `ManuallyDrop<Option>`
+/// the guard points at — the guard holds a raw pointer, so it never borrows
+/// the closure and the two can share a scope.
 ///
 /// Runs last: the body is copied verbatim, so any sugar inside it (`?.`, `??`,
 /// `try`) has already been lowered.

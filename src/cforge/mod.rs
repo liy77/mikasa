@@ -1351,6 +1351,20 @@ pub fn ensure_copper_dep_built(pkg_dir: &path::Path) {
     }
 }
 
+/// Parse `name`, `name@version`, or `name@version+feat1+feat2` into
+/// `(name, version, features)`.
+fn parse_dep_spec(dep: &str) -> (&str, &str, Vec<String>) {
+    match dep.split_once('@') {
+        Some((n, rest)) => {
+            let mut parts = rest.split('+');
+            let version = parts.next().unwrap_or("latest");
+            let features: Vec<String> = parts.map(|s| s.to_string()).collect();
+            (n, version, features)
+        }
+        None => (dep, "latest", Vec::new()),
+    }
+}
+
 pub async fn generate_toml(extra_dependencies: Vec<String>) {
     let properties = kson::read_properties(
         std::env::current_dir()
@@ -1382,11 +1396,11 @@ pub async fn generate_toml(extra_dependencies: Vec<String>) {
                 properties_obj.add_path_dependency(name, path);
                 continue;
             }
-            let (name, version) = match dep.split_once('@') {
-                Some((n, v)) => (n, v),
-                None => (dep.as_str(), "latest"),
-            };
-            properties_obj.add_dependency(name, version).await;
+            // `name@version+feat1+feat2` (e.g. `serde@1+derive`).
+            let (name, version, features) = parse_dep_spec(dep);
+            properties_obj
+                .add_dependency_with_features(name, version, features)
+                .await;
         }
 
         toml = properties_obj.to_toml();
@@ -1404,11 +1418,10 @@ pub async fn generate_toml(extra_dependencies: Vec<String>) {
                 properties_obj.add_path_dependency(name, path);
                 continue;
             }
-            let (name, version) = match dep.split_once('@') {
-                Some((n, v)) => (n, v),
-                None => (dep.as_str(), "latest"),
-            };
-            properties_obj.add_dependency(name, version).await;
+            let (name, version, features) = parse_dep_spec(dep);
+            properties_obj
+                .add_dependency_with_features(name, version, features)
+                .await;
         }
 
         toml = properties_obj.to_toml();

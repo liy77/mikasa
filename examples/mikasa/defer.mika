@@ -1,5 +1,5 @@
-// Swift-style `defer`: the block runs when its scope exits, on every path,
-// and later defers run first.
+// `defer`: the block runs when its scope exits, on every path, and later
+// defers run first.
 
 func void demo() {
     println!("start")

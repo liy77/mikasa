@@ -1,5 +1,5 @@
-// Swift-style `guard`: the happy path falls through, the `else` must leave
-// the scope, and a `guard let` binding stays usable afterwards.
+// `guard`: the happy path falls through, the `else` must leave the scope,
+// and a `guard let` binding stays usable afterwards.
 
 func i32 labeled() {
     mut n = 0

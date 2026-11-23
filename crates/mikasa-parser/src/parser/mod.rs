@@ -27,11 +27,13 @@ const TIME_SOURCE: &str = include_str!("../../../../std/time.mika");
 const FS_SOURCE: &str = include_str!("../../../../std/fs.mika");
 const WS_SOURCE: &str = include_str!("../../../../std/ws.mika");
 const REFLECT_SOURCE: &str = include_str!("../../../../std/reflect.mika");
+mod async_sugar;
 mod autoborrow;
 pub mod result;
 pub mod scope;
 pub mod scope_manager;
 mod sugar;
+mod mika_sugar;
 mod ternary;
 pub mod utils;
 
@@ -43,8 +45,8 @@ use utils::convert_type;
 const COPPER_OPERATORS: [(&str, &str); 2] = [("++", "+= 1"), ("--", "-= 1")];
 
 /// True when a `guard`'s `else` body transfers control out of the enclosing
-/// scope, which Swift requires. Accepts `return`, `break`, `continue`, and the
-/// diverging calls `panic!` / `exit` / `process::exit` / `unreachable!`.
+/// scope. Accepts `return`, `break`, `continue`, and the diverging calls
+/// `panic!` / `exit` / `process::exit` / `unreachable!`.
 fn guard_else_exits(body: &str) -> bool {
     let mut depth = 0i32;
     let mut prev_word = false;
@@ -174,6 +176,13 @@ pub struct Parser {
     /// params). A later `x = …` is an assignment, not a shadowed `let x = …`.
     fn_locals: HashSet<String>,
     pending_async_fn: bool,
+    /// `codable struct` / `codable class` — emit serde derives.
+    pending_codable: bool,
+    /// `\Type.field` was lowered — emit `__MikaKeyPath` helper at EOF.
+    uses_keypath: bool,
+    /// The function header currently being emitted is `async fn` — used when
+    /// the name turns out to be `main` so the entry point `.await`s it.
+    next_fn_async: bool,
     /// True from the moment a Copper `func` keyword is consumed until its name
     /// identifier is emitted. Used to detect a user-defined `main` and rename
     /// it to `__copper_main` (see `parse_any`), so it doesn't collide with the
@@ -478,10 +487,22 @@ impl Parser {
         // string `+` concatenation.
         let lowered = autoborrow::rewrite(ternaried);
         let uses_defer = lowered.iter().any(|t| t.value.contains("__CopperDefer"));
+        let uses_keypath = lowered.iter().any(|t| t.value.contains("__MikaKeyPath"));
+        let needs_async = lowered.iter().any(|t| {
+            t.value == "await"
+                || t.value == "async"
+                || t.value.contains(".await")
+                || t.value.contains("tokio::")
+                || t.value.contains("#[tokio::main]")
+        });
+        let mut result = Result::new();
+        if needs_async {
+            result.mark_async_usage();
+        }
         Self {
             tokens: lowered,
             current: 0,
-            result: Result::new(),
+            result,
             eof: false,
             function_start: false,
             seen_import: false,
@@ -504,6 +525,9 @@ impl Parser {
             pending_pub: false,
             fn_locals: HashSet::new(),
             pending_async_fn: false,
+            pending_codable: false,
+            uses_keypath,
+            next_fn_async: false,
             expect_function_name: false,
             source_path: None,
             project_root: None,
@@ -1283,6 +1307,8 @@ impl Parser {
         // reach the name (`func int main` → return_type set on `int`).
         if self.expect_function_name && self.kind() == TokenKind::Identifier {
             self.expect_function_name = false;
+            let was_async = self.next_fn_async;
+            self.next_fn_async = false;
             if token_value == "main" {
                 let kind = if self.result.return_type.trim().is_empty()
                     || self.result.return_type.trim() == "()"
@@ -1292,6 +1318,7 @@ impl Parser {
                     result::ReturnKind::Int
                 };
                 self.result.set_user_main(kind);
+                self.result.set_user_main_async(was_async);
                 self.append("__copper_main", AppendMode::Append);
                 return Consumed::consume(1);
             }
@@ -1310,9 +1337,9 @@ impl Parser {
             }
         }
 
-        // Swift-style `guard`: `guard cond else { exit }` and
-        // `guard let PAT = expr else { exit }`. The happy path falls through
-        // with any binding still in scope; the `else` must leave the scope.
+        // `guard cond else { exit }` and `guard let PAT = expr else { exit }`.
+        // The happy path falls through with any binding still in scope; the
+        // `else` must leave the scope.
         if token_value == "guard" {
             if let Some(consumed) = self.parse_guard() {
                 return consumed;
@@ -1320,10 +1347,25 @@ impl Parser {
         }
 
         // `async func ...` → set flag so parse_function emits `async fn`
+        // `async { ... }` / `async move { ... }` → pass through (block).
         if token_value == "async" {
             if let Some(next) = self.peek() {
                 if next.value == "func" {
                     self.pending_async_fn = true;
+                    self.result.mark_async_usage();
+                    return Consumed::consume(1);
+                }
+                if next.value == "move" || next.kind == TokenKind::BraceStart {
+                    self.result.mark_async_usage();
+                }
+            }
+        }
+
+        // `codable struct` / `codable class` → serde Serialize/Deserialize
+        if token_value == "codable" {
+            if let Some(next) = self.peek() {
+                if next.value == "struct" || next.value == "class" || next.value == "actor" {
+                    self.pending_codable = true;
                     return Consumed::consume(1);
                 }
             }
@@ -1334,6 +1376,7 @@ impl Parser {
             && self.current > 0
             && self.tokens[self.current - 1].kind == TokenKind::Dot
         {
+            self.result.mark_async_usage();
             self.append("await", AppendMode::Append);
             return Consumed::consume(1);
         }
@@ -1346,7 +1389,9 @@ impl Parser {
         // enum, const, …) fall through to the spaced-keyword emit below.
         if token_value == "pub" {
             let item_follows = match self.peek().map(|t| t.value.as_str()) {
-                Some("func") | Some("struct") | Some("class") => true,
+                Some("func") | Some("struct") | Some("class") | Some("actor") | Some("codable") => {
+                    true
+                }
                 Some("unsafe") => self
                     .select(self.current + 2)
                     .map(|t| t.value == "func")
@@ -1459,7 +1504,7 @@ impl Parser {
         Consumed::consume(1)
     }
 
-    /// Lower a Swift-style `guard` into Rust that keeps the same scoping.
+    /// Lower a `guard` into Rust that keeps the same scoping.
     ///
     /// ```text
     /// guard cond else { exit }
@@ -1468,12 +1513,12 @@ impl Parser {
     ///   → let PAT = match expr { Some(v) => v, _ => { exit; loop {} } };
     /// ```
     ///
-    /// The `let` form binds in the enclosing scope, matching Swift — the `else`
-    /// never returns, so the `match` diverges and the binding is always
-    /// initialized on the happy path. `else` is mandatory and its body must
-    /// transfer control (`return`, `break`, `continue`, `panic`/`exit`); that
-    /// is checked here so a missing exit is a compile error instead of a
-    /// binding that is silently never reached.
+    /// The `let` form binds in the enclosing scope — the `else` never returns,
+    /// so the `match` diverges and the binding is always initialized on the
+    /// happy path. `else` is mandatory and its body must transfer control
+    /// (`return`, `break`, `continue`, `panic`/`exit`); that is checked here
+    /// so a missing exit is a compile error instead of a binding that is
+    /// silently never reached.
     fn parse_guard(&mut self) -> Option<Consumed> {
         let start = self.current;
         // `guard let` / `guard mut` — the pattern form. Anything else is a
@@ -1550,7 +1595,7 @@ impl Parser {
                 .unwrap_or(&cond);
             let (pat, expr) = split_guard_binding(let_head);
             // Rust's `let`-`else` binds in the enclosing scope and requires the
-            // `else` to diverge — the same two rules Swift's `guard let` has.
+            // `else` to diverge — the same two rules `guard let` needs.
             let lowered = format!("let {pat} = {expr} else {body};");
             self.append(&lowered, AppendMode::Append);
         } else {
@@ -1865,6 +1910,9 @@ impl Parser {
         if self.value() == "func" {
             self.function_start = true;
             self.fn_locals.clear();
+            // Clear leftover return type from the previous function so a
+            // following void `main` doesn't inherit `-> i64` from `func int …`.
+            self.result.return_type.clear();
             // The next identifier is this function's name; arm the `main`
             // rename detector in parse_any.
             self.expect_function_name = true;
@@ -1879,6 +1927,8 @@ impl Parser {
                 self.result.force_append(prefix, false);
                 self.result.is_function = true;
                 self.result.is_copper_function = true;
+                self.result.mark_async_usage();
+                self.next_fn_async = true;
                 self.pending_async_fn = false;
             } else {
                 self.result.enter_function_vis(is_pub);
@@ -2271,7 +2321,10 @@ impl Parser {
                     w[0].kind == TokenKind::Identifier && w[1].kind == TokenKind::ParenthesesStart
                 })
             };
-            if !has_inline_ctor_or_methods {
+            let has_observers = class_tokens.iter().any(|t| {
+                matches!(t.value.as_str(), "willSet" | "didSet")
+            });
+            if !has_inline_ctor_or_methods && !has_observers {
                 return self.parse_struct_or_class_fields(true);
             }
 
@@ -2293,6 +2346,416 @@ impl Parser {
         }
 
         Consumed::consume(0)
+    }
+
+    /// `actor Name { fields…; methods… }` → `Arc<Mutex<Inner>>` wrapper with
+    /// `&self` methods that lock internally (no tokio).
+    pub fn parse_actor_definition(&mut self) -> Consumed {
+        if self.value() != "actor" || self.kind() != TokenKind::Keyword {
+            return Consumed::consume(0);
+        }
+        let mut consumed = 1;
+        let actor_name = if let Some(tok) = self.select(self.current + consumed) {
+            if tok.kind == TokenKind::Identifier {
+                consumed += 1;
+                tok.value.clone()
+            } else {
+                return Consumed::consume(0);
+            }
+        } else {
+            return Consumed::consume(0);
+        };
+
+        let mut brace_count = 0;
+        let mut body_tokens = Vec::new();
+        while let Some(tok) = self.select(self.current + consumed) {
+            consumed += 1;
+            if tok.kind == TokenKind::BraceStart {
+                brace_count = 1;
+                body_tokens.push(tok.clone());
+                break;
+            }
+        }
+        while brace_count > 0 {
+            if let Some(tok) = self.select(self.current + consumed) {
+                consumed += 1;
+                match tok.kind {
+                    TokenKind::BraceStart => brace_count += 1,
+                    TokenKind::BraceEnd => brace_count -= 1,
+                    _ => {}
+                }
+                body_tokens.push(tok.clone());
+            } else {
+                break;
+            }
+        }
+
+        let rust = self.process_actor_members(&body_tokens, &actor_name);
+        self.append(&rust, AppendMode::ForceAppendWithSpace);
+        Consumed::consume(consumed.try_into().unwrap_or(0))
+    }
+
+    fn process_actor_members(&mut self, body: &[Token], actor_name: &str) -> String {
+        let tokens: Vec<&Token> = body.iter().collect();
+        if tokens.len() < 2 {
+            return String::new();
+        }
+        let inner = &tokens[1..tokens.len() - 1];
+        let inner_name = format!("{}Inner", actor_name);
+
+        // Fields: same scan as class until first `func`.
+        let mut fields: Vec<(String, String)> = Vec::new();
+        let mut i = 0;
+        while i < inner.len() {
+            while i < inner.len()
+                && matches!(
+                    inner[i].kind,
+                    TokenKind::Newline | TokenKind::Comment | TokenKind::DocComment
+                )
+            {
+                i += 1;
+            }
+            if i >= inner.len() || inner[i].value == "func" {
+                break;
+            }
+            let field_start = if inner[i].value == "pub" { i + 1 } else { i };
+            if field_start + 2 >= inner.len() {
+                break;
+            }
+            let a = &inner[field_start];
+            let b = &inner[field_start + 1];
+            let is_colon =
+                (b.kind == TokenKind::Operator || b.kind == TokenKind::Colon) && b.value == ":";
+            if a.kind == TokenKind::Identifier && is_colon {
+                let mut j = field_start + 2;
+                let mut angle_depth = 0usize;
+                let mut paren_depth = 0usize;
+                let mut bracket_depth = 0usize;
+                let mut type_toks: Vec<&Token> = Vec::new();
+                while j < inner.len() {
+                    let tt = inner[j];
+                    if angle_depth == 0 && paren_depth == 0 && bracket_depth == 0 {
+                        if matches!(
+                            tt.kind,
+                            TokenKind::Newline
+                                | TokenKind::Comment
+                                | TokenKind::DocComment
+                                | TokenKind::Comma
+                                | TokenKind::Semicolon
+                                | TokenKind::BraceEnd
+                        ) || tt.value == ","
+                            || tt.value == ";"
+                            || tt.value == "func"
+                        {
+                            break;
+                        }
+                    }
+                    match tt.value.as_str() {
+                        "<" => angle_depth += 1,
+                        ">" => angle_depth = angle_depth.saturating_sub(1),
+                        "(" => paren_depth += 1,
+                        ")" => paren_depth = paren_depth.saturating_sub(1),
+                        "[" => bracket_depth += 1,
+                        "]" => bracket_depth = bracket_depth.saturating_sub(1),
+                        _ => {}
+                    }
+                    type_toks.push(tt);
+                    j += 1;
+                }
+                if type_toks.is_empty() {
+                    break;
+                }
+                let raw_type = Self::join_type_tokens(&type_toks);
+                let (rtype, _) = utils::convert_type_with_marking(&raw_type);
+                fields.push((a.value.clone(), rtype));
+                i = j;
+                if i < inner.len() && (inner[i].value == "," || inner[i].value == ";") {
+                    i += 1;
+                }
+            } else {
+                break;
+            }
+        }
+
+        let mut output = String::new();
+        let want_codable = self.pending_codable;
+        if want_codable {
+            self.pending_codable = false;
+            self.result.mark_codable_usage();
+            output.push_str("#[derive(Serialize, Deserialize, Clone, Debug)]\n");
+        } else {
+            output.push_str("#[derive(Clone, Debug)]\n");
+        }
+        output.push_str(&format!("struct {} {{\n", inner_name));
+        for (n, t) in &fields {
+            output.push_str(&format!("    {}: {},\n", n, t));
+        }
+        output.push_str("}\n\n");
+
+        output.push_str("#[derive(Clone)]\n");
+        output.push_str(&format!("pub struct {} {{\n", actor_name));
+        output.push_str(&format!(
+            "    inner: std::sync::Arc<std::sync::Mutex<{}>>,\n",
+            inner_name
+        ));
+        output.push_str("}\n\n");
+
+        output.push_str(&format!("impl {} {{\n", actor_name));
+        // `new` from fields
+        let params: Vec<String> = fields
+            .iter()
+            .map(|(n, t)| format!("{}: {}", n, t))
+            .collect();
+        let inits: Vec<String> = fields.iter().map(|(n, _)| n.clone()).collect();
+        output.push_str(&format!(
+            "    pub fn new({}) -> Self {{\n",
+            params.join(", ")
+        ));
+        output.push_str(&format!(
+            "        Self {{ inner: std::sync::Arc::new(std::sync::Mutex::new({} {{ {} }})) }}\n",
+            inner_name,
+            inits.join(", ")
+        ));
+        output.push_str("    }\n");
+
+        // Methods: `func Ret name(self, ...) { body }`
+        let mut k = i;
+        while k < inner.len() {
+            while k < inner.len()
+                && matches!(
+                    inner[k].kind,
+                    TokenKind::Newline | TokenKind::Comment | TokenKind::DocComment
+                )
+            {
+                k += 1;
+            }
+            if k >= inner.len() {
+                break;
+            }
+            if inner[k].value != "func" {
+                k += 1;
+                continue;
+            }
+            k += 1; // skip func
+                    // Return type tokens until name(
+            let mut m = k;
+            let mut a_depth = 0usize;
+            let mut p_depth = 0usize;
+            let mut ret_end = k;
+            let mut name = String::new();
+            let mut pstart = None;
+            while m + 1 < inner.len() {
+                if a_depth == 0
+                    && p_depth == 0
+                    && inner[m].kind == TokenKind::Identifier
+                    && matches!(
+                        inner[m + 1].kind,
+                        TokenKind::ParenthesesStart | TokenKind::ParametersStart
+                    )
+                {
+                    ret_end = m;
+                    name = inner[m].value.clone();
+                    pstart = Some(m + 1);
+                    break;
+                }
+                match inner[m].value.as_str() {
+                    "<" => a_depth += 1,
+                    ">" => a_depth = a_depth.saturating_sub(1),
+                    "(" => p_depth += 1,
+                    ")" => p_depth = p_depth.saturating_sub(1),
+                    _ => {}
+                }
+                m += 1;
+            }
+            let Some(ps) = pstart else {
+                k += 1;
+                continue;
+            };
+            let ret_raw = Self::join_type_tokens(&inner[k..ret_end]);
+            let (rust_ret, _) = if ret_raw.is_empty() || ret_raw == "void" {
+                ("()".to_string(), None)
+            } else {
+                utils::convert_type_with_marking(&ret_raw)
+            };
+
+            // Params (skip bare `self`)
+            let mut params_out = Vec::new();
+            let mut param_names = Vec::new();
+            let mut idx = ps + 1;
+            let mut depth = 1usize;
+            let mut cur: Vec<&Token> = Vec::new();
+            while idx < inner.len() && depth > 0 {
+                let t = inner[idx];
+                if matches!(
+                    t.kind,
+                    TokenKind::ParenthesesStart | TokenKind::ParametersStart
+                ) {
+                    depth += 1;
+                    cur.push(t);
+                } else if matches!(t.kind, TokenKind::ParenthesesEnd | TokenKind::ParametersEnd) {
+                    depth -= 1;
+                    if depth == 0 {
+                        break;
+                    }
+                    cur.push(t);
+                } else if depth == 1 && t.value == "," {
+                    Self::flush_actor_param(&cur, &mut params_out, &mut param_names);
+                    cur.clear();
+                } else if !matches!(
+                    t.kind,
+                    TokenKind::Newline | TokenKind::Comment | TokenKind::DocComment
+                ) {
+                    cur.push(t);
+                }
+                idx += 1;
+            }
+            if !cur.is_empty() {
+                Self::flush_actor_param(&cur, &mut params_out, &mut param_names);
+            }
+            // find body
+            while idx < inner.len() && inner[idx].kind != TokenKind::BraceStart {
+                idx += 1;
+            }
+            if idx >= inner.len() {
+                break;
+            }
+            let mut body_toks = Vec::new();
+            let mut bdepth = 1;
+            idx += 1;
+            while idx < inner.len() && bdepth > 0 {
+                let tt = &inner[idx];
+                if tt.kind == TokenKind::BraceStart {
+                    bdepth += 1;
+                } else if tt.kind == TokenKind::BraceEnd {
+                    bdepth -= 1;
+                }
+                if bdepth > 0 {
+                    body_toks.push((*tt).clone());
+                }
+                idx += 1;
+            }
+            let mut body_str = Self::lower_method_body(body_toks, &param_names);
+            // Route field access through the lock guard.
+            body_str = body_str.replace("self.", "__g.");
+
+            let sig = if params_out.is_empty() {
+                String::new()
+            } else {
+                format!(", {}", params_out.join(", "))
+            };
+            output.push_str(&format!(
+                "    pub fn {}(&self{}) -> {} {{\n",
+                name, sig, rust_ret
+            ));
+            output.push_str("        let mut __g = self.inner.lock().unwrap();\n");
+            output.push_str(&body_str);
+            if !body_str.trim_end().ends_with('}') && rust_ret != "()" {
+                // lower_method_body usually includes statements; ensure newline
+            }
+            output.push_str("\n    }\n");
+            k = idx;
+        }
+
+        output.push_str("}\n\n");
+        output
+    }
+
+    fn extract_will_did(body: &[&Token]) -> (Option<String>, Option<String>) {
+        let mut will = None;
+        let mut did = None;
+        let mut i = 0usize;
+        while i < body.len() {
+            if matches!(
+                body[i].kind,
+                TokenKind::Newline | TokenKind::Comment | TokenKind::DocComment | TokenKind::Whitespace
+            ) {
+                i += 1;
+                continue;
+            }
+            if body[i].value == "willSet" || body[i].value == "didSet" {
+                let kind = body[i].value.clone();
+                let mut j = i + 1;
+                while j < body.len()
+                    && matches!(
+                        body[j].kind,
+                        TokenKind::Newline
+                            | TokenKind::Comment
+                            | TokenKind::DocComment
+                            | TokenKind::Whitespace
+                    )
+                {
+                    j += 1;
+                }
+                if j < body.len() && body[j].kind == TokenKind::BraceStart {
+                    let open = j;
+                    let mut depth = 1usize;
+                    j += 1;
+                    let start = j;
+                    while j < body.len() && depth > 0 {
+                        match body[j].kind {
+                            TokenKind::BraceStart => depth += 1,
+                            TokenKind::BraceEnd => depth -= 1,
+                            _ => {}
+                        }
+                        if depth > 0 {
+                            j += 1;
+                        }
+                    }
+                    let src: String = body[start..j]
+                        .iter()
+                        .filter(|t| {
+                            !matches!(
+                                t.kind,
+                                TokenKind::Comment | TokenKind::DocComment | TokenKind::Whitespace
+                            )
+                        })
+                        .map(|t| t.value.clone())
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    if kind == "willSet" {
+                        will = Some(src);
+                    } else {
+                        did = Some(src);
+                    }
+                    let _ = open;
+                    i = if j < body.len() { j + 1 } else { j };
+                    continue;
+                }
+            }
+            i += 1;
+        }
+        (will, did)
+    }
+
+    fn flush_actor_param(
+        arg: &[&Token],
+        params: &mut Vec<String>,
+        param_names: &mut Vec<String>,
+    ) {
+        if arg.is_empty() {
+            return;
+        }
+        // Skip bare `self` / `&self` / `mut self`
+        if arg.iter().any(|t| t.value == "self") && !arg.iter().any(|t| t.value == ":") {
+            return;
+        }
+        if let Some(colon_pos) = arg.iter().position(|t| t.value == ":") {
+            let lhs = arg[..colon_pos]
+                .iter()
+                .map(|t| t.value.as_str())
+                .collect::<Vec<_>>()
+                .join(" ");
+            let raw_ty = Self::join_type_tokens(&arg[colon_pos + 1..]);
+            let (ptype, _) = utils::convert_type_with_marking(&raw_ty);
+            for t in &arg[..colon_pos] {
+                if t.kind == TokenKind::Identifier || t.kind == TokenKind::Param {
+                    if t.value != "mut" {
+                        param_names.push(t.value.clone());
+                    }
+                }
+            }
+            params.push(format!("{}: {}", lhs.trim(), ptype));
+        }
     }
 
     fn join_type_tokens(toks: &[&Token]) -> String {
@@ -2344,7 +2807,7 @@ impl Parser {
         let inner = &tokens[1..tokens.len() - 1];
 
         let mut output = String::new();
-        let mut fields: Vec<(String, String)> = Vec::new();
+        let mut fields: Vec<(String, String, Option<String>, Option<String>)> = Vec::new();
 
         // Collect the fields (supporting generic types like `Option<StaticStr>`,
         // `Vec<PropDef>`, `&'static str`, tuples, etc.) until the first method/ctor.
@@ -2387,6 +2850,10 @@ impl Parser {
                 while j < inner.len() {
                     let tt = inner[j];
                     if angle_depth == 0 && paren_depth == 0 && bracket_depth == 0 {
+                        // Observer block starts with `{` after the type.
+                        if tt.kind == TokenKind::BraceStart {
+                            break;
+                        }
                         if matches!(
                             tt.kind,
                             TokenKind::Newline
@@ -2417,7 +2884,34 @@ impl Parser {
                     break;
                 }
                 let raw_type = Self::join_type_tokens(&type_toks);
-                fields.push((a.value.clone(), raw_type));
+                // Optional `willSet` / `didSet` observer block.
+                let mut will_set: Option<String> = None;
+                let mut did_set: Option<String> = None;
+                if j < inner.len() && inner[j].kind == TokenKind::BraceStart {
+                    let open = j;
+                    let mut depth = 1usize;
+                    j += 1;
+                    let body_start = j;
+                    while j < inner.len() && depth > 0 {
+                        match inner[j].kind {
+                            TokenKind::BraceStart => depth += 1,
+                            TokenKind::BraceEnd => depth -= 1,
+                            _ => {}
+                        }
+                        if depth > 0 {
+                            j += 1;
+                        }
+                    }
+                    let body = &inner[body_start..j];
+                    let (w, d) = Self::extract_will_did(body);
+                    will_set = w;
+                    did_set = d;
+                    if j < inner.len() && inner[j].kind == TokenKind::BraceEnd {
+                        j += 1;
+                    }
+                    let _ = open;
+                }
+                fields.push((a.value.clone(), raw_type, will_set, did_set));
                 i = j;
                 if i < inner.len() && (inner[i].value == "," || inner[i].value == ";") {
                     i += 1;
@@ -2429,32 +2923,55 @@ impl Parser {
 
         // Build the struct (Copper `class` lowers to a Rust struct + impl).
         // Clone/Debug always unless the user already supplied `#[derive(...)]`.
-        let rust_fields: Vec<(String, String)> = fields
+        // Observed fields store as `__name` and expose getter/setter methods.
+        let rust_fields: Vec<(String, String, Option<String>, Option<String>)> = fields
             .iter()
-            .map(|(n, t)| {
+            .map(|(n, t, w, d)| {
                 let (rtype, _) = utils::convert_type_with_marking(t);
-                (n.clone(), rtype)
+                (n.clone(), rtype, w.clone(), d.clone())
             })
             .collect();
+        let want_codable = self.pending_codable;
+        if want_codable {
+            self.pending_codable = false;
+            self.result.mark_codable_usage();
+            self.result.record_codable_type(class_name);
+        }
         if !self.has_preceding_derive() {
-            let all_copy = rust_fields.iter().all(|(_, t)| Self::type_is_copyish(t));
-            if all_copy {
+            let all_copy = rust_fields.iter().all(|(_, t, _, _)| Self::type_is_copyish(t));
+            if want_codable {
+                if all_copy {
+                    output.push_str(
+                        "#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]\n",
+                    );
+                } else {
+                    output.push_str("#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]\n");
+                }
+            } else if all_copy {
                 output.push_str("#[derive(Clone, Copy, Debug, PartialEq)]\n");
             } else if rust_fields
                 .iter()
-                .all(|(_, t)| Self::type_is_clone_debug_safe(t))
+                .all(|(_, t, _, _)| Self::type_is_clone_debug_safe(t))
             {
                 output.push_str("#[derive(Clone, Debug, PartialEq)]\n");
             }
+        } else if want_codable {
+            output.push_str("#[derive(Serialize, Deserialize)]\n");
         }
         output.push_str(&format!("pub struct {} {{\n", class_name));
-        for (n, t) in &rust_fields {
-            output.push_str(&format!("    pub {}: {},\n", n, t));
+        for (n, t, w, d) in &rust_fields {
+            let storage = if w.is_some() || d.is_some() {
+                format!("__{}", n)
+            } else {
+                n.clone()
+            };
+            output.push_str(&format!("    pub {}: {},\n", storage, t));
         }
         output.push_str("}\n\n");
 
         // Build the constructor (only classic `ClassName(...)` at member level)
         output.push_str(&format!("impl {} {{\n", class_name));
+        let mut had_ctor = false;
         if let Some(pos) = inner.iter().enumerate().position(|(idx, t)| {
             t.kind == TokenKind::Identifier
                 && t.value == class_name
@@ -2466,6 +2983,7 @@ impl Parser {
                     )
                     || inner[idx - 1].value == "pub")
         }) {
+            had_ctor = true;
             if pos + 1 < inner.len() && inner[pos + 1].kind == TokenKind::ParenthesesStart {
                 // coleta params
                 let mut params = Vec::new();
@@ -2569,20 +3087,28 @@ impl Parser {
                     .collect::<Vec<_>>()
                     .join(", ");
 
-                // Initialize the fields
-                let init = fields
+                // Initialize the fields (observed props store as `__name`)
+                let init = rust_fields
                     .iter()
-                    .map(|(field_name, _)| {
-                        // Searches in assigns if this field has an explicit initialization
+                    .map(|(field_name, _, w, d)| {
+                        let storage = if w.is_some() || d.is_some() {
+                            format!("__{}", field_name)
+                        } else {
+                            field_name.clone()
+                        };
                         if let Some((_, expr)) = assigns.iter().find(|(f, _)| f == field_name) {
-                            format!("{}: {}", field_name, expr)
+                            // Ctor assigns skip observers — write storage directly.
+                            let expr = expr.replace(
+                                &format!("self.{}", field_name),
+                                &format!("self.{}", storage),
+                            );
+                            format!("{}: {}", storage, expr)
                         } else if let Some((param_name, _)) =
                             params.iter().find(|(n, _)| n == field_name)
                         {
-                            format!("{}: {}", field_name, param_name)
+                            format!("{}: {}", storage, param_name)
                         } else {
-                            // Default if not found in assigns or params
-                            format!("{}: Default::default()", field_name)
+                            format!("{}: Default::default()", storage)
                         }
                     })
                     .collect::<Vec<_>>()
@@ -2592,6 +3118,58 @@ impl Parser {
                 output.push_str(&format!("        Self {{ {} }}\n", init));
                 output.push_str("    }\n\n");
             }
+        }
+        if !had_ctor && rust_fields.iter().any(|(_, _, w, d)| w.is_some() || d.is_some()) {
+            let params: Vec<String> = rust_fields
+                .iter()
+                .map(|(n, t, _, _)| format!("{}: {}", n, t))
+                .collect();
+            let inits: Vec<String> = rust_fields
+                .iter()
+                .map(|(n, _, w, d)| {
+                    let storage = if w.is_some() || d.is_some() {
+                        format!("__{}", n)
+                    } else {
+                        n.clone()
+                    };
+                    format!("{}: {}", storage, n)
+                })
+                .collect();
+            output.push_str(&format!(
+                "    pub fn new({}) -> Self {{\n",
+                params.join(", ")
+            ));
+            output.push_str(&format!("        Self {{ {} }}\n", inits.join(", ")));
+            output.push_str("    }\n\n");
+        }
+
+        // Property observers → getter + setter
+        for (name, ty, will, did) in &rust_fields {
+            if will.is_none() && did.is_none() {
+                continue;
+            }
+            let storage = format!("__{}", name);
+            output.push_str(&format!(
+                "    pub fn {}(&self) -> {} {{ self.{} }}\n",
+                name, ty, storage
+            ));
+            output.push_str(&format!(
+                "    pub fn set_{}(&mut self, newValue: {}) {{\n",
+                name, ty
+            ));
+            output.push_str(&format!("        let oldValue = self.{};\n", storage));
+            if let Some(w) = will {
+                output.push_str("        {\n");
+                output.push_str(w);
+                output.push_str("\n        }\n");
+            }
+            output.push_str(&format!("        self.{} = newValue;\n", storage));
+            if let Some(d) = did {
+                output.push_str("        {\n");
+                output.push_str(d);
+                output.push_str("\n        }\n");
+            }
+            output.push_str("    }\n\n");
         }
 
         // Methods:
@@ -3252,6 +3830,14 @@ impl Parser {
                 }
             }
 
+            let want_codable = self.pending_codable;
+            if want_codable {
+                self.pending_codable = false;
+                self.result.mark_codable_usage();
+                if !has_generics {
+                    self.result.record_codable_type(&struct_name);
+                }
+            }
             if !has_generics && !self.has_preceding_derive() {
                 let all_copy =
                     !field_types.is_empty() && field_types.iter().all(|t| Self::type_is_copyish(t));
@@ -3259,7 +3845,19 @@ impl Parser {
                     && field_types
                         .iter()
                         .all(|t| Self::type_is_clone_debug_safe(t));
-                if all_copy {
+                if want_codable {
+                    if all_copy {
+                        self.append(
+                            "#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]\n",
+                            AppendMode::ForceAppendWithSpace,
+                        );
+                    } else {
+                        self.append(
+                            "#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]\n",
+                            AppendMode::ForceAppendWithSpace,
+                        );
+                    }
+                } else if all_copy {
                     self.append(
                         "#[derive(Clone, Copy, Debug, PartialEq)]\n",
                         AppendMode::ForceAppendWithSpace,
@@ -3270,6 +3868,11 @@ impl Parser {
                         AppendMode::ForceAppendWithSpace,
                     );
                 }
+            } else if want_codable && !self.has_preceding_derive() {
+                self.append(
+                    "#[derive(Serialize, Deserialize)]\n",
+                    AppendMode::ForceAppendWithSpace,
+                );
             }
             self.append(
                 &format!("{}struct {}{} {{\n", vis, struct_name, generics),
@@ -4612,8 +5215,8 @@ impl Parser {
 
     /// Emit the guard type that backs `defer`. Its `Drop` invokes the closure,
     /// and Rust drops locals in reverse declaration order, so two `defer`s in
-    /// one scope run last-registered first — the same order Swift uses. The
-    /// closure is `FnMut` so the body may mutate captured bindings.
+    /// one scope run last-registered first. The closure is `FnMut` so the body
+    /// may mutate captured bindings.
     fn prepend_defer_guard_if_used(&mut self) {
         if !self.uses_defer {
             return;
@@ -4634,6 +5237,25 @@ impl Parser {
         self.result.prepend_value(guard);
     }
 
+    fn prepend_keypath_helper_if_used(&mut self) {
+        if !self.uses_keypath {
+            return;
+        }
+        self.result.mark_keypath_usage();
+        let helper = concat!(
+            "#[allow(dead_code)]\n",
+            "struct __MikaKeyPath<Root, Value> {\n",
+            "    get: fn(&Root) -> &Value,\n",
+            "    get_mut: fn(&mut Root) -> &mut Value,\n",
+            "}\n",
+            "impl<Root, Value> __MikaKeyPath<Root, Value> {\n",
+            "    fn get<'a>(&self, root: &'a Root) -> &'a Value { (self.get)(root) }\n",
+            "    fn get_mut<'a>(&self, root: &'a mut Root) -> &'a mut Value { (self.get_mut)(root) }\n",
+            "}\n\n",
+        );
+        self.result.prepend_value(helper);
+    }
+
     pub fn parse(&mut self) -> String {
         loop {
             if self.eof {
@@ -4642,10 +5264,14 @@ impl Parser {
                 // data type was actually marked used on the result — robust to
                 // the paths that set `uses_json` without the parser's
                 // `uses_data_types` flag.
+                // Codable runtime first, then imports/aliases on top of it.
+                self.result.prepend_codable_runtime();
                 self.result.add_data_type_aliases();
                 self.prepend_vec_ext_if_used();
                 self.prepend_defer_guard_if_used();
+                self.prepend_keypath_helper_if_used();
                 self.prepend_used_std_modules();
+                self.result.append_codable_impls();
                 self.result.write_main_function();
                 break self.result.get().expect("Format Error");
             }
@@ -4701,6 +5327,7 @@ impl Parser {
                         self.parse_mut()
                             .or(|| self.parse_var())
                             .or(|| self.parse_type_declaration())
+                            .or(|| self.parse_actor_definition())
                             .or(|| self.parse_class_definition())
                             .or(|| self.parse_struct_definition())
                             .or(|| self.parse_impl_block())
@@ -4866,6 +5493,19 @@ impl Parser {
                             self.next();
                         }
                     }
+                    // Leftover `@resultBuilder` / `@propertyWrapper` markers
+                    // (field/func forms are lowered in sugar). Skip silently.
+                    TokenKind::AtIdent => {
+                        self.next();
+                        while self.kind() == TokenKind::Newline {
+                            self.next();
+                        }
+                    }
+                    // Key paths are lowered in sugar to `__MikaKeyPath { … }`.
+                    TokenKind::KeyPathStart => {
+                        self.append("\\", AppendMode::Append);
+                        self.next();
+                    }
                     // `(a, b) = expr` — try tuple destructuring before
                     // falling back to a plain parenthesised expression.
                     TokenKind::ParenthesesStart => {
@@ -4960,7 +5600,10 @@ impl Parser {
                     _ => {}
                 }
             } else {
+                self.result.add_data_type_aliases();
+                self.result.prepend_codable_runtime();
                 self.prepend_used_std_modules();
+                self.result.append_codable_impls();
                 self.result.write_main_function();
                 break self.result.get().expect("Format Error");
             }
@@ -5010,7 +5653,9 @@ fn is_chain_breaker(kind: TokenKind, value: &str) -> bool {
         | TokenKind::InterpolatedString
         | TokenKind::Keyword
         | TokenKind::Param
-        | TokenKind::ParamType => false,
+        | TokenKind::ParamType
+        | TokenKind::AtIdent
+        | TokenKind::KeyPathStart => false,
         // Closing delimiters at chain depth: chain ends before depth drops.
         TokenKind::ParenthesesEnd
         | TokenKind::ParametersEnd

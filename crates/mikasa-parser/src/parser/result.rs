@@ -28,6 +28,14 @@ pub struct Result {
     pub(crate) uses_json: bool,
     pub(crate) uses_xml: bool,
     pub(crate) uses_toml: bool,
+    /// `codable struct` / `codable class` — pulls in serde + serde_json.
+    pub(crate) uses_codable: bool,
+    /// `\Type.field` key paths — emits `__MikaKeyPath` helper.
+    pub(crate) uses_keypath: bool,
+    /// Any `async func` / `.await` / async builtin — pulls in tokio + async main.
+    pub(crate) uses_async: bool,
+    /// User wrote `async func main` — entry must `.await` `__copper_main`.
+    pub(crate) user_main_async: bool,
     pub(crate) cstd_used: bool,
     /// Native std modules (other than cstd) pulled in via
     /// `import { … } from <module>` — currently `net` / `http`. Each is
@@ -44,6 +52,9 @@ pub struct Result {
     /// definitions). Generic structs are not recorded (their impl would need
     /// generic bounds — out of MVP scope).
     pub(crate) reflect_structs: Vec<(String, Vec<String>)>,
+    /// Names of `codable` types (non-generic). Each gets `to_json` /
+    /// `from_json` inherent methods at end-of-output.
+    pub(crate) codable_types: Vec<String>,
     /// Transpiled Rust source (crate-root lib) for each used std module, as
     /// `(module_name, lib_source)`. cforge writes each as a separate local
     /// crate under `__copper__/std/<name>/` and path-depends on it, instead of
@@ -75,10 +86,15 @@ impl Result {
             uses_json: false,
             uses_xml: false,
             uses_toml: false,
+            uses_codable: false,
+            uses_keypath: false,
+            uses_async: false,
+            user_main_async: false,
             cstd_used: false,
             used_std_modules: std::collections::BTreeSet::new(),
             external_crates: Vec::new(),
             reflect_structs: Vec::new(),
+            codable_types: Vec::new(),
             std_lib_crates: Vec::new(),
             user_main: None,
         }
@@ -110,9 +126,27 @@ impl Result {
         self.user_main = Some(kind);
     }
 
+    pub fn set_user_main_async(&mut self, is_async: bool) {
+        self.user_main_async = is_async;
+        if is_async {
+            self.uses_async = true;
+        }
+    }
+
+    pub fn mark_async_usage(&mut self) {
+        self.uses_async = true;
+    }
+
     /// Record a Copper struct (name + ordered field names) for reflect codegen.
     pub fn record_reflect_struct(&mut self, name: &str, fields: Vec<String>) {
         self.reflect_structs.push((name.to_string(), fields));
+    }
+
+    /// Record a `codable` type for `to_json` / `from_json` codegen.
+    pub fn record_codable_type(&mut self, name: &str) {
+        if !self.codable_types.iter().any(|n| n == name) {
+            self.codable_types.push(name.to_string());
+        }
     }
 
     /// If the `reflect` module is imported, append one
@@ -190,11 +224,29 @@ impl Result {
                         false,
                     );
                 }
-                let entry = match kind {
-                    ReturnKind::Int => {
-                        "\n\nfn main() { std::process::exit(__copper_main() as i32); }"
+                let entry = if self.uses_async {
+                    // Tokio runtime is implicit — never require `tokio::` in source.
+                    match (kind, self.user_main_async) {
+                        (ReturnKind::Int, true) => {
+                            "\n\n#[tokio::main]\nasync fn main() { std::process::exit(__copper_main().await as i32); }"
+                        }
+                        (ReturnKind::Unit, true) => {
+                            "\n\n#[tokio::main]\nasync fn main() { __copper_main().await; }"
+                        }
+                        (ReturnKind::Int, false) => {
+                            "\n\n#[tokio::main]\nasync fn main() { std::process::exit(__copper_main() as i32); }"
+                        }
+                        (ReturnKind::Unit, false) => {
+                            "\n\n#[tokio::main]\nasync fn main() { __copper_main(); }"
+                        }
                     }
-                    ReturnKind::Unit => "\n\nfn main() { __copper_main(); }",
+                } else {
+                    match kind {
+                        ReturnKind::Int => {
+                            "\n\nfn main() { std::process::exit(__copper_main() as i32); }"
+                        }
+                        ReturnKind::Unit => "\n\nfn main() { __copper_main(); }",
+                    }
                 };
                 self.force_append(entry, false);
             }
@@ -204,7 +256,14 @@ impl Result {
                 if self.main_function_code.is_empty() {
                     return;
                 }
-                self.force_append(&("\n\nfn main() {\n".to_owned() + &body + "}"), false);
+                if self.uses_async {
+                    self.force_append(
+                        &("\n\n#[tokio::main]\nasync fn main() {\n".to_owned() + &body + "}"),
+                        false,
+                    );
+                } else {
+                    self.force_append(&("\n\nfn main() {\n".to_owned() + &body + "}"), false);
+                }
             }
         }
     }
@@ -338,7 +397,23 @@ impl Result {
             aliases.push_str("type TomlValue = toml::Value;\n");
         }
 
-        if !aliases.is_empty() {
+        if self.uses_codable
+            && !self.value.contains("use serde::{Deserialize, Serialize}")
+            && !imports.contains("use serde::{Deserialize, Serialize}")
+        {
+            imports.push_str("use serde::{Deserialize, Serialize};\n");
+        }
+
+        // Async builtins resolve through these aliases so user code never
+        // writes `tokio::…`. The real calls are still emitted with full paths
+        // by sugar; the prelude covers macros (`join!` / `select!`).
+        if self.uses_async {
+            // Macros available without writing `tokio::` — allow unused when
+            // the program only uses sleep/spawn.
+            imports.push_str("#[allow(unused_imports)]\nuse tokio::{join, select};\n");
+        }
+
+        if !aliases.is_empty() || self.uses_codable || self.uses_async {
             let full_aliases = format!(
                 "// Native data type aliases for Copper\n{}\n{}\n",
                 imports, aliases
@@ -359,6 +434,81 @@ impl Result {
         self.uses_toml = true;
     }
 
+    pub fn mark_codable_usage(&mut self) {
+        self.uses_codable = true;
+        // Round-trip helpers typically need serde_json too.
+        self.uses_json = true;
+    }
+
+    /// `JSONEncoder` / `JSONDecoder` + free helpers, emitted when any
+    /// `codable` type is used so user code never writes `serde_json::…`.
+    pub fn prepend_codable_runtime(&mut self) {
+        if !self.uses_codable {
+            return;
+        }
+        // `Serialize`/`Deserialize` come from `add_data_type_aliases` (prepended
+        // after this block so they sit above it in the final file).
+        let runtime = concat!(
+            "#[allow(dead_code)]\n",
+            "struct JSONEncoder { pretty: bool }\n",
+            "impl JSONEncoder {\n",
+            "    fn new() -> Self { Self { pretty: false } }\n",
+            "    fn pretty() -> Self { Self { pretty: true } }\n",
+            "    fn encode<T: Serialize>(&self, value: &T) -> String {\n",
+            "        if self.pretty {\n",
+            "            serde_json::to_string_pretty(value).unwrap_or_default()\n",
+            "        } else {\n",
+            "            serde_json::to_string(value).unwrap_or_default()\n",
+            "        }\n",
+            "    }\n",
+            "}\n",
+            "#[allow(dead_code)]\n",
+            "struct JSONDecoder;\n",
+            "impl JSONDecoder {\n",
+            "    fn new() -> Self { Self }\n",
+            "    fn decode<T: for<'de> Deserialize<'de>>(&self, s: &str) -> Option<T> {\n",
+            "        serde_json::from_str(s).ok()\n",
+            "    }\n",
+            "}\n",
+            "#[allow(dead_code)]\n",
+            "fn encode<T: Serialize>(value: &T) -> String {\n",
+            "    JSONEncoder::new().encode(value)\n",
+            "}\n",
+            "#[allow(dead_code)]\n",
+            "fn encode_pretty<T: Serialize>(value: &T) -> String {\n",
+            "    JSONEncoder::pretty().encode(value)\n",
+            "}\n\n",
+        );
+        self.prepend_value(runtime);
+    }
+
+    /// Inherent `to_json` / `from_json` on every recorded `codable` type.
+    pub fn append_codable_impls(&mut self) {
+        if self.codable_types.is_empty() {
+            return;
+        }
+        let mut out = String::new();
+        for name in &self.codable_types {
+            out.push_str(&format!("impl {name} {{\n"));
+            out.push_str(
+                "    fn to_json(&self) -> String { JSONEncoder::new().encode(self) }\n",
+            );
+            out.push_str(
+                "    fn to_json_pretty(&self) -> String { JSONEncoder::pretty().encode(self) }\n",
+            );
+            out.push_str(&format!(
+                "    fn from_json(s: &str) -> Option<{name}> {{ JSONDecoder::new().decode(s) }}\n"
+            ));
+            out.push_str("}\n\n");
+        }
+        self.value.push('\n');
+        self.value.push_str(&out);
+    }
+
+    pub fn mark_keypath_usage(&mut self) {
+        self.uses_keypath = true;
+    }
+
     pub fn get_required_dependencies(&self) -> Vec<String> {
         // Dependencies for the MAIN project's Cargo.toml. Crate-backed std
         // MODULES (http/json/crypto) no longer add their crates here — each is
@@ -368,7 +518,11 @@ impl Result {
         // is the inline DATA-TYPE crates (the `json`/`toml` value types used
         // directly in main, not via a module) plus the user's external crates.
         const SERDE_JSON: &str = "serde_json@1";
+        const SERDE: &str = "serde@1+derive";
         const TOML: &str = "toml@0.8";
+        // macros = #[tokio::main] / join! / select!; rt-multi-thread = default
+        // runtime; time/sync/net/io-util/fs cover the implicit async builtins.
+        const TOKIO: &str = "tokio@1+rt-multi-thread+macros+time+sync+net+io-util+fs";
 
         let mut deps = Vec::new();
         let add = |spec: &str, deps: &mut Vec<String>| {
@@ -380,8 +534,15 @@ impl Result {
         if self.uses_json {
             add(SERDE_JSON, &mut deps);
         }
+        if self.uses_codable {
+            add(SERDE, &mut deps);
+            add(SERDE_JSON, &mut deps);
+        }
         if self.uses_toml {
             add(TOML, &mut deps);
+        }
+        if self.uses_async {
+            add(TOKIO, &mut deps);
         }
 
         // XML needs no external dependency for now (uses String).

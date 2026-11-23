@@ -54,8 +54,8 @@ pub struct Interpreter {
     out: Sink,
     /// `defer` bodies registered in the scopes currently executing, outermost
     /// first. Each frame is one scope; within a frame, later entries run
-    /// first (Swift's reverse order). A scope pushes a frame on entry and
-    /// drains it — running each body — on every exit path.
+    /// first (LIFO). A scope pushes a frame on entry and drains it — running
+    /// each body — on every exit path.
     defers: Vec<Vec<Block>>,
     /// Source lines (1-based) where execution should pause. Empty unless a
     /// debugger attached breakpoints.
@@ -1305,14 +1305,14 @@ impl Interpreter {
     ///
     /// The frame is popped *before* the bodies run, and each body gets a fresh
     /// frame of its own. A `defer` registered while unwinding therefore belongs
-    /// to that body and runs before the earlier ones — Swift's order — instead
-    /// of appending to the frame being drained, which would loop forever.
+    /// to that body and runs before the earlier ones (LIFO), instead of
+    /// appending to the frame being drained, which would loop forever.
     fn flush_defers(&mut self, scope: &Rc<RefCell<Env>>) -> Result<(), RuntimeError> {
         let frame = self.defers.pop().unwrap_or_default();
         for body in frame.into_iter().rev() {
             self.defers.push(Vec::new());
             // A `defer` body that transfers control is swallowed: the scope is
-            // already leaving, and Swift ignores such an attempt.
+            // already leaving.
             let _ = self.exec_block_body(&body, scope)?;
             self.flush_defers(scope)?;
         }
@@ -1518,10 +1518,9 @@ impl Interpreter {
                 }
                 Ok(Outcome::Normal(Value::Unit))
             }
-            // Swift-style `guard cond else { exit }` / `guard let PAT = expr
-            // else { exit }`. The happy path falls through; a `guard let`
-            // binds in the *enclosing* scope so the name stays usable after
-            // the guard, exactly as in Swift.
+            // `guard cond else { exit }` / `guard let PAT = expr else { exit }`.
+            // The happy path falls through; a `guard let` binds in the
+            // *enclosing* scope so the name stays usable after the guard.
             Stmt::Guard {
                 cond,
                 let_pattern,

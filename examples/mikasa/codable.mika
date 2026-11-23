@@ -1,0 +1,49 @@
+// `codable` types: declare once, then encode/decode JSON without serde paths.
+//
+//   u.to_json() / u.to_json_pretty()
+//   User::from_json(text)
+//   encode(&u) / encode_pretty(&u)
+//   decode(User, text)
+//   JSONEncoder::pretty().encode(&u)
+//   JSONDecoder::new().decode::<User>(&text)
+
+codable struct User {
+    name: string
+    age: int
+}
+
+codable struct Team {
+    title: string
+    members: Vec<User>
+}
+
+u = User { name: "Ada".to_string(), age: 36 }
+
+// Instance helpers
+println!("to_json = {}", u.to_json())
+pretty = u.to_json_pretty()
+println!("pretty =\n{}", pretty)
+
+// Round-trip via type method
+back = User::from_json(&pretty).unwrap()
+println!("from_json = {} / {}", back.name, back.age)
+
+// Free helpers + decode(Type, text) sugar
+js = encode(&u)
+again = decode(User, js).unwrap()
+println!("decode = {} / {}", again.name, again.age)
+
+// Encoder / Decoder objects
+enc = JSONEncoder::pretty()
+dec = JSONDecoder::new()
+team = Team {
+    title: "Pioneers".to_string(),
+    members: vec![
+        User { name: "Ada".to_string(), age: 36 },
+        User { name: "Grace".to_string(), age: 40 },
+    ],
+}
+tjs = enc.encode(&team)
+loaded = dec.decode::<Team>(&tjs).unwrap()
+println!("team {} has {} members", loaded.title, loaded.members.len())
+println!("{}", loaded.to_json_pretty())

@@ -7,7 +7,7 @@
   "Guard": {
     "prefix": "guard",
     "body": ["guard ${1:condition} else {", "    return ${2}", "}", "${0}"],
-    "description": "guard — early exit, like Swift"
+    "description": "guard — early exit"
   },
   "Guard let": {
     "prefix": "guardlet",

@@ -61,6 +61,10 @@ pub enum TokenKind {
     Toml,
     JsonObject,
     Attribute,
+    /// `@Name` — property wrappers, result builders (`@Clamped`, `@resultBuilder`).
+    AtIdent,
+    /// `\` introducer for key paths (`\Type.field`).
+    KeyPathStart,
 }
 
 impl ToString for TokenKind {
@@ -125,6 +129,8 @@ impl ToString for TokenKind {
             TokenKind::Toml => "Toml".to_string(),
             TokenKind::JsonObject => "JsonObject".to_string(),
             TokenKind::Attribute => "Attribute".to_string(),
+            TokenKind::AtIdent => "AtIdent".to_string(),
+            TokenKind::KeyPathStart => "KeyPathStart".to_string(),
         }
     }
 }

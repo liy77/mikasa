@@ -1,0 +1,28 @@
+// KeyPaths: `\Type.field` is a typed get / get_mut handle.
+// No strings — the field is checked by the Rust type system.
+
+struct Person {
+    name: string
+    age: int
+}
+
+struct Point {
+    x: f64
+    y: f64
+}
+
+mut p = Person { name: "Ada".to_string(), age: 36 }
+name_kp = \Person.name
+age_kp = \Person.age
+
+println!("name via kp = {}", name_kp.get(&p))
+println!("age via kp = {}", age_kp.get(&p))
+
+*name_kp.get_mut(&mut p) = "Grace".to_string()
+*age_kp.get_mut(&mut p) = 40
+println!("after set = {} / {}", p.name, p.age)
+
+mut pt = Point { x: 1.0, y: 2.0 }
+x_kp = \Point.x
+*x_kp.get_mut(&mut pt) = 9.5
+println!("point = ({}, {})", pt.x, pt.y)

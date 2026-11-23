@@ -427,6 +427,17 @@ impl<'a> Properties<'a> {
     }
 
     pub async fn add_dependency(&mut self, name: &str, version: &str) {
+        self.add_dependency_with_features(name, version, Vec::new())
+            .await;
+    }
+
+    /// Like [`add_dependency`], but with Cargo features (e.g. serde `derive`).
+    pub async fn add_dependency_with_features(
+        &mut self,
+        name: &str,
+        version: &str,
+        features: Vec<String>,
+    ) {
         if self.dependencies.iter().any(|d| d.name == name) {
             return;
         }
@@ -446,7 +457,7 @@ impl<'a> Properties<'a> {
         let dep = Dependency {
             name: name.to_string(),
             version: actual_version.clone(),
-            features: Vec::new(),
+            features,
             kind: DepKind::NormalOnlyVersion,
             git: None,
             branch: None,

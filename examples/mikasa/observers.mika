@@ -1,0 +1,36 @@
+// Property observers on `class` fields (`willSet` / `didSet`).
+// Storage is `__name`; use `name()` / `set_name(…)`.
+
+class Thermometer {
+    temp: f64 {
+        willSet {
+            println!("willSet → {}", newValue)
+        }
+        didSet {
+            println!("didSet  {} (was {})", self.temp(), oldValue)
+        }
+    }
+}
+
+class Score {
+    points: int {
+        willSet {
+            if newValue < 0 {
+                println!("warning: negative score {}", newValue)
+            }
+        }
+        didSet {
+            println!("score {} (was {})", self.points(), oldValue)
+        }
+    }
+}
+
+mut t = Thermometer::new(0.0)
+t.set_temp(36.5)
+t.set_temp(37.2)
+println!("final temp = {}", t.temp())
+
+mut s = Score::new(0)
+s.set_points(10)
+s.set_points(7)
+s.set_points(-1)
