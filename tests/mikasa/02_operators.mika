@@ -1,0 +1,19 @@
+import("harness.mika")
+
+func main() {
+    check("eq", 1 == 1)
+    check("neq", 1 != 2)
+    check("lt", 1 < 2)
+    check("le", 2 <= 2)
+    check("gt", 3 > 2)
+    check("ge", 3 >= 3)
+    check("unary neg", -5 == 0 - 5)
+    check("ternary", (1 > 0 ? 10 : 20) == 10)
+    check("ternary else", (1 < 0 ? 10 : 20) == 20)
+    mut n = 0
+    n++
+    check_eq("postinc", n, 1)
+    n--
+    check_eq("postdec", n, 0)
+    summary()
+}

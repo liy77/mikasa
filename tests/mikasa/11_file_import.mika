@@ -1,0 +1,12 @@
+// Dynamic file import: import("…") merges sibling / nested .mika sources.
+import("harness.mika")
+import("fixtures/math_util.mika")
+import("fixtures/nested_mid.mika")
+
+func main() {
+    check_eq("import add", add(20, 22), 42)
+    check_eq("import mul", mul(6, 7), 42)
+    check_eq("nested mid", mid_value(), 10)
+    check_eq("nested leaf", leaf_value(), 7)
+    summary()
+}

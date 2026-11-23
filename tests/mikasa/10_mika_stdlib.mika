@@ -1,0 +1,92 @@
+// One check per testable `mika` / `cstd` stdlib function (headless-safe).
+// Skipped here (need interactive stdin): input, readln, read_int, read_float.
+// die/exit/panic_if are covered only on the failure path of the harness.
+import("harness.mika")
+import {
+    trim,
+    split,
+    join,
+    to_int,
+    to_float,
+    exists,
+    is_file,
+    is_dir,
+    write_file,
+    read_file,
+    append_file,
+    list_dir,
+    env,
+    now_ms,
+    sleep_ms,
+    args,
+    run,
+    rand_int,
+} from mika
+
+func main() {
+    check_eq_str("trim", trim("  ab  "), "ab")
+
+    mut parts = split("a,b,c", ",")
+    check_eq("split.len", parts.len(), 3)
+    check_eq_str("split.0", parts[0], "a")
+    check_eq_str("join", join(parts, "-"), "a-b-c")
+
+    mut oi = to_int("42")
+    mut iv = 0
+    match oi {
+        Some(v) => { iv = v },
+        None => { iv = -1 },
+    }
+    check_eq("to_int", iv, 42)
+
+    mut bad = to_int("nope")
+    mut bad_ok = false
+    match bad {
+        Some(_) => { bad_ok = false },
+        None => { bad_ok = true },
+    }
+    check("to_int none", bad_ok)
+
+    mut of = to_float("3.5")
+    mut fv_ok = false
+    match of {
+        Some(_) => { fv_ok = true },
+        None => { fv_ok = false },
+    }
+    check("to_float", fv_ok)
+
+    mut dir = "/tmp/mikasa-stdlib-test"
+    mut path = "/tmp/mikasa-stdlib-test/sample.txt"
+    run("mkdir -p /tmp/mikasa-stdlib-test")
+    write_file(path, "hi")
+    append_file(path, "!")
+    check_eq_str("read_file", read_file(path), "hi!")
+    check("exists", exists(path))
+    check("is_file", is_file(path))
+    check("is_dir", is_dir(dir))
+    check("!is_dir file", !is_dir(path))
+    check("!exists missing", !exists("/tmp/mikasa-stdlib-test/missing-xyz"))
+
+    mut listing = list_dir(dir)
+    check("list_dir nonempty", listing.len() > 0)
+
+    check("env PATH", env("PATH").len() > 0)
+    check_eq_str("env missing", env("MIKASA_ENV_VAR_THAT_SHOULD_NOT_EXIST_ZZZ"), "")
+
+    mut t0 = now_ms()
+    sleep_ms(5)
+    mut dt = now_ms() - t0
+    check("now_ms/sleep_ms", dt >= 0)
+
+    mut a = args()
+    check("args", a.len() >= 0)
+
+    mut out = run("echo hello")
+    check_eq_str("run echo", trim(out), "hello")
+
+    mut r = rand_int(1, 10)
+    check("rand_int lo", r >= 1)
+    check("rand_int hi", r < 10)
+
+    summary()
+}

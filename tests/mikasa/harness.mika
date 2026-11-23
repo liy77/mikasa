@@ -1,0 +1,42 @@
+// Shared assert helpers for the Mikasa language suite (Astra).
+import { exit } from mika
+
+mut PASSED = 0
+mut FAILED = 0
+
+func check(name: string, cond: bool) {
+    if cond {
+        PASSED = PASSED + 1
+        println("ok   ${name}")
+    } else {
+        FAILED = FAILED + 1
+        println("FAIL ${name}")
+    }
+}
+
+func check_eq(name: string, got: int, want: int) {
+    if got == want {
+        PASSED = PASSED + 1
+        println("ok   ${name}")
+    } else {
+        FAILED = FAILED + 1
+        println("FAIL ${name}: got ${got} want ${want}")
+    }
+}
+
+func check_eq_str(name: string, got: string, want: string) {
+    if got == want {
+        PASSED = PASSED + 1
+        println("ok   ${name}")
+    } else {
+        FAILED = FAILED + 1
+        println("FAIL ${name}: got '${got}' want '${want}'")
+    }
+}
+
+func summary() {
+    println("-- ${PASSED} passed, ${FAILED} failed --")
+    if FAILED > 0 {
+        exit(1)
+    }
+}

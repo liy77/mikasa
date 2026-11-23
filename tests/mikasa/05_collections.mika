@@ -1,0 +1,15 @@
+import("harness.mika")
+
+func main() {
+    mut nums = [10, 20, 30]
+    check_eq("len", nums.len(), 3)
+    check_eq("index0", nums[0], 10)
+    check_eq("index2", nums[2], 30)
+    nums[1] = 25
+    check_eq("index set", nums[1], 25)
+
+    mut t = (1, 2, 3)
+    check_eq("tuple.0", t.0, 1)
+    check_eq("tuple.2", t.2, 3)
+    summary()
+}

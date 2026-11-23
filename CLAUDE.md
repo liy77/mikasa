@@ -202,8 +202,10 @@ cargo build                    # debug
 cargo build --release          # release (what install.py runs)
 cargo fmt -- --check
 cargo clippy -- -D warnings
-cargo test                     # tests in mikasa-syntax interpolation
-for f in examples/mikasa/*.crs; do ./target/debug/cforge run "$f"; done
+cargo test                     # crate unit/integration tests
+python tests/run_all.py        # cargo tests + tests/mikasa/*.mika via astra
+# or: python scripts/test.py
+for f in examples/mikasa/*.mika; do ./target/debug/astra run "$f"; done
 python scripts/install.py      # reinstall; open NEW terminal after
 ```
 

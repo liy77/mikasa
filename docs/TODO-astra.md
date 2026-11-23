@@ -55,3 +55,4 @@
 | Artefato `.ast` / `.loy` + wasm embutido | `astra build` |
 | GUI 100% Mikasa (`astra.mika` + `backend.mika`) | host Rust fino |
 | Binário CLI `astra` | alias histórico `alloy` onde ainda existir |
+| Suite `tests/mikasa/` + `astra-vm` `mikasa_suite` | linguagem + stdlib + file import + rust wasm |

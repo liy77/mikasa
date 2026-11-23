@@ -1,0 +1,14 @@
+import("harness.mika")
+
+func main() {
+    mut nums = [1, 2, 3, 4]
+    mut doubled = nums.iter().map(|x| x * 2).collect()
+    check_eq("map len", doubled.len(), 4)
+    check_eq("map0", doubled[0], 2)
+    check_eq("map3", doubled[3], 8)
+
+    mut evens = nums.iter().filter(|x| x % 2 == 0).collect()
+    check_eq("filter len", evens.len(), 2)
+    check_eq("filter0", evens[0], 2)
+    summary()
+}
