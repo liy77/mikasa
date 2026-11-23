@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 
 use crate::ast::{Element, MuiValue, Node, Prop, PropValue};
-use copper_syntax::expr::{BinOp, Expr, ExprKind, Literal, StrPart, UnOp};
+use mikasa_syntax::expr::{BinOp, Expr, ExprKind, Literal, StrPart, UnOp};
 
 /// An RGBA color in 0-255 channels (alpha 0-255). The single representation
 /// both `#rrggbb[aa]` and `rgba(...)` resolve to.
@@ -104,11 +104,7 @@ pub struct ReactiveEnv {
 
 /// A numeric prop, reactive to signals when `env` is Some. With `env = None`
 /// only literals resolve (preserves the static-only contract of the old API).
-pub fn f32_prop_reactive(
-    el: &Element,
-    name: &str,
-    env: Option<&ReactiveEnv>,
-) -> Option<f32> {
+pub fn f32_prop_reactive(el: &Element, name: &str, env: Option<&ReactiveEnv>) -> Option<f32> {
     let e = match &find(el, name)?.value {
         PropValue::Expr(e) => e,
         _ => return None,
@@ -200,11 +196,7 @@ pub fn eval_dim_reactive(e: &Expr, env: &ReactiveEnv) -> (Option<f32>, Vec<Strin
     (v, deps)
 }
 
-fn eval_dim_reactive_inner(
-    e: &Expr,
-    env: &ReactiveEnv,
-    deps: &mut Vec<String>,
-) -> Option<f32> {
+fn eval_dim_reactive_inner(e: &Expr, env: &ReactiveEnv, deps: &mut Vec<String>) -> Option<f32> {
     match &e.kind {
         ExprKind::Literal(Literal::Int(i)) => Some(*i as f32),
         ExprKind::Literal(Literal::Float(f)) => Some(*f as f32),
@@ -225,15 +217,15 @@ fn eval_dim_reactive_inner(
             let pick = if c == 0.0 { els } else { then };
             eval_dim_reactive_inner(pick, env, deps)
         }
+        ExprKind::NullCoalesce { lhs, rhs } => eval_dim_reactive_inner(lhs, env, deps)
+            .or_else(|| eval_dim_reactive_inner(rhs, env, deps)),
         ExprKind::Binary { op, lhs, rhs } => {
             // Allow either operand to come from a pure-literal expr so a
             // signal on one side of `==` and a literal string on the other
             // (`is_macos == "1"`) both resolve. The literal helper also
             // extracts numeric content from non-interpolated string literals.
-            let a = eval_dim_reactive_inner(lhs, env, deps)
-                .or_else(|| literal_f32_or_str(lhs))?;
-            let b = eval_dim_reactive_inner(rhs, env, deps)
-                .or_else(|| literal_f32_or_str(rhs))?;
+            let a = eval_dim_reactive_inner(lhs, env, deps).or_else(|| literal_f32_or_str(lhs))?;
+            let b = eval_dim_reactive_inner(rhs, env, deps).or_else(|| literal_f32_or_str(rhs))?;
             match op {
                 BinOp::Add => Some(a + b),
                 BinOp::Sub => Some(a - b),
@@ -344,7 +336,10 @@ fn literal_f32(e: &Expr) -> Option<f32> {
         ExprKind::Literal(Literal::Int(i)) => Some(*i as f32),
         ExprKind::Literal(Literal::Float(f)) => Some(*f as f32),
         // `marginTop: -36` parses as a negation, not a negative literal.
-        ExprKind::Unary { op: UnOp::Neg, expr } => literal_f32(expr).map(|v| -v),
+        ExprKind::Unary {
+            op: UnOp::Neg,
+            expr,
+        } => literal_f32(expr).map(|v| -v),
         _ => None,
     }
 }
@@ -700,7 +695,7 @@ fn parse_hex(hex: &str) -> Option<Rgba> {
 /// expression interpolation (e.g. `method: "${kind}"`) is rejected —
 /// material names must be a compile-time constant.
 pub fn enum_member(el: &Element, name: &str) -> Option<String> {
-    use copper_syntax::expr::{Literal, StrPart};
+    use mikasa_syntax::expr::{Literal, StrPart};
     match &find(el, name)?.value {
         PropValue::Mui(MuiValue::Enum { member, .. }) => Some(member.to_lowercase()),
         PropValue::Expr(e) => match &e.kind {

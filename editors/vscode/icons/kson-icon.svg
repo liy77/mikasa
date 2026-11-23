@@ -1,5 +1,5 @@
 <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-  <!-- KSON config file icon, copper-themed to match the Copper extension. -->
+  <!-- KSON config file icon, themed to match the Mikasa extension. -->
   <rect x="3" y="2" width="26" height="28" rx="4" fill="#2b2118"/>
   <rect x="3" y="2" width="26" height="28" rx="4" fill="none" stroke="#b87333" stroke-width="1.5"/>
   <!-- structured-data braces -->

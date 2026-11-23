@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Copper Language uninstaller — cross-platform and self-contained.
+Mikasa uninstaller — cross-platform and self-contained.
 
 This file is copied into the install directory by install.py, so it must NOT
 import the shared _pretty module (it runs far from scripts/). It re-detects
@@ -167,7 +167,7 @@ def clean_path_unix(scope):
                 fish_profile.unlink()
                 ok(f"Removed {fish_profile}")
             else:
-                warn(f"{fish_profile} exists but doesn't look managed by Copper; leaving it in place.")
+                warn(f"{fish_profile} exists but doesn't look managed by Mikasa; leaving it in place.")
         else:
             info(f"{fish_profile} not found.")
         return
@@ -201,13 +201,13 @@ def clean_path_unix(scope):
 
 # --- main ---------------------------------------------------------------
 def main():
-    ap = argparse.ArgumentParser(prog="uninstall.py", description="Remove the Copper compiler (cforge).")
+    ap = argparse.ArgumentParser(prog="uninstall.py", description="Remove the Mikasa compiler (mikasa).")
     grp = ap.add_mutually_exclusive_group()
     grp.add_argument("--local", action="store_const", const="local", dest="force")
     grp.add_argument("--global", action="store_const", const="global", dest="force")
     args = ap.parse_args()
 
-    banner("Copper", "Language Uninstaller")
+    banner("Mikasa", "Language Uninstaller")
     scope, install_dir = resolve_scope(args.force)
     info(f"Detected {scope} installation")
     info(f"Target directory: {install_dir}")
@@ -218,7 +218,7 @@ def main():
     else:
         clean_path_unix(scope)
 
-    banner("Copper uninstalled")
+    banner("Mikasa uninstalled")
     info("Open a new terminal so the PATH change takes effect.")
     print()
 

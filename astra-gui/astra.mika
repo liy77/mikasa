@@ -1,0 +1,445 @@
+// Astra — GUI written entirely in Mikasa (MocidaUI document).
+//
+// Logic lives in backend.mika. The thin Rust host only links mocida,
+// runs the interpreter, and forwards signals. Edit this file and save —
+// the host hot-reloads it in dev.
+
+App() {
+  name: "Astra"
+  width: 1120
+  height: 740
+  minWidth: 800
+  minHeight: 560
+  background: #0a0a0c
+  mainContent: AstraApp
+  host: "."
+}
+
+view AstraApp() {
+  mut nav = signal(0)
+  mut mode = signal(0)
+  mut source = signal("")
+  mut output = signal("")
+  mut run_trigger = signal(0)
+  mut open_trigger = signal(0)
+  mut path_field = signal("")
+  mut update_trigger = signal(0)
+  mut update_status = signal("")
+  mut version = signal("…")
+  mut wrap_output = signal(true)
+  mut status = signal("")
+
+  Stack(
+    orientation: horizontal,
+    align: stretch,
+    background: #0a0a0c,
+    width: Window.width,
+    height: Window.height
+  ) {
+    // ── Sidebar ──────────────────────────────────────────────────────────
+    Rectangle(
+      width: 200,
+      height: Window.height,
+      background: #101014,
+      borderColor: #1c1c24,
+      borderWidth: 1
+    ) {
+      Stack(
+        orientation: vertical,
+        align: stretch,
+        justify: spaceBetween,
+        width: 200,
+        height: Window.height,
+        paddingTop: 20,
+        paddingBottom: 18,
+        paddingLeft: 14,
+        paddingRight: 14
+      ) {
+        Stack(orientation: vertical, align: stretch, gap: 22, width: 172) {
+          Stack(orientation: horizontal, align: center, gap: 10, width: 172) {
+            Image("mocida://icon", width: 36, height: 36, fillMode: fit, antialiasing: true)
+            Stack(orientation: vertical, gap: 2, align: left) {
+              Text("Astra", size: 17, color: #f4f4f7, weight: bold)
+              Text("Mikasa VM", size: 10, color: #6e6e7a)
+            }
+          }
+
+          Stack(orientation: vertical, align: stretch, gap: 4, width: 172) {
+            SideNav("Playground", nav == 0, 0, nav, "mocida://icons/code.png")
+            SideNav("Runner", nav == 1, 1, nav, "mocida://icons/terminal.png")
+            SideNav("Updates", nav == 2, 2, nav, "mocida://icons/update.png")
+          }
+        }
+
+        Stack(orientation: vertical, align: stretch, gap: 6, width: 172) {
+          Rectangle(width: 172, height: 1, background: #1c1c24) {}
+          Text("v${version}", size: 11, color: #5c5c68)
+          Text("F1  F2  F3", size: 10, color: #3e3e48)
+        }
+      }
+    }
+
+    // ── Main pane ────────────────────────────────────────────────────────
+    if nav == 0 {
+      Playground(mode, source, output, run_trigger, wrap_output, status)
+    } else if nav == 1 {
+      Runner(path_field, output, run_trigger, open_trigger, wrap_output, status)
+    } else {
+      Updates(version, update_status, update_trigger)
+    }
+  }
+}
+
+view SideNav(label, on, index, target, icon) {
+  if on {
+    Stack(
+      orientation: horizontal,
+      align: center,
+      gap: 8,
+      height: 36,
+      width: 172,
+      background: #e23b3b,
+      radius: 9,
+      paddingLeft: 12,
+      paddingRight: 12,
+      cursor: pointer,
+      onClick: { target = index }
+    ) {
+      Image(icon, width: 15, height: 15, fillMode: fit)
+      Text(label, size: 13, color: #ffffff, weight: bold)
+    }
+  } else {
+    Stack(
+      orientation: horizontal,
+      align: center,
+      gap: 8,
+      height: 36,
+      width: 172,
+      background: #101014,
+      radius: 9,
+      paddingLeft: 12,
+      paddingRight: 12,
+      cursor: pointer,
+      onClick: { target = index }
+    ) {
+      Image(icon, width: 15, height: 15, fillMode: fit)
+      Text(label, size: 13, color: #8a8a96)
+    }
+  }
+}
+
+view ModeChip(label, on, index, target, icon) {
+  if on {
+    Stack(
+      orientation: horizontal,
+      align: center,
+      gap: 5,
+      height: 30,
+      background: #1e1e28,
+      radius: 8,
+      paddingLeft: 10,
+      paddingRight: 10,
+      borderColor: #e23b3b,
+      borderWidth: 1,
+      cursor: pointer,
+      onClick: { target = index }
+    ) {
+      Image(icon, width: 13, height: 13, fillMode: fit)
+      Text(label, size: 12, color: #f0f0f4)
+    }
+  } else {
+    Stack(
+      orientation: horizontal,
+      align: center,
+      gap: 5,
+      height: 30,
+      background: #141418,
+      radius: 8,
+      paddingLeft: 10,
+      paddingRight: 10,
+      borderColor: #24242e,
+      borderWidth: 1,
+      cursor: pointer,
+      onClick: { target = index }
+    ) {
+      Image(icon, width: 13, height: 13, fillMode: fit)
+      Text(label, size: 12, color: #7a7a88)
+    }
+  }
+}
+
+view Playground(mode, source, output, run_trigger, wrap_output, status) {
+  Stack(
+    orientation: vertical,
+    align: stretch,
+    gap: 14,
+    padding: 20,
+    width: Window.width - 200,
+    height: Window.height
+  ) {
+    Stack(
+      orientation: horizontal,
+      align: center,
+      justify: spaceBetween,
+      width: Window.width - 240,
+      height: 40
+    ) {
+      Stack(orientation: horizontal, align: center, gap: 10) {
+        Text("PLAYGROUND", size: 11, color: #e23b3b, weight: bold)
+        Text("edit · run · inspect", size: 12, color: #6e6e7a)
+        if status != "" {
+          Text("·  ${status}", size: 12, color: #8a8a96)
+        }
+      }
+      Stack(orientation: horizontal, align: center, gap: 10) {
+        Stack(orientation: horizontal, align: center, gap: 4) {
+          ModeChip("Split", mode == 0, 0, mode, "mocida://icons/split.png")
+          ModeChip("Editor", mode == 1, 1, mode, "mocida://icons/code.png")
+          ModeChip("Output", mode == 2, 2, mode, "mocida://icons/terminal.png")
+        }
+        Stack(
+          orientation: horizontal,
+          align: center,
+          gap: 7,
+          height: 34,
+          background: #e23b3b,
+          radius: 9,
+          paddingLeft: 14,
+          paddingRight: 16,
+          cursor: pointer,
+          onClick: { status = "running…" ; run_trigger = run_trigger + 1 }
+        ) {
+          Image("mocida://icons/play.png", width: 14, height: 14, fillMode: fit)
+          Text("Run", size: 13, color: #ffffff, weight: bold)
+        }
+      }
+    }
+
+    if mode == 1 {
+      EditorPane(source, Window.width - 240, Window.height - 90)
+    } else if mode == 2 {
+      OutputPane(output, wrap_output, Window.width - 240, Window.height - 90)
+    } else if Window.width == 0 or Window.width >= 1000 {
+      Stack(
+        orientation: horizontal,
+        align: stretch,
+        gap: 14,
+        width: Window.width - 240,
+        height: Window.height - 90
+      ) {
+        EditorPane(source, (Window.width - 268) / 2, Window.height - 90)
+        OutputPane(output, wrap_output, (Window.width - 268) / 2, Window.height - 90)
+      }
+    } else {
+      Stack(orientation: vertical, align: stretch, gap: 14, width: Window.width - 240) {
+        EditorPane(source, Window.width - 240, (Window.height - 120) / 2)
+        OutputPane(output, wrap_output, Window.width - 240, (Window.height - 120) / 2)
+      }
+    }
+  }
+}
+
+view EditorPane(source, w, h) {
+  Stack(orientation: vertical, align: stretch, gap: 8, width: w, height: h) {
+    Stack(orientation: horizontal, align: center, gap: 8, width: w, height: 18) {
+      Text("SOURCE", size: 10, color: #7a7a88, weight: bold)
+      Text(".mika", size: 10, color: #4a4a56)
+    }
+    TextArea(
+      value: source,
+      placeholder: "func main() {\n    println(\"hello from Astra\")\n}",
+      width: w,
+      height: h - 26,
+      background: #0d1117,
+      textColor: #d6e2f0,
+      borderColor: #22222c,
+      borderWidth: 1,
+      radius: 12,
+      padding: 16,
+      fontSize: 14,
+      cursor: text,
+      onChange: { |v| source = v },
+    )
+  }
+}
+
+view OutputPane(output, wrap_output, w, h) {
+  Stack(orientation: vertical, align: stretch, gap: 8, width: w, height: h) {
+    Stack(orientation: horizontal, align: center, justify: spaceBetween, width: w, height: 24) {
+      Text("OUTPUT", size: 10, color: #7a7a88, weight: bold)
+      Switch(
+        "wrap",
+        value: wrap_output,
+        onColor: #e23b3b,
+        offColor: #2a2a32,
+        knobColor: #ffffff,
+        labelColor: #7a7a88,
+        labelSize: 11,
+        onChange: { |v| wrap_output = v }
+      )
+    }
+    Rectangle(
+      width: w,
+      height: h - 32,
+      background: #0b1210,
+      radius: 12,
+      borderColor: #1a3228,
+      borderWidth: 1
+    ) {
+      Text(
+        output,
+        size: 13,
+        color: #b6e3c4,
+        align: left,
+        vAlign: top,
+        padding: 16,
+        wrap: wrap_output
+      )
+    }
+  }
+}
+
+view Runner(path_field, output, run_trigger, open_trigger, wrap_output, status) {
+  Stack(
+    orientation: vertical,
+    align: stretch,
+    gap: 16,
+    padding: 22,
+    width: Window.width - 200,
+    height: Window.height
+  ) {
+    Rectangle(
+      width: Window.width - 244,
+      background: #121218,
+      radius: 14,
+      borderColor: #22222c,
+      borderWidth: 1,
+      padding: 18
+    ) {
+      Stack(orientation: vertical, align: stretch, gap: 12, width: Window.width - 280) {
+        Text("OPEN A FILE", size: 11, color: #e23b3b, weight: bold)
+        Text(
+          "Pick a .mika on disk. Run uses that file instead of the editor.",
+          size: 13,
+          color: #7a7a88,
+          wrap: true,
+          width: Window.width - 280
+        )
+        Input(
+          value: path_field,
+          placeholder: "path/to/file.mika",
+          width: Window.width - 280,
+          height: 40,
+          background: #0a0a0c,
+          textColor: #f0f0f4,
+          placeholderColor: #4a4a56,
+          borderColor: #22222c,
+          borderColorFocused: #e23b3b,
+          borderWidth: 1,
+          radius: 10,
+          padding: 12,
+          fontSize: 14,
+          cursor: text,
+          onChange: { |v| path_field = v },
+        )
+        Stack(orientation: horizontal, gap: 10, align: center) {
+          Stack(
+            orientation: horizontal,
+            align: center,
+            gap: 7,
+            height: 36,
+            background: #1a1a22,
+            radius: 9,
+            paddingLeft: 12,
+            paddingRight: 14,
+            borderColor: #2a2a34,
+            borderWidth: 1,
+            cursor: pointer,
+            onClick: { open_trigger = open_trigger + 1 }
+          ) {
+            Image("mocida://icons/folder.png", width: 14, height: 14, fillMode: fit)
+            Text("Choose file", size: 13, color: #d0d0d8)
+          }
+          Stack(
+            orientation: horizontal,
+            align: center,
+            gap: 7,
+            height: 36,
+            background: #e23b3b,
+            radius: 9,
+            paddingLeft: 12,
+            paddingRight: 14,
+            cursor: pointer,
+            onClick: { status = "running…" ; run_trigger = run_trigger + 1 }
+          ) {
+            Image("mocida://icons/play.png", width: 14, height: 14, fillMode: fit)
+            Text("Run file", size: 13, color: #ffffff, weight: bold)
+          }
+        }
+      }
+    }
+
+    OutputPane(output, wrap_output, Window.width - 244, Window.height - 280)
+  }
+}
+
+view Updates(version, update_status, update_trigger) {
+  Stack(
+    orientation: vertical,
+    align: center,
+    justify: center,
+    gap: 18,
+    width: Window.width - 200,
+    height: Window.height
+  ) {
+    Rectangle(
+      width: 420,
+      background: #121218,
+      radius: 18,
+      borderColor: #22222c,
+      borderWidth: 1,
+      padding: 28
+    ) {
+      Stack(orientation: vertical, align: center, gap: 14, width: 364) {
+        Image("mocida://icon", width: 96, height: 96, fillMode: fit, antialiasing: true)
+        Text("Astra", size: 24, color: #f4f4f7, weight: bold)
+        Text("Mikasa interpreter", size: 13, color: #7a7a88)
+
+        Rectangle(width: 364, height: 1, background: #22222c) {}
+
+        Text("installed  v${version}", size: 13, color: #c4c4cc)
+
+        Stack(
+          orientation: horizontal,
+          align: center,
+          justify: center,
+          gap: 8,
+          width: 220,
+          height: 40,
+          background: #e23b3b,
+          radius: 10,
+          cursor: pointer,
+          onClick: {
+            update_status = "Checking GitHub for a newer build…"
+            update_trigger = update_trigger + 1
+          }
+        ) {
+          Image("mocida://icons/update.png", width: 15, height: 15, fillMode: fit)
+          Text("Check for updates", size: 13, color: #ffffff, weight: bold)
+        }
+
+        if update_status == "" {
+          Text(
+            "Astra checks GitHub releases for a newer nightly.",
+            size: 12,
+            color: #5c5c68,
+            align: center,
+            width: 364
+          )
+        } else {
+          Text(update_status, size: 13, color: #d0d0d8, align: center, width: 364, wrap: true)
+        }
+      }
+    }
+  }
+}

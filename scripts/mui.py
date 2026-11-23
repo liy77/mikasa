@@ -122,7 +122,7 @@ def main():
     ap.add_argument("--no-run", action="store_true", help="build only, don't launch the binary")
     args = ap.parse_args()
 
-    banner("Copper", "MUI Build & Run")
+    banner("Mikasa", "MUI Build & Run")
 
     src = Path(args.file)
     if not src.exists():

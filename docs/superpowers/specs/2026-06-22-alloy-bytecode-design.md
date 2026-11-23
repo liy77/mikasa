@@ -2,7 +2,7 @@
 
 **Data:** 2026-06-22
 **Status:** Design aprovado (pré-implementação)
-**Depende de:** [Alloy VM](2026-06-22-alloy-vm-design.md) (interpretador completo)
+**Depende de:** [Alloy VM](2026-06-22-astra-vm-design.md) (interpretador completo)
 
 ## Objetivo
 
@@ -37,14 +37,14 @@ offset 8:  fmt_ver    : u16 LE        (versão do formato; muda se a AST mudar)
 - **Independente de plataforma:** é só dados (sem código nativo, sem endianness
   ambígua — bincode com config fixa LE).
 - **Serialização:** `serde` + `bincode`. Deriva-se `Serialize`/`Deserialize`
-  nos tipos de AST de `copper-syntax` consumidos pelo `Program`:
+  nos tipos de AST de `mikasa-syntax` consumidos pelo `Program`:
   `Span`, `Param`, `Field`, `ClassMember`, `ImportKind`, `Item`, `Block`,
   `Stmt`, `Expr`, `ExprKind`, `Literal`, `StrTemplate`, `StrPart`, `BinOp`,
   `UnOp`, `AssignOp`, `Pattern`, `MatchArm`, `Type`. (Não afeta a transpilação
   do `cforge`, que ignora a AST.)
-- **`bincode`** entra como dependência só do `alloy-vm` (puro-Rust).
+- **`bincode`** entra como dependência só do `astra-vm` (puro-Rust).
 
-### Módulo `crate::bytecode` (em `alloy-vm`)
+### Módulo `crate::bytecode` (em `astra-vm`)
 
 ```rust
 pub const MAGIC: &[u8; 8] = b"ALLOYBC\0";
@@ -87,19 +87,19 @@ bundlar múltiplos `Program` no artefato.
 
 ## C — Distribuição cross-platform do runtime
 
-O binário `alloy` está no crate portátil `alloy-vm` (sem mocida; deps
+O binário `alloy` está no crate portátil `astra-vm` (sem mocida; deps
 `ureq`+rustls / `serde_json` / `sha2` / `hmac` / `bincode` são puro-Rust),
 então cross-compila limpo.
 
 - **Script `scripts/release-alloy.py`** (Python, como o resto de `scripts/`):
   para cada alvo disponível, roda
-  `cargo build --release --target <T> -p alloy-vm --bin alloy` e empacota o
+  `cargo build --release --target <T> -p astra-vm --bin alloy` e empacota o
   binário (+ `README`/licença) em `dist/alloy/alloy-<versão>-<T>.{tar.gz|zip}`.
 - **Alvos:** `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`,
   `x86_64-apple-darwin`, `aarch64-apple-darwin`, `x86_64-pc-windows-msvc`,
   `aarch64-pc-windows-msvc`. O script **pula** alvos cujo toolchain não está
   instalado (com aviso), em vez de falhar — útil pra rodar localmente.
-- **Versão:** derivada de `CARGO_PKG_VERSION` do `alloy-vm`.
+- **Versão:** derivada de `CARGO_PKG_VERSION` do `astra-vm`.
 - Instalador por-SO fica como passo opcional futuro.
 
 ## Testes

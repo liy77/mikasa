@@ -1,0 +1,6 @@
+// Dynamic file import — splices util.mika into this program.
+import("util.mika")
+
+func main() {
+    greet("mikasa")
+}

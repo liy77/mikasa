@@ -1,26 +1,26 @@
 [workspace]
-members = [".", "crates/copper-syntax", "crates/copper-parser", "crates/copper-lsp", "crates/mui-syntax", "crates/mui-codegen", "crates/mui-lsp", "crates/alloy-vm"]
+members = [".", "crates/mikasa-syntax", "crates/mikasa-parser", "crates/mikasa-lsp", "crates/mui-syntax", "crates/mui-codegen", "crates/mui-lsp", "crates/astra-vm", "crates/mika-import"]
 # `dist/rust` is the output dir for cforge-transpiled programs; it has its
 # own Cargo.toml that must NOT be a workspace member. The installer-gui
 # is its own self-contained Tauri app — also kept out.
-exclude = ["dist", "installer-gui", "lson-src", "alloy-gui"]
+exclude = ["dist", "installer-gui", "lson-src", "alloy-gui", "examples/mika-import-rs"]
 resolver = "2"
 
 [package]
-name = "copper-cforge"
+name = "mikasa"
 version = "0.1.0-beta.0"
 edition = "2021"
 build = "build.rs"
 authors = ["Liy", "Copper Authors"]
 
 [[bin]]
-name = "cforge"
+name = "mikasa"
 path = "src/main.rs"
 
 [dependencies]
-copper-syntax = { path = "crates/copper-syntax" }
-copper-parser = { path = "crates/copper-parser" }
-alloy-vm = { path = "crates/alloy-vm" }
+mikasa-syntax = { path = "crates/mikasa-syntax" }
+mikasa-parser = { path = "crates/mikasa-parser" }
+astra-vm = { path = "crates/astra-vm" }
 mui-syntax = { path = "crates/mui-syntax" }
 mui-codegen = { path = "crates/mui-codegen" }
 clap = "4.6.1"
@@ -34,3 +34,4 @@ tokio = { version = "1.52.3", features = ["full"] }
 toml = "1.1.2"
 quick-xml = "0.40.1"
 walkdir = "2.5.0"
+sha2 = "0.10"

@@ -20,14 +20,14 @@
 pub mod cforge;
 pub mod utils;
 
-// Re-export the tokenizer module from copper-syntax so existing paths
+// Re-export the tokenizer module from mikasa-syntax so existing paths
 // (`crate::tokenizer::tokens::Token`, etc.) keep resolving. cforge drives
 // the same tokenizer the parser and LSP consume.
-pub use copper_syntax::tokenizer;
+pub use mikasa_syntax::tokenizer;
 
-// The parser now lives in its own crate (`copper-parser`). Re-export it at
+// The parser now lives in its own crate (`mikasa-parser`). Re-export it at
 // the crate root so `crate::parser::Parser` keeps resolving in cforge.
-pub use copper_parser::parser;
+pub use mikasa_parser::parser;
 
 use clap::{Arg, Command as ClapCommand};
 use std::process::Command as ProcessCommand;
@@ -39,7 +39,7 @@ pub use utils::*;
 use once_cell::sync::Lazy;
 
 static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
-    ClapCommand::new("cforge")
+    ClapCommand::new("mikasa")
         .arg(Arg::new("input")
             .short('i')
             .long("input")
@@ -68,6 +68,10 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
             .long("bundle")
             .action(clap::ArgAction::SetTrue)
             .help("Embed the app.bundle (assets + config) into the executable for a self-contained binary (.mui only)"))
+        .arg(Arg::new("web")
+            .long("web")
+            .action(clap::ArgAction::SetTrue)
+            .help("Also build a browser package <name>_web/ for a MocidaUI file (wasm host + generated boot)"))
         .arg(Arg::new("version")
             .short('v')
             .long("version")
@@ -77,7 +81,7 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
             .long("target")
             .num_args(1)
             .value_name("TARGET")
-            .help("Cross-compile target (friendly names: windows, mac, linux or full rust triple)")
+            .help("Cross-compile target (friendly names: windows, mac, linux, web or full rust triple)")
         )
         .arg(Arg::new("verbose")
             .short('V')
@@ -96,16 +100,43 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
                     .short('o')
                     .long("output")
                     .help("Output directory for compiled files"),
+                Arg::new("listen")
+                    .long("listen")
+                    .num_args(0..=1)
+                    .default_missing_value("3000")
+                    .value_name("PORT")
+                    .help("Serve a MocidaUI file as a WASM site on PORT (default 3000). Example: mikasa run --listen=3000 app.mui"),
             ])
         )
         .subcommand(ClapCommand::new("init")
-            .about("Scaffold a new Copper project (properties.kson, main.crs, .gitignore)")
+            .about("Scaffold a new Mikasa project (properties.kson, main.mika, .gitignore) — no cargo needed")
         )
         .subcommand(ClapCommand::new("install")
-            .about("Install dependencies. With no NAME, resolves + downloads every dependency in properties.kson and writes properties.lock. With a NAME, adds/pins that one.")
+            .about("Install dependencies into properties.kson / properties.lock (crates.io over HTTPS). No cargo required; optional cargo fetch when available.")
             .arg(Arg::new("package")
                 .help("Crate to install, optionally pinned: name or name@version. Omit to install everything in properties.kson.")
                 .value_name("NAME[@VERSION]")
+                .required(false)
+                .index(1))
+        )
+        .subcommand(ClapCommand::new("remove")
+            .visible_alias("uninstall")
+            .about("Remove a dependency from properties.kson and properties.lock")
+            .arg(Arg::new("package")
+                .help("Crate to remove")
+                .value_name("NAME")
+                .required(true)
+                .index(1))
+        )
+        .subcommand(ClapCommand::new("list")
+            .visible_alias("ls")
+            .about("List dependencies declared in properties.kson")
+        )
+        .subcommand(ClapCommand::new("cache")
+            .about("Inspect or clean CForge transpilation and registry caches")
+            .arg(Arg::new("action")
+                .help("status (default) or clean")
+                .value_name("ACTION")
                 .required(false)
                 .index(1))
         )
@@ -113,11 +144,12 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
         // Accepts the same flags so `cforge build app.mui --release --clean` works
         // exactly like `cforge -c -i app.mui --release --clean`.
         .subcommand(ClapCommand::new("build")
-            .about("Compile a file or directory (alias for `-c -i`). Accepts --release, --clean, --bundle, --output, --target.")
+            .about("Compile a file or directory (alias for `-c -i`). Accepts --release, --clean, --bundle, --web, --output, --target.")
             .arg(Arg::new("input")
-                .help("File (.crs/.mui/.crm) or directory to compile")
+                .help("File (.mika/.mui, or a legacy .crs/.crm) or directory to compile")
                 .value_name("FILE")
-                .required(true)
+                .required(false)
+                .default_value(".")
                 .index(1))
             .arg(Arg::new("output").short('o').long("output")
                 .help("Output directory for compiled files"))
@@ -127,14 +159,17 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
                 .action(clap::ArgAction::SetTrue).help("Clean the output directory before compiling"))
             .arg(Arg::new("bundle").short('b').long("bundle")
                 .action(clap::ArgAction::SetTrue).help("Embed app.bundle into the executable (.mui only)"))
+            .arg(Arg::new("web").long("web")
+                .action(clap::ArgAction::SetTrue)
+                .help("Build browser package <name>_web/ for a MocidaUI file"))
             .arg(Arg::new("target").long("target").num_args(1).value_name("TARGET")
-                .help("Cross-compile target (windows, mac, linux or a full rust triple)"))
+                .help("Cross-compile target (windows, mac, linux, web or a full rust triple)"))
             .arg(Arg::new("verbose").short('V').long("verbose")
                 .action(clap::ArgAction::SetTrue).help("Enable verbose output"))
         )
         // `cforge format <paths…>` — pretty-print MUI (.mui/.crm) files.
         .subcommand(ClapCommand::new("format")
-            .about("Pretty-print MUI (.mui/.crm) files: clean indentation, spacing and blank lines (comments preserved).")
+            .about("Pretty-print MocidaUI files (.mui, or a .mika with a view): clean indentation, spacing and blank lines (comments preserved).")
             .arg(Arg::new("input")
                 .help("Files or directories to format (recurses into directories)")
                 .value_name("PATH")
@@ -149,23 +184,27 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
                 .help("Write the formatted result to stdout instead of editing files"))
         )
         // `cforge vm run/build <file>` (alias `virtual`) — execute a .crs through
-        // the Alloy tree-walking interpreter instead of transpiling to Rust. No
+        // the Astra tree-walking interpreter instead of transpiling to Rust. No
         // cargo/rustc needed.
         .subcommand(ClapCommand::new("vm")
             .visible_alias("virtual")
-            .about("Run a .crs through the Alloy interpreter (no Rust build)")
+            .about("Run a .mika through the Astra interpreter (no Rust build)")
             .subcommand_required(true)
             .subcommand(ClapCommand::new("run")
-                .about("Interpret a .crs file with Alloy")
+                .about("Interpret a .mika file with Astra")
                 .arg(Arg::new("input").value_name("FILE").required(true).index(1)))
             .subcommand(ClapCommand::new("build")
-                .about("Parse + validate a .crs through Alloy without running it")
+                .about("Parse + validate a .mika through Astra without running it")
                 .arg(Arg::new("input").value_name("FILE").required(true).index(1)))
         )
         // `cforge check <file.crs>` — real Rust verification (borrow + Miri),
         // with auto-provisioned toolchain (~/.alloy/rustup).
+        .subcommand(ClapCommand::new("update")
+            .visible_alias("upgrade")
+            .about("Download the latest Mikasa nightly from GitHub and replace this install (no cargo needed)")
+        )
         .subcommand(ClapCommand::new("check")
-            .about("Check a .crs with real Rust (borrow checker + Miri), provisioning the toolchain automatically")
+            .about("Check a .mika with real Rust (borrow checker + Miri), provisioning the toolchain automatically")
             .arg(Arg::new("input").value_name("FILE").required(true).index(1))
             .arg(Arg::new("no-miri").long("no-miri")
                 .action(clap::ArgAction::SetTrue)
@@ -173,10 +212,29 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
         )
 });
 
-/// `cforge vm run/build <file>` — drive the Alloy interpreter. Returns the
+/// Print the deprecation warning for a legacy extension. `mikasa build` and
+/// `mikasa run` call this; the file still works, the spelling is what aged.
+fn warn_deprecated_extension(file: Option<&String>) {
+    let Some(file) = file else { return };
+    if let Some(ext) = path::Path::new(file).extension().and_then(|e| e.to_str()) {
+        if let Some(warning) = mikasa_syntax::ext::deprecation_warning(ext) {
+            eprintln!("warning: {warning}");
+        }
+    }
+    // `import { … } from cstd` still resolves, but `mika` is the name now.
+    if let Ok(src) = std::fs::read_to_string(file) {
+        if src.contains("from cstd") {
+            if let Some(warning) = mikasa_syntax::ext::stdlib_deprecation("cstd") {
+                eprintln!("warning: {warning}");
+            }
+        }
+    }
+}
+
+/// `mikasa vm run/build <file>` — drive the Astra interpreter. Returns the
 /// process exit code.
 fn run_vm(sub: &str, file: &str) -> i32 {
-    use alloy_vm::loader;
+    use astra_vm::loader;
     use std::path::Path;
     let p = Path::new(file);
 
@@ -191,22 +249,22 @@ fn run_vm(sub: &str, file: &str) -> i32 {
         // Compile each imported `.rs` to wasm and embed it in the `.loy`.
         let mut modules = resolved.wasm_modules.clone();
         for imp in &resolved.rs_imports {
-            match alloy_vm::wasm::compile_rs_to_wasm(&imp.rs_path) {
-                Ok(bytes) => modules.push(alloy_vm::bytecode::WasmModule {
+            match astra_vm::wasm::compile_rs_to_wasm_named(&imp.rs_path, &imp.names) {
+                Ok(bytes) => modules.push(astra_vm::bytecode::WasmModule {
                     names: imp.names.clone(),
                     bytes,
                 }),
                 Err(e) => {
                     eprintln!(
-                        "cforge vm build: could not compile {} to wasm: {e}",
+                        "mikasa vm build: could not compile {} to wasm: {e}",
                         imp.rs_path.display()
                     );
                     return 1;
                 }
             }
         }
-        let out = p.with_extension("loy");
-        let bytes = alloy_vm::bytecode::compile(&resolved.program.items, &modules);
+        let out = p.with_extension(mikasa_syntax::ext::ARTIFACT);
+        let bytes = astra_vm::bytecode::compile(&resolved.program.items, &modules);
         match std::fs::write(&out, bytes) {
             Ok(()) => {
                 if modules.is_empty() {
@@ -235,7 +293,7 @@ fn run_vm(sub: &str, file: &str) -> i32 {
             }
         };
 
-        let mut interp = alloy_vm::interp::Interpreter::new();
+        let mut interp = astra_vm::interp::Interpreter::new();
         // Wasm already embedded in a `.loy` — no rustc needed.
         for m in &resolved.wasm_modules {
             if let Err(e) = interp.register_wasm_bytes(&m.names, &m.bytes) {
@@ -244,23 +302,22 @@ fn run_vm(sub: &str, file: &str) -> i32 {
             }
         }
         for imp in &resolved.rs_imports {
-            let rt = match alloy_vm::wasm::WasmRuntime::from_rs(&imp.rs_path) {
-                Ok(rt) => rt,
-                Err(e) => {
-                    eprintln!(
-                        "cforge vm: could not run {} via wasm ({e}). \
-                         Use the native transpile: cforge run {file}",
-                        imp.rs_path.display()
-                    );
-                    return 1;
-                }
-            };
-            // Plain `pub fn` (no `#[no_mangle] pub extern "C"`) isn't a wasm
-            // export yet → point at the native transpile.
+            let rt =
+                match astra_vm::wasm::WasmRuntime::from_rs_named(&imp.rs_path, &imp.names) {
+                    Ok(rt) => rt,
+                    Err(e) => {
+                        eprintln!(
+                            "mikasa vm: could not run {} via wasm ({e}). \
+                             Use the native transpile: mikasa run {file}",
+                            imp.rs_path.display()
+                        );
+                        return 1;
+                    }
+                };
             if let Some(missing) = imp.names.iter().find(|n| !rt.exports(n)) {
                 eprintln!(
-                    "cforge vm: `{missing}` from {} isn't a wasm export \
-                     (needs `#[no_mangle] pub extern \"C\"`). Use: cforge run {file}",
+                    "mikasa vm: `{missing}` from {} isn't exported after wrap. \
+                     Use: mikasa run {file}",
                     imp.rs_path.display()
                 );
                 return 1;
@@ -305,7 +362,7 @@ fn parse_commands() -> ParsedCommands {
 
     // Handle flags (boolean arguments)
     for flag in [
-        "version", "verbose", "clean", "compile", "release", "bundle",
+        "version", "verbose", "clean", "compile", "release", "bundle", "web",
     ] {
         if let Some(value) = matches.get_one::<bool>(flag) {
             let mut cmd = ParsedCommand::new(flag.to_string(), vec![]);
@@ -419,8 +476,8 @@ fn parse_commands() -> ParsedCommands {
             cmd.set_valid(true);
             parsed_args.update_or_add_command(cmd);
         } else {
-            // If no file specified for run, try using main.crs as default
-            let default_file = "main.crs";
+            // If no file specified for run, try using main.mika as default.
+            let default_file = "main.mika";
             if path::Path::new(default_file).exists() {
                 let mut cmd =
                     ParsedCommand::new("input".to_string(), vec![default_file.to_string()]);
@@ -455,9 +512,19 @@ fn parse_commands() -> ParsedCommands {
             cmd.set_valid(true);
             parsed_args.update_or_add_command(cmd);
         }
+
+        // A legacy extension still runs, but `mikasa run` says so.
+        warn_deprecated_extension(run_matches.get_one::<String>("input"));
+
+        // `mikasa run --listen[=PORT] file.mui` — serve the MUI as a WASM site.
+        if let Some(port) = run_matches.get_one::<String>("listen") {
+            let mut cmd = ParsedCommand::new("listen".to_string(), vec![port.clone()]);
+            cmd.set_valid(true);
+            parsed_args.update_or_add_command(cmd);
+        }
     }
 
-    // `cforge build <file>` — alias for `-c -i <file>`. Translate the subcommand
+    // `mikasa build <file>` — alias for `-c -i <file>`. Translate the subcommand
     // into the same parsed commands `-c -i` produces, so the compile path in
     // main() runs unchanged. Accepts the same flags (--release/--clean/--bundle/
     // --output/--target/--verbose).
@@ -467,6 +534,7 @@ fn parse_commands() -> ParsedCommands {
         parsed_args.update_or_add_command(compile);
 
         if let Some(file_path) = bm.get_one::<String>("input") {
+            warn_deprecated_extension(Some(file_path));
             let path = path::Path::new(file_path);
             if !path.exists() {
                 eprintln!("Error: '{}' does not exist", file_path);
@@ -495,7 +563,7 @@ fn parse_commands() -> ParsedCommands {
             parsed_args.update_or_add_command(cmd);
         }
 
-        for flag in ["release", "clean", "bundle", "verbose"] {
+        for flag in ["release", "clean", "bundle", "web", "verbose"] {
             if bm.get_flag(flag) {
                 let mut cmd = ParsedCommand::new(flag.to_string(), vec![]);
                 cmd.set_valid(true);
@@ -536,25 +604,55 @@ fn parse_commands() -> ParsedCommands {
 
 #[tokio::main]
 async fn main() {
-    // Project-management subcommands run before the toolchain checks below:
-    // `init` only writes files, and `install` only talks to crates.io —
-    // neither needs cargo/rustc present.
-    match BASE_CMD.clone().get_matches().subcommand() {
+    let matches = BASE_CMD.clone().get_matches();
+
+    // `-v` / `--version` never needs cargo.
+    if matches.get_flag("version") {
+        println!(
+            "mikasa v{} (build {}, commit {})",
+            CFORGE_VERSION, BUILD_DATE, GIT_HASH
+        );
+        println!(
+            "Mikasa v{} (build {}, commit {})",
+            COPPER_VERSION, BUILD_DATE, GIT_HASH
+        );
+        return;
+    }
+
+    // Cargo-free commands — project mgmt, self-update, format, Astra VM.
+    // These must work with only the mikasa binary on PATH (no rustc/cargo).
+    match matches.subcommand() {
         Some(("init", _)) => {
             cforge::commands::init();
             return;
         }
         Some(("install", install_matches)) => {
             match install_matches.get_one::<String>("package") {
-                // `cforge install <name>` — add/pin a single dependency.
                 Some(package) => cforge::commands::install(package).await,
-                // `cforge install` — resolve + download everything in
-                // properties.kson and write properties.lock.
                 None => cforge::commands::install_all().await,
             }
             return;
         }
-        // `cforge format` only rewrites source text — no toolchain needed.
+        Some(("remove", rm_matches)) => {
+            if let Some(pkg) = rm_matches.get_one::<String>("package") {
+                cforge::commands::remove(pkg);
+            }
+            return;
+        }
+        Some(("list", _)) => {
+            cforge::commands::list();
+            return;
+        }
+        Some(("update", _)) => {
+            std::process::exit(cforge::update::run());
+        }
+        Some(("cache", cache_matches)) => {
+            let action = cache_matches
+                .get_one::<String>("action")
+                .map(String::as_str);
+            cforge::cache::handle_cache_command(action, Some("./dist"));
+            return;
+        }
         Some(("format", fmt_matches)) => {
             let paths: Vec<String> = fmt_matches
                 .get_many::<String>("input")
@@ -564,12 +662,11 @@ async fn main() {
             let to_stdout = fmt_matches.get_flag("stdout");
             std::process::exit(cforge::mui_fmt::format_command(&paths, check, to_stdout));
         }
-        // `cforge vm run/build` (alias `virtual`) — Alloy interpreter, no toolchain.
         Some(("vm", vm_matches)) => {
             let (sub, sm) = match vm_matches.subcommand() {
                 Some(pair) => pair,
                 None => {
-                    eprintln!("usage: cforge vm <run|build> <file.crs>");
+                    eprintln!("usage: mikasa vm <run|build> <file.mika>");
                     std::process::exit(1);
                 }
             };
@@ -579,16 +676,31 @@ async fn main() {
                 .unwrap_or("");
             std::process::exit(run_vm(sub, file));
         }
+        // `mikasa run <file>` without cargo → Astra interpreter (same as `vm run`).
+        Some(("run", run_matches)) if !is_command_available("cargo") => {
+            let file = run_matches
+                .get_one::<String>("input")
+                .map(String::as_str)
+                .unwrap_or("main.mika");
+            eprintln!(
+                "ℹ️  cargo not on PATH — running via Astra (`mikasa vm run`). \
+                 Install Rust only if you need a native transpile."
+            );
+            std::process::exit(run_vm("run", file));
+        }
         _ => {}
     }
 
     if !is_command_available("cargo") {
-        println!("🦀 Cargo is not installed. Please install it to continue.");
+        println!("🦀 Cargo is not installed — needed for transpile/build/check.");
+        println!("   Cargo-free commands: mikasa init | install | upgrade | vm run | format");
+        println!("   Install Rust from https://rustup.rs/ when you want native builds.");
         return;
     }
 
     if !is_command_available("rustc") {
-        println!("🦀 Rust is not installed. Please install it to continue.");
+        println!("🦀 rustc is not installed — needed for transpile/build/check.");
+        println!("   Install Rust from https://rustup.rs/");
         return;
     }
 
@@ -625,11 +737,11 @@ async fn main() {
 
     if commands.get_command("version").unwrap().is_valid {
         println!(
-            "CForge v{} (build {}, commit {})",
+            "mikasa v{} (build {}, commit {})",
             CFORGE_VERSION, BUILD_DATE, GIT_HASH
         );
         println!(
-            "Copper v{} (build {}, commit {})",
+            "Mikasa v{} (build {}, commit {})",
             COPPER_VERSION, BUILD_DATE, GIT_HASH
         );
         return;
@@ -687,13 +799,25 @@ async fn main() {
         .get_command("bundle")
         .map(|c| c.is_valid)
         .unwrap_or(false);
+    let want_web = commands
+        .get_command("web")
+        .map(|c| c.is_valid)
+        .unwrap_or(false);
 
     // Resolve --target early so both the compile and run paths can see it.
     // parse_commands records it from either the top-level flag or `build --target`.
-    let target_triple: Option<&'static str> = commands
+    let target_raw = commands
         .get_command("target")
         .filter(|c| c.is_valid)
         .and_then(|c| c.args.first())
+        .cloned();
+    let target_is_web = target_raw
+        .as_deref()
+        .map(|t| matches!(t, "web" | "wasm-web" | "emscripten"))
+        .unwrap_or(false);
+    let target_triple: Option<&'static str> = target_raw
+        .as_deref()
+        .filter(|_| !target_is_web)
         .map(|t| cforge::resolve_target(t));
 
     if let Some(triple) = target_triple {
@@ -704,16 +828,52 @@ async fn main() {
     }
 
     if commands.get_command("compile").unwrap().is_valid {
-        // A single `.mui` / `.crm` is a mocida UI: "compiling" it means lowering
+        // A single MocidaUI file (`.mui`, or a `.mika` with a `view`/`App()`) is
+        // a mocida UI: "compiling" it means lowering
         // the component AST to Rust (mui-codegen) rather than the Copper→Rust
         // transpile. Same `-c` entry point, file extension picks the backend.
         // `--release` additionally `cargo build`s the generated crate; `--bundle`
         // embeds the app.bundle (assets + config) into the binary.
+        // `--web` / `--target web` also (or only) emits `<stem>_web/` for browsers.
         if input_dir.is_none() && files.len() == 1 && cforge::mui::is_mui_file(&files[0]) {
-            let code =
-                cforge::mui::compile(&files[0], output_dir.as_deref(), is_release, embed_bundle);
+            // `--web` / `--target web` → emit `<stem>_web/` (browser package).
+            // `--web` alone → web only. `--web --release` → web + native release.
+            // `--target web` → web only (never native). Plain build keeps native path.
+            let do_web = want_web || target_is_web;
+            let do_native = !target_is_web && (!want_web || is_release || embed_bundle);
+            let mut code = 0;
+            if do_web {
+                code = cforge::mui::build_web(&files[0], output_dir.as_deref(), is_release);
+            }
+            if code == 0 && do_native {
+                code = cforge::mui::compile(
+                    &files[0],
+                    output_dir.as_deref(),
+                    is_release,
+                    embed_bundle,
+                );
+            }
             println!();
             std::process::exit(code);
+        }
+
+        if let Some(ref dir) = input_dir {
+            let p = path::Path::new(dir);
+            if p.join("crs").is_dir() && p.join("properties.kson").is_file() {
+                match cforge::module_transpile::transpile_crs_project(p) {
+                    Ok(rust_dir) => {
+                        cforge::pretty::ok(&format!(
+                            "Transpiled Copper project → {}",
+                            rust_dir.display()
+                        ));
+                    }
+                    Err(e) => {
+                        cforge::pretty::fail(&e);
+                        std::process::exit(1);
+                    }
+                }
+                return;
+            }
         }
 
         let detected_dependencies =
@@ -729,11 +889,19 @@ async fn main() {
 
     // Handle run subcommand
     if commands.get_command("run").is_some() && commands.get_command("run").unwrap().is_valid {
-        // A single `.mui` / `.crm` file is a mocida UI: render it live via the
-        // mui-dev host instead of going through the Copper→Rust→cargo pipeline.
-        // (Transpiling `.crm` to a native binary is the M5 release path.)
+        // A single MocidaUI file (`.mui`, or a `.mika` with a `view`/`App()`)
+        // renders live via the mui-dev host instead of the transpile pipeline.
         if input_dir.is_none() && files.len() == 1 && cforge::mui::is_mui_file(&files[0]) {
-            let code = cforge::mui::run(&files[0]);
+            let listen_port = commands
+                .get_command("listen")
+                .filter(|c| c.is_valid)
+                .and_then(|c| c.args.first())
+                .and_then(|s| s.parse::<u16>().ok());
+            let code = if let Some(port) = listen_port {
+                cforge::mui::run_listen(&files[0], port)
+            } else {
+                cforge::mui::run(&files[0])
+            };
             println!();
             std::process::exit(code);
         }

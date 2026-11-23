@@ -410,7 +410,7 @@ pub const PROP_VALUES: &[(&str, &[&str])] = &[
 pub const MUI_KEYWORDS: &[(&str, &str, &str)] = &[
     ("view", "view Name(props) { ... }", "Declares a component. Props are typed parameters; the body is a widget tree."),
     ("App", "App() { name:, width:, height:, mainContent: View }", "App config block: window + bundle identity, and the entry component to mount."),
-    ("import", "import { Name } from \"./file.mui\"", "Import component views (.mui/.crm) or logic (.crs/.rs) from another file."),
+    ("import", "import { Name } from \"./file.mui\"", "Import component views (.mui, or a .mika) or logic (.mika/.rs) from another file."),
     ("signal", "signal(initial)", "Creates a reactive cell. Reading it in a binding subscribes; writing updates bound widgets."),
     ("computed", "computed { expr }", "A derived, lazily-cached signal that re-reads when its dependencies change."),
     ("effect", "effect { ... }", "A reactive side effect: runs on mount and whenever a signal it reads changes."),

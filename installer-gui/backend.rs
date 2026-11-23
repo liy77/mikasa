@@ -1,4 +1,4 @@
-// Backend logic for the Copper installer — no Tauri dependency.
+// Backend logic for the Mikasa installer — no Tauri dependency.
 // Imported by installer.mui via `import { ... } from "./backend.rs"`.
 
 use std::path::{Path, PathBuf};

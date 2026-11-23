@@ -1,0 +1,7 @@
+// Imports a sibling .mika — Astra merges the items and runs them instantly.
+import { dobro, quadrado } from math
+
+func main() {
+    println!("dobro(5)    = {}", dobro(5))
+    println!("quadrado(6) = {}", quadrado(6))
+}

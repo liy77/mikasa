@@ -1,4 +1,4 @@
-/// Native JSON functions for Copper language
+/// Native JSON functions for the Mikasa language
 pub mod json {
     use serde_json::{Result, Value};
 
@@ -53,7 +53,7 @@ pub mod json {
     }
 }
 
-/// Native TOML functions for Copper language
+/// Native TOML functions for the Mikasa language
 pub mod toml_utils {
     use toml::{from_str, to_string, Value};
 
@@ -103,8 +103,8 @@ pub mod toml_utils {
     }
 }
 
-/// Native XML functions for Copper language
-/// Native XML functions for Copper language
+/// Native XML functions for the Mikasa language
+/// Native XML functions for the Mikasa language
 pub mod xml {
     use quick_xml::{
         escape::{escape, unescape},

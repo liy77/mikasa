@@ -1,0 +1,1920 @@
+use crate::{tokenizer::tokens::*, ConsumedTrait};
+
+use super::{kind::TokenKind, tokens::Token};
+use crate::utils::Consumed;
+use once_cell::sync::Lazy;
+use regex::Regex;
+
+/// Remove `/* ... */` block comments from `source`, leaving everything else
+/// (including embedded newlines) intact so subsequent tokenization keeps the
+/// same line numbers. Block comments inside string literals are preserved.
+/// Block comments do not nest in Copper, mirroring Rust's older rules — the
+/// first `*/` ends the comment.
+fn strip_block_comments(source: &str) -> String {
+    let mut out = String::with_capacity(source.len());
+    let mut chars = source.chars().peekable();
+    let mut in_string = false;
+    let mut escape = false;
+
+    while let Some(c) = chars.next() {
+        if in_string {
+            out.push(c);
+            if escape {
+                escape = false;
+            } else if c == '\\' {
+                escape = true;
+            } else if c == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+
+        if c == '"' {
+            in_string = true;
+            out.push(c);
+            continue;
+        }
+
+        // Line comment `// …`: copy it verbatim to end of line. A `/*` that
+        // appears INSIDE a line comment (e.g. a glob path like `ui/*.mui` in a
+        // doc comment) must NOT open a block comment — without this guard the
+        // scan ran to the next `*/`/EOF and silently swallowed real code after
+        // the comment (a `view` after such a line vanished -> "no view").
+        if c == '/' && chars.peek() == Some(&'/') {
+            out.push(c);
+            out.push(chars.next().unwrap()); // the second '/'
+            for next in chars.by_ref() {
+                out.push(next);
+                if next == '\n' {
+                    break;
+                }
+            }
+            continue;
+        }
+
+        if c == '/' && chars.peek() == Some(&'*') {
+            chars.next(); // consume `*`
+                          // Skip until matching `*/`, preserving any newlines so token
+                          // location data stays aligned with the source file.
+            let mut prev = '\0';
+            for next in chars.by_ref() {
+                if prev == '*' && next == '/' {
+                    break;
+                }
+                if next == '\n' {
+                    out.push('\n');
+                }
+                prev = next;
+            }
+            continue;
+        }
+
+        out.push(c);
+    }
+
+    out
+}
+
+pub(super) type EndToken = Token;
+
+impl EndToken {
+    pub fn new_end(kind: TokenKind, value: String, length: usize, data: Data) -> Self {
+        Self {
+            kind,
+            value,
+            length,
+            data,
+            generated: false,
+            struct_brace: false,
+            origin: None,
+            location_data: None,
+        }
+    }
+}
+
+// Operator categories + boolean literals now live in the shared lexicon so the
+// tokenizer, the transpiler's type conversion, and the typed expression AST all
+// read one definition (see crate::lexicon). The iteration ORDER/strategy in
+// symbol_token (compound -> compare -> arithmetic -> range with `.rev()` ->
+// symbol) is unchanged — only the data moved.
+use crate::lexicon::{
+    ARITHMETIC_SIGNS, BOOL, COMPARE_SIGNS, COMPOUND_SIGNS, RANGE_SIGNS,
+    SYMBOL_OPERATORS as OPERATORS,
+};
+
+// `static`, not `const`: a `const Lazy` is a fresh, uncompiled Lazy at every
+// use site, which recompiled the regex for every tokenizer instance.
+static TRAILING_SPACES: Lazy<Regex> = Lazy::new(|| Regex::new(r"\s+$").unwrap());
+static CARRIAGE_RETURN: Lazy<Regex> = Lazy::new(|| Regex::new(r"\r").unwrap());
+static REGEX_LITERAL: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(/)([^/]+)(/)?").unwrap());
+const COMMA_SEPARATORS: [&str; 2] = [",", ";"];
+const BOM: u32 = 65279;
+const RUST_KEYWORDS: &[&str] = &[
+    // Control Flow Keywords
+    "if",
+    "else",
+    "guard",
+    "defer",
+    "match",
+    "loop",
+    "while",
+    "for",
+    "break",
+    "continue",
+    "return",
+    // Visibility and Access Modifiers
+    "pub",
+    "crate",
+    "self",
+    "super",
+    "mod",
+    // Declaration Keywords
+    "let",
+    "const",
+    "static",
+    "mut",
+    // Types and Traits Keywords
+    "struct",
+    "enum",
+    "union",
+    "trait",
+    "impl",
+    "type",
+    // Memory and Safety Control Keywords
+    "unsafe",
+    "async",
+    "await",
+    "move",
+    "dyn",
+    // Module Handling Keywords
+    "extern",
+    "use",
+    // Function Definition and Implementation Keywords
+    "fn",
+    "self",
+    "Self",
+    // Data Manipulation Keywords
+    "ref",
+    "match",
+    "in",
+    "as",
+    "Box",
+    // Reliability and Testing Control Keywords
+    "where",
+    "macro",
+    "macro_rules",
+    "proc",
+    // Result and Error Handling Keywords
+    "Result",
+    "Option",
+    "Some",
+    "None",
+    "Ok",
+    "Err",
+    // Standard Data and System Types Keywords
+    "bool",
+    "char",
+    "i8",
+    "i16",
+    "i32",
+    "i64",
+    "i128",
+    "u8",
+    "u16",
+    "u32",
+    "u64",
+    "u128",
+    "isize",
+    "usize",
+    "f32",
+    "f64",
+    "str",
+    // Property and Pattern Keywords
+    "true",
+    "false",
+    // Contextual Keywords
+    "abstract",
+    "become",
+    "box",
+    "do",
+    "final",
+    "macro",
+    "override",
+    "priv",
+    "typeof",
+    "unsized",
+    "virtual",
+    "yield",
+    "try",
+];
+
+const COPPER_KEYWORDS: &[&str] = &[
+    // Function Definition and Implementation Keywords
+    "func", "$init", "$child", // Module Handling Keywords
+    "import", "from", // Class Keywords
+    "class", "extends", // Struct and Impl Keywords
+    "struct", "impl", "trait", "for", // Data Format Types
+    "json", "xml", "toml", // Visibility (alias for `pub`)
+    "public",
+];
+
+pub struct Tokenizer {
+    source: String,
+    index: usize,
+    chunk: String,
+    chunk_line: isize,
+    chunk_column: usize,
+    chunk_offset: usize,
+    tokens: Vec<Token>,
+    ends: Vec<EndToken>,
+    seen_for: bool,
+    seen_func: bool,
+    seen_import: bool,
+    seen_public: bool,
+    import_specifier_list: bool,
+    /// Tracks whether each currently-open `{` is the body of a `match`
+    /// expression. Used by line_break_token to pick the right separator
+    /// (`,` for match arms, `;` for everything else).
+    brace_is_match: Vec<bool>,
+    /// We saw a `match` keyword and are still scanning its head expression;
+    /// the next `{` (at paren depth 0) opens the match body.
+    expect_match_brace: bool,
+    /// Tracks whether each currently-open `{` opens a **struct/enum literal**
+    /// (`Vec2 { x: 1, y: 2 }`) rather than a code block. Inside one,
+    /// line_break_token separates fields with `,` (not `;`), so a multi-line
+    /// literal whose last field has no trailing comma stays valid.
+    brace_is_struct: Vec<bool>,
+    /// Set when the most recently tokenized `}` closed a **struct/enum
+    /// literal** (`Point { x: 1, y: 2 }`). A struct literal in value position
+    /// is an expression that DOES need a `;` terminator — unlike a block close
+    /// (`if {...}`, fn body) which doesn't. `line_break_token` reads this to
+    /// emit the `;` after `mut p = Point { ... }`. Cleared once any non-`}`,
+    /// non-whitespace token is seen.
+    last_closed_brace_was_struct: bool,
+    /// We just emitted a control-flow keyword (`if`/`else`/`while`/`for`/
+    /// `loop`); the next `{` opens its block, NOT a struct literal — even when
+    /// the condition ends in an identifier (`if ready {`, `for x in xs {`).
+    expect_block_brace: bool,
+    /// Parenthesis / bracket depth since `expect_match_brace` was set, so
+    /// `match foo({}) { ... }` doesn't mistake the inner `{}` for the match
+    /// body.
+    match_paren_depth: i32,
+    location_data_compensations: Vec<usize>,
+    /// Collected tokenizer errors. The CLI driver (`cforge`) checks this
+    /// and exits non-zero; the LSP reads them as diagnostics. Either way,
+    /// `tokenize()` itself never aborts the process — that would kill the
+    /// language server on the first malformed edit.
+    pub errors: Vec<String>,
+}
+
+impl Tokenizer {
+    pub fn new(source: String) -> Self {
+        // Strip `/* ... */` block comments before chunked tokenization.
+        // The line-by-line scanner can't see across newlines, so the
+        // simplest correct treatment is to remove block comments up front
+        // while preserving each newline they contained — that keeps later
+        // line/column reporting honest.
+        let source = strip_block_comments(&source);
+
+        let mut s = Self {
+            source,
+            index: 0,
+            chunk: String::new(),
+            chunk_line: 0,
+            chunk_column: 0,
+            chunk_offset: 0,
+            tokens: Vec::new(),
+            ends: Vec::new(),
+            seen_for: false,
+            seen_func: false,
+            seen_import: false,
+            seen_public: false,
+            import_specifier_list: false,
+            brace_is_match: vec![],
+            expect_match_brace: false,
+            brace_is_struct: vec![],
+            last_closed_brace_was_struct: false,
+            expect_block_brace: false,
+            match_paren_depth: 0,
+            location_data_compensations: vec![],
+            errors: Vec::new(),
+        };
+
+        s.clean_source();
+
+        s
+    }
+
+    /// Find the end of the current logical line, extending past newlines that
+    /// occur inside multi-line raw string literals (`r"..."`, `r#"..."#`).
+    fn find_logical_line_end(&self, start: usize) -> usize {
+        let bytes = self.source.as_bytes();
+        let len = bytes.len();
+        let mut i = start;
+        let mut in_string = false;
+        let mut escape = false;
+        let mut raw_hashes: Option<usize> = None;
+
+        while i < len {
+            let b = bytes[i];
+            if let Some(hashes) = raw_hashes {
+                if b == b'"' {
+                    let mut h = 0;
+                    while i + 1 + h < len && h < hashes && bytes[i + 1 + h] == b'#' {
+                        h += 1;
+                    }
+                    if h == hashes {
+                        i += 1 + h;
+                        raw_hashes = None;
+                        continue;
+                    }
+                }
+                i += 1;
+                continue;
+            }
+            if in_string {
+                if escape {
+                    escape = false;
+                } else if b == b'\\' {
+                    escape = true;
+                } else if b == b'"' {
+                    in_string = false;
+                } else if b == b'\n' {
+                    return i + 1;
+                }
+                i += 1;
+                continue;
+            }
+            if b == b'/' && i + 1 < len && bytes[i + 1] == b'/' {
+                while i < len && bytes[i] != b'\n' {
+                    i += 1;
+                }
+                return if i < len { i + 1 } else { len };
+            }
+            if (b == b'r' || (b == b'b' && i + 1 < len && bytes[i + 1] == b'r'))
+                && (i == start || !(bytes[i - 1].is_ascii_alphanumeric() || bytes[i - 1] == b'_'))
+            {
+                let r_pos = if b == b'b' { i + 1 } else { i };
+                let mut h = 0;
+                while r_pos + 1 + h < len && bytes[r_pos + 1 + h] == b'#' {
+                    h += 1;
+                }
+                if r_pos + 1 + h < len && bytes[r_pos + 1 + h] == b'"' {
+                    raw_hashes = Some(h);
+                    i = r_pos + 2 + h;
+                    continue;
+                }
+            }
+            if b == b'"' {
+                in_string = true;
+                i += 1;
+                continue;
+            }
+            if b == b'\n' {
+                return i + 1;
+            }
+            i += 1;
+        }
+        len
+    }
+
+    pub fn tokenize(&mut self) -> Vec<Token> {
+        while self.index < self.source.len() {
+            // Find the end of current logical line (extending past multi-line raw strings)
+            let line_end = self.find_logical_line_end(self.index);
+
+            self.chunk = self.source[self.index..line_end].to_string();
+            self.chunk_line += 1;
+            self.chunk_column = 0;
+            self.chunk_offset = self.index;
+
+            while self.chunk_column < self.chunk.len() {
+                let prev_col = self.chunk_column;
+                let consumed = self
+                    .identifier_token()
+                    .or(|| self.number_token())
+                    .or(|| self.string_token())
+                    .or(|| self.comment_token())
+                    .or(|| self.regex_token())
+                    .or(|| self.operator_token())
+                    .or(|| self.symbol_token())
+                    .or(|| self.whitespace_token())
+                    .or(|| self.line_break_token());
+
+                if !consumed.is_consumed() {
+                    self.next_char();
+                }
+                // Belt-and-suspenders: if a token method claimed it
+                // consumed but didn't actually advance the chunk cursor,
+                // force-advance one char rather than spin forever. This
+                // is defensive — a properly-advancing token method
+                // should make this branch unreachable.
+                if self.chunk_column == prev_col {
+                    self.next_char();
+                }
+            }
+
+            // Move to next line
+            self.index = line_end;
+        }
+
+        if !self.ends.is_empty() {
+            let last = self.ends.last().unwrap();
+            let location = last.origin.as_ref().unwrap().location_data.clone().unwrap();
+
+            self.error(&format!(
+                "Unterminated token {}\nOrigin: {}:{}",
+                last.value, location.last_line, location.last_column
+            ));
+        }
+
+        if self.kind() != Some(TokenKind::Newline) {
+            self.token(TokenKind::Newline, ";\n".to_string());
+        }
+
+        self.token(TokenKind::Eof, "END_OF_FILE".to_string());
+        self.tokens.clone()
+    }
+
+    pub fn operator_token(&mut self) -> Consumed {
+        let mut consumed = 0;
+        let mut value = String::new();
+        let mut kind = TokenKind::Operator;
+
+        for sign in COMPOUND_SIGNS.iter() {
+            if self
+                .chunk
+                .get(self.chunk_column..)
+                .unwrap_or_default()
+                .starts_with(sign)
+            {
+                // Inside an import path, `::` extends the ModulePath token
+                // (`crate` → `crate::` → later `crate::math`).
+                if *sign == "::"
+                    && self.seen_import
+                    && self.last_significant_kind() == Some(TokenKind::ModulePath)
+                {
+                    consumed += sign.len();
+                    self.chunk_column += sign.len();
+                    self.add_to_value(sign);
+                    return Consumed::Consumed(consumed as isize);
+                }
+                value.push_str(sign);
+                consumed += sign.len();
+                self.chunk_column += sign.len();
+                break;
+            }
+        }
+
+        if consumed == 0 {
+            for sign in COMPARE_SIGNS.iter() {
+                if self
+                    .chunk
+                    .get(self.chunk_column..)
+                    .unwrap_or_default()
+                    .starts_with(sign)
+                {
+                    value.push_str(sign);
+                    consumed += sign.len();
+                    self.chunk_column += sign.len();
+                    break;
+                }
+            }
+        }
+
+        if consumed == 0 {
+            for sign in ARITHMETIC_SIGNS.iter() {
+                if self
+                    .chunk
+                    .get(self.chunk_column..)
+                    .unwrap_or_default()
+                    .starts_with(sign)
+                {
+                    value.push_str(sign);
+                    consumed += sign.len();
+                    self.chunk_column += sign.len();
+                    break;
+                }
+            }
+        }
+
+        if consumed == 0 {
+            for sign in RANGE_SIGNS.iter().rev() {
+                if self
+                    .chunk
+                    .get(self.chunk_column..)
+                    .unwrap_or_default()
+                    .starts_with(sign)
+                {
+                    value.push_str(sign);
+                    consumed += sign.len();
+                    self.chunk_column += sign.len();
+                    kind = TokenKind::Range;
+                    break;
+                }
+            }
+        }
+
+        if consumed == 0 {
+            for sign in OPERATORS.iter() {
+                if self
+                    .chunk
+                    .get(self.chunk_column..)
+                    .unwrap_or_default()
+                    .starts_with(sign)
+                {
+                    if *sign == ":" && self.kind() == Some(TokenKind::Param) {
+                        value.push(':');
+                        consumed += sign.len() + 1;
+                        self.chunk_column += sign.len() + 1;
+                        kind = TokenKind::Colon;
+                        break;
+                    } else if *sign == "?" {
+                        // Null coalescing (`??`) and optional chaining (`?.`).
+                        // A bare `?` stays the Rust try operator / ternary.
+                        let rest = self.chunk.get(self.chunk_column..).unwrap_or_default();
+                        if rest.starts_with("??") {
+                            value.push_str("??");
+                            consumed += 2;
+                            self.chunk_column += 2;
+                            kind = TokenKind::Operator;
+                            break;
+                        }
+                        if rest.starts_with("?.") {
+                            value.push_str("?.");
+                            consumed += 2;
+                            self.chunk_column += 2;
+                            kind = TokenKind::OptionalChain;
+                            break;
+                        }
+                    } else if *sign == "." {
+                        kind = TokenKind::Dot;
+
+                        if self.seen_import {
+                            value.push_str(sign);
+                            consumed += sign.len();
+                            self.chunk_column += sign.len();
+                            self.add_to_value(sign);
+
+                            return Consumed::Consumed(consumed as isize);
+                        }
+                    }
+
+                    value.push_str(sign);
+                    consumed += sign.len();
+                    self.chunk_column += sign.len();
+                    break;
+                }
+            }
+        }
+
+        if consumed > 0 {
+            self.token(kind, value);
+        }
+
+        Consumed::consume(consumed as isize)
+    }
+
+    pub fn symbol_token(&mut self) -> Consumed {
+        let mut consumed = 0;
+        let mut value = String::new();
+        let mut kind = TokenKind::Symbol;
+        // Set when this token is the `{`/`}` of a struct/enum literal; copied
+        // onto the pushed token so the parser can coerce string fields (Bug B).
+        let mut is_struct_brace = false;
+
+        // `#[...]` Rust attribute — capture the full `#[...]` as one Attribute token
+        // so the parser doesn't mis-parse `[...]` as a vec literal.
+        if self.current_char() == '#' {
+            let rest = &self.chunk[self.chunk_column..];
+            if rest.starts_with("#[") {
+                let mut depth = 0usize;
+                let mut end = 0usize;
+                for (i, c) in rest.char_indices() {
+                    match c {
+                        '[' => depth += 1,
+                        ']' => {
+                            depth -= 1;
+                            if depth == 0 {
+                                end = i + 1;
+                                break;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                if end > 0 {
+                    let attr = rest[..end].to_string();
+                    let len = attr.len();
+                    self.chunk_column += len;
+                    self.token(TokenKind::Attribute, attr);
+                    return Consumed::Consumed(len as isize);
+                }
+            }
+        }
+
+        // Copper attributes symbol
+        if self.current_char() == '$' {
+            value.push(self.current_char());
+            self.next_char();
+            consumed += 1;
+
+            kind = TokenKind::CurrencySign;
+        } else if self.current_char() == '<' || self.current_char() == '>' {
+            value.push(self.current_char());
+            self.next_char();
+            consumed += 1;
+
+            kind = match value.as_str() {
+                "<" => TokenKind::AngleStart,
+                ">" => TokenKind::AngleEnd,
+                _ => TokenKind::Symbol,
+            };
+        } else if self.current_char() == '(' && self.seen_func {
+            // After `func`, `(` opens a tuple return type like `(i32, str)`.
+            // Collect the full `(...)` as a single ReturnType token so the
+            // parser doesn't mistake it for the start of the parameter list.
+            self.seen_func = false;
+            let rest = &self.chunk[self.chunk_column..];
+            let mut depth = 0usize;
+            let mut end = 0usize;
+            for (i, c) in rest.char_indices() {
+                match c {
+                    '(' => depth += 1,
+                    ')' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            end = i + 1;
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            let type_str = rest[..end].to_string();
+            let len = type_str.len();
+            self.chunk_column += len;
+            self.token(TokenKind::ReturnType, type_str);
+            return Consumed::Consumed(len as isize);
+        } else if self.current_char() == '(' || self.current_char() == ')' {
+            value.push(self.current_char());
+            self.next_char();
+            consumed += 1;
+
+            kind = match value.as_str() {
+                "(" => {
+                    if self.expect_match_brace {
+                        self.match_paren_depth += 1;
+                    }
+                    let last_sig = self.last_token();
+                    let last_is_ident = last_sig.map(|t| t.kind) == Some(TokenKind::Identifier);
+                    let last_is_angle_end = last_sig.map(|t| t.kind) == Some(TokenKind::AngleEnd);
+                    let last_is_op_gt = last_sig
+                        .map(|t| t.kind == TokenKind::Operator && t.value == ">")
+                        .unwrap_or(false);
+                    if last_is_ident || last_is_angle_end || last_is_op_gt {
+                        self.end(TokenKind::ParametersEnd, ")".to_string());
+                        TokenKind::ParenthesesStart
+                    } else {
+                        self.end(TokenKind::ParenthesesEnd, ")".to_string());
+                        TokenKind::ParenthesesStart
+                    }
+                }
+                ")" => {
+                    if self.expect_match_brace && self.match_paren_depth > 0 {
+                        self.match_paren_depth -= 1;
+                    }
+                    if self.end_kind() == Some(TokenKind::ParametersEnd) {
+                        self.skip_end();
+                        TokenKind::ParametersEnd
+                    } else {
+                        self.skip_end();
+                        TokenKind::ParenthesesEnd
+                    }
+                }
+                _ => TokenKind::Symbol,
+            };
+        } else if self.current_char() == '[' || self.current_char() == ']' {
+            value.push(self.current_char());
+            self.next_char();
+            consumed += 1;
+
+            kind = match value.as_str() {
+                "[" => {
+                    if self.expect_match_brace {
+                        self.match_paren_depth += 1;
+                    }
+                    self.end(TokenKind::BracketEnd, "]".to_string());
+                    TokenKind::BracketStart
+                }
+                "]" => {
+                    if self.expect_match_brace && self.match_paren_depth > 0 {
+                        self.match_paren_depth -= 1;
+                    }
+                    self.skip_end();
+                    TokenKind::BracketEnd
+                }
+                _ => TokenKind::Symbol,
+            };
+        } else if self.current_char() == '{' || self.current_char() == '}' {
+            value.push(self.current_char());
+            self.next_char();
+            consumed += 1;
+
+            kind = match value.as_str() {
+                "{" => {
+                    if self.seen_import && self.value(true) == Some("import".to_string()) {
+                        self.import_specifier_list = true;
+                    }
+
+                    // Track whether this `{` opens the body of a `match`.
+                    // Only count when we're not inside the matched
+                    // expression's parens (paren depth 0).
+                    let opens_match_body = self.expect_match_brace && self.match_paren_depth == 0;
+                    self.brace_is_match.push(opens_match_body);
+                    if opens_match_body {
+                        self.expect_match_brace = false;
+                    }
+
+                    // A `{` opens a struct/enum literal when it directly follows
+                    // a type name (`Vec2 {`) — i.e. the previous token is an
+                    // identifier or a closing generic `>` — and it isn't a
+                    // control-flow block (`if x {`, `for i in xs {`) or a match
+                    // body. The `expect_block_brace` flag disambiguates the
+                    // `Identifier {` case where the identifier is a condition.
+                    // A trailing `>` can close a generic type (`Vec<T> {`) OR be
+                    // the tail of a `=>` fat arrow (a match arm body `=> {`).
+                    // Only the former is a struct literal; the latter opens a
+                    // normal block whose statements need `;`. `=>` lexes as two
+                    // tokens (`=` then `>`), so detect the fat arrow by looking
+                    // one token further back.
+                    let prev_gt_closes_generic = matches!(
+                        self.last_token().map(|t| (t.kind, t.value.clone())),
+                        Some((TokenKind::Operator, v)) if v == ">"
+                    ) && self.second_last_nonws_value().as_deref()
+                        != Some("=");
+                    let prev_is_type_name = matches!(
+                        self.last_token().map(|t| (t.kind, t.value.clone())),
+                        Some((TokenKind::Identifier, _)) | Some((TokenKind::ReturnType, _))
+                    ) || prev_gt_closes_generic;
+                    let non_ws: Vec<&str> = self
+                        .tokens
+                        .iter()
+                        .rev()
+                        .filter(|t| {
+                            !matches!(
+                                t.kind,
+                                TokenKind::Whitespace
+                                    | TokenKind::Newline
+                                    | TokenKind::Comment
+                                    | TokenKind::DocComment
+                            )
+                        })
+                        .take(3)
+                        .map(|t| t.value.as_str())
+                        .collect();
+                    let in_json_macro = matches!(non_ws.as_slice(), ["(", "!", "json", ..]);
+                    let nested_in_struct = matches!(self.brace_is_struct.last(), Some(&true))
+                        && matches!(
+                            self.last_token().map(|t| t.value.as_str()),
+                            Some(":" | "[" | ",")
+                        );
+                    let opens_struct = (prev_is_type_name || in_json_macro || nested_in_struct)
+                        && !opens_match_body
+                        && !self.expect_block_brace;
+                    self.brace_is_struct.push(opens_struct);
+                    is_struct_brace = opens_struct;
+                    self.expect_block_brace = false;
+
+                    self.end(TokenKind::BraceEnd, "}".to_string());
+                    TokenKind::BraceStart
+                }
+                "}" => {
+                    if self.import_specifier_list {
+                        self.import_specifier_list = false;
+                    }
+                    self.brace_is_match.pop();
+                    // Remember whether this `}` closed a struct literal: a
+                    // struct literal in value position is an expression and
+                    // needs a `;` after it (handled in line_break_token).
+                    self.last_closed_brace_was_struct =
+                        matches!(self.brace_is_struct.pop(), Some(true));
+                    is_struct_brace = self.last_closed_brace_was_struct;
+
+                    self.skip_end();
+                    TokenKind::BraceEnd
+                }
+                _ => TokenKind::Symbol,
+            };
+        } else if COMMA_SEPARATORS.contains(&self.current_char().to_string().as_str()) {
+            value.push(self.current_char());
+            self.next_char();
+            consumed += 1;
+
+            kind = match value.as_str() {
+                "," => TokenKind::Comma,
+                ";" => {
+                    if self.peek() == '\n' {
+                        self.next_char();
+                        consumed += 1;
+
+                        if self.seen_import {
+                            self.set_kind(TokenKind::ModulePath);
+                            self.seen_import = false;
+                        }
+
+                        value.push('\n');
+
+                        TokenKind::Newline
+                    } else {
+                        TokenKind::Semicolon
+                    }
+                }
+                _ => TokenKind::Symbol,
+            };
+        } else if self.current_char() == '.' {
+            value.push(self.current_char());
+            self.next_char();
+            consumed += 1;
+
+            kind = TokenKind::Dot;
+        }
+
+        // Only stamp `struct_brace` when we actually produced a brace token.
+        // `symbol_token` is also called speculatively for non-symbol chars and
+        // ends with a zero-length `self.token(Symbol, "")`, which (length 0)
+        // returns the PREVIOUS token instead of pushing — writing here would
+        // clobber a real struct-brace flag on whatever token came before.
+        if matches!(kind, TokenKind::BraceStart | TokenKind::BraceEnd) {
+            self.token(kind, value).struct_brace = is_struct_brace;
+        } else {
+            self.token(kind, value);
+        }
+
+        Consumed::consume(consumed)
+    }
+
+    pub fn string_token(&mut self) -> Consumed {
+        let mut consumed = 0;
+        let mut value = String::new();
+        let kind = TokenKind::String;
+        let mut escape = false;
+
+        if self.current_char() == '"' {
+            value.push(self.current_char());
+            self.next_char();
+            consumed += 1;
+
+            while (self.current_char() != '"' || escape) && self.current_char() != '\0' {
+                if self.current_char() == '\\' {
+                    escape = !escape;
+                } else {
+                    escape = false;
+                }
+
+                value.push(self.current_char());
+                self.next_char();
+                consumed += 1;
+            }
+
+            value.push(self.current_char());
+            self.next_char();
+            consumed += 1;
+        }
+
+        // Detect `$ident` / `${expr}` interpolation. If present, swap the
+        // token's kind/value/data so downstream code can render either as a
+        // `format!(...)` expression or as raw macro args, depending on
+        // context.
+        // A string that is already an argument of a Rust macro (`json!`,
+        // `format!`, `write!`, …) owns its `$` / `{}`. Interpolating it
+        // rewrites the macro body and can swallow the rest of the file when
+        // a `${…}` brace count doesn't match.
+        let in_macro_arg = self.last_significant().is_some_and(|t| t.value == "!");
+        if !in_macro_arg {
+            if let Some(interp) = super::interpolation::parse(&value) {
+                let rendered = super::interpolation::render_format_call(&interp);
+                let token = self.token(TokenKind::InterpolatedString, rendered);
+                token.data = Data::Interpolation {
+                    placeholder: interp.placeholder,
+                    args: interp.args,
+                };
+            } else if self.seen_import && self.last_significant_is_from() {
+                // `import { X } from "./math/vec2.crs"` — treat the string as the
+                // module path (quotes stripped). Parser/cforge normalize to
+                // `crate::math::vec2`.
+                let raw = value.trim_matches('"').to_string();
+                self.token(TokenKind::ModulePath, raw);
+            } else {
+                self.token(kind, value);
+            }
+        } else if self.seen_import && self.last_significant_is_from() {
+            let raw = value.trim_matches('"').to_string();
+            self.token(TokenKind::ModulePath, raw);
+        } else {
+            self.token(kind, value);
+        }
+
+        Consumed::consume(consumed)
+    }
+
+    pub fn number_token(&mut self) -> Consumed {
+        let mut consumed = 0;
+        let mut value = String::new();
+        let kind = TokenKind::Number;
+
+        if self.current_char().is_numeric() {
+            while self.current_char().is_numeric() {
+                value.push(self.current_char());
+                self.next_char();
+                consumed += 1;
+            }
+
+            if self.current_char() == '.' {
+                if self.peek().is_numeric() {
+                    value.push(self.current_char());
+                    self.next_char();
+                    consumed += 1;
+
+                    while self.current_char().is_numeric() {
+                        value.push(self.current_char());
+                        self.next_char();
+                        consumed += 1;
+                    }
+                } else if self.peek() != '.' {
+                    self.error(&format!("Invalid float or range: {}", self.peek()));
+                }
+            }
+        }
+
+        self.token(kind, value);
+
+        Consumed::consume(consumed)
+    }
+
+    pub fn identifier_token(&mut self) -> Consumed {
+        let mut consumed = 0;
+        let mut value = String::new();
+        let mut kind = TokenKind::Unknown;
+
+        if self.current_char() == '\'' {
+            let rest = &self.chunk[self.chunk_column..];
+            if rest.starts_with("'\\") {
+                let mut char_len = 0usize;
+                for (i, ch) in rest.char_indices().skip(2) {
+                    if ch == '\'' {
+                        char_len = i + 1;
+                        break;
+                    }
+                    if ch == '\n' {
+                        break;
+                    }
+                }
+                if char_len > 0 {
+                    let lit = rest[..char_len].to_string();
+                    self.chunk_column += char_len;
+                    self.token(TokenKind::String, lit);
+                    return Consumed::Consumed(char_len as isize);
+                }
+            } else {
+                let mut chars = rest.char_indices();
+                let _ = chars.next(); // opening '
+                if let Some((_, ch)) = chars.next() {
+                    if ch != '\'' && ch != '\n' {
+                        if let Some((close_idx, '\'')) = chars.next() {
+                            let char_len = close_idx + 1;
+                            let lit = rest[..char_len].to_string();
+                            self.chunk_column += char_len;
+                            self.token(TokenKind::String, lit);
+                            return Consumed::Consumed(char_len as isize);
+                        }
+                    }
+                }
+            }
+
+            value.push(self.current_char());
+            self.next_char();
+            consumed += 1;
+
+            // Continue capturing the lifetime name
+            while self.current_char().is_alphanumeric() || self.current_char() == '_' {
+                value.push(self.current_char());
+                self.next_char();
+                consumed += 1;
+            }
+
+            kind = TokenKind::Lifetime;
+        } else if self.current_char().is_alphabetic() || self.current_char() == '_' {
+            // Raw string (`r"..."`, `r#"..."#`, `br"..."`, `br#"..."#`) or byte literal (`b"..."`, `b'...'`)
+            let rest = &self.chunk[self.chunk_column..];
+            if rest.starts_with("r\"")
+                || rest.starts_with("r#")
+                || rest.starts_with("br\"")
+                || rest.starts_with("br#")
+            {
+                let prefix_len = if rest.starts_with("br") { 2 } else { 1 };
+                let after_r = &rest[prefix_len..];
+                let hashes = after_r.chars().take_while(|&c| c == '#').count();
+                let after_hashes = &after_r[hashes..];
+                if after_hashes.starts_with('"') {
+                    let closing = format!("\"{}", "#".repeat(hashes));
+                    let content_start = prefix_len + hashes + 1;
+                    if let Some(end_rel) = rest[content_start..].find(&closing) {
+                        let total_len = content_start + end_rel + closing.len();
+                        let raw_lit = rest[..total_len].to_string();
+                        self.chunk_column += total_len;
+                        self.token(TokenKind::String, raw_lit);
+                        return Consumed::Consumed(total_len as isize);
+                    }
+                }
+            } else if rest.starts_with("b\"") {
+                let bytes = rest.as_bytes();
+                let mut i = 2;
+                let mut esc = false;
+                while i < bytes.len() {
+                    if esc {
+                        esc = false;
+                    } else if bytes[i] == b'\\' {
+                        esc = true;
+                    } else if bytes[i] == b'"' {
+                        let total_len = i + 1;
+                        let lit = rest[..total_len].to_string();
+                        self.chunk_column += total_len;
+                        self.token(TokenKind::String, lit);
+                        return Consumed::Consumed(total_len as isize);
+                    }
+                    i += 1;
+                }
+            } else if rest.starts_with("b'") {
+                let bytes = rest.as_bytes();
+                let mut i = 2;
+                let mut esc = false;
+                while i < bytes.len() && i < 8 {
+                    if esc {
+                        esc = false;
+                    } else if bytes[i] == b'\\' {
+                        esc = true;
+                    } else if bytes[i] == b'\'' {
+                        let total_len = i + 1;
+                        let lit = rest[..total_len].to_string();
+                        self.chunk_column += total_len;
+                        self.token(TokenKind::String, lit);
+                        return Consumed::Consumed(total_len as isize);
+                    }
+                    i += 1;
+                }
+            }
+
+            while self.current_char().is_alphanumeric() || self.current_char() == '_' {
+                value.push(self.current_char());
+                self.next_char();
+                consumed += 1;
+            }
+
+            if BOOL.contains(&value.as_str()) {
+                kind = TokenKind::Keyword;
+            } else if COPPER_KEYWORDS.contains(&value.as_str())
+                // `from` is contextual: it is only the import keyword while an
+                // import statement is in progress. Anywhere else (`From` trait,
+                // `X::from`, `.from(`, a variable named `from`) it must fall
+                // through to the normal identifier-resolution path below.
+                && (value != "from" || self.seen_import)
+                // `json`/`xml`/`toml` are data-type keywords only in type
+                // position. As a method/field name (`resp.json(...)`), a
+                // function name / call (`func String json(...)`, `json(...)`),
+                // or a path segment / macro (`serde_json::json!(...)`,
+                // `x::json`) they must be plain identifiers — fall through
+                // like `from`.
+                && !(matches!(value.as_str(), "json" | "xml" | "toml" | "import")
+                    && (matches!(self.last_token().map(|t| t.kind), Some(TokenKind::Dot))
+                        || self.last_token().map(|t| t.value == "::").unwrap_or(false)
+                        || self.current_char() == '('
+                        || self.current_char() == '!'
+                        || self.current_char() == ':'))
+            {
+                match value.as_str() {
+                    "import" => {
+                        self.seen_import = true;
+                        kind = TokenKind::Import;
+                    }
+                    "from" => {
+                        kind = TokenKind::From;
+                    }
+                    "as" => {
+                        kind = TokenKind::As;
+                    }
+                    "public" => {
+                        // `public` is an alias for `pub`. Normalize the token so
+                        // the whole pipeline (dispatch + `pub func` handling)
+                        // treats `public` and `pub` identically.
+                        self.seen_public = true;
+                        value = "pub".to_string();
+                        kind = TokenKind::Keyword;
+                    }
+                    "for" => {
+                        self.seen_for = true;
+                        kind = TokenKind::For;
+                        // The next `{` opens the loop body, not a struct literal,
+                        // even though `for x in items {` ends in an identifier.
+                        self.expect_block_brace = true;
+                    }
+                    "struct" => {
+                        kind = TokenKind::Struct;
+                    }
+                    "impl" => {
+                        kind = TokenKind::Impl;
+                    }
+                    "trait" => {
+                        kind = TokenKind::Trait;
+                    }
+                    "json" => {
+                        kind = TokenKind::Json;
+                    }
+                    "xml" => {
+                        kind = TokenKind::Xml;
+                    }
+                    "toml" => {
+                        kind = TokenKind::Toml;
+                    }
+                    "func" => {
+                        self.seen_func = true;
+                        kind = TokenKind::Keyword;
+                    }
+                    _ => {
+                        kind = TokenKind::Keyword;
+                    }
+                }
+            } else if self.seen_func
+                && self
+                    .peek_significant_char()
+                    .map(|c| c == '(')
+                    .unwrap_or(false)
+            {
+                // `func name(...)` with no declared return type: the first
+                // identifier after `func` is immediately followed by `(`, so
+                // it's the function NAME (void return), not a return type.
+                // Without this the void `main` (and any void function) would
+                // be mislabeled as a return type, leaving the function nameless
+                // (`fn (...)`). Emit it as a plain Identifier — the parser's
+                // name handling (incl. the `main` → `__copper_main` rename)
+                // then applies.
+                self.seen_func = false;
+                kind = TokenKind::Identifier;
+            } else if self.seen_func {
+                // First identifier-like token after `func` is the declared
+                // return type. Win against RUST_KEYWORDS so things like
+                // `func Result<T, E> name(...)` route the whole `Result<...>`
+                // to the parser's ReturnType handler.
+                self.seen_func = false;
+                // Optional-return sugar: `func Type? name(...)`. Fold a
+                // trailing `?` into the ReturnType token (mirrors the ParamType
+                // path below) so `convert_type` lowers `Type?` → `Option<Type>`.
+                // Generic returns (`Result<T, E>`) keep the `?`-less base name;
+                // their `<...>` is still gobbled by the parser's ReturnType arm.
+                if self.current_char() == '?' || self.current_char() == '!' {
+                    let ch = self.current_char();
+                    self.next_char();
+                    value.push(ch);
+                }
+                kind = TokenKind::ReturnType;
+            } else if self.seen_import
+                && self.last_significant_is_from()
+                && matches!(value.as_str(), "crate" | "super" | "self" | "std")
+            {
+                // `from crate::…` / `from super::…` / `from self::…` / `from std::…` — path
+                // roots, not statement keywords (wins over RUST_KEYWORDS).
+                kind = TokenKind::ModulePath;
+            } else if RUST_KEYWORDS.contains(&value.as_str()) {
+                // Specialise loop-related keywords so the parser can route
+                // them through the keyword-spacing path without re-checking
+                // strings.
+                kind = match value.as_str() {
+                    "loop" => TokenKind::Loop,
+                    "while" => TokenKind::While,
+                    "break" => TokenKind::Break,
+                    "continue" => TokenKind::Continue,
+                    "in" => TokenKind::In,
+                    _ => TokenKind::Keyword,
+                };
+                if value == "match" {
+                    // Arm the brace tracker: the next `{` we open while not
+                    // inside parens belongs to this match expression.
+                    self.expect_match_brace = true;
+                    self.match_paren_depth = 0;
+                }
+                // Control-flow keywords open a block (not a struct literal) at
+                // the next `{`, even when the condition ends in an identifier.
+                if matches!(
+                    value.as_str(),
+                    "if" | "else" | "guard" | "defer" | "while" | "for" | "loop"
+                ) {
+                    self.expect_block_brace = true;
+                }
+            } else if self.import_specifier_list {
+                kind = TokenKind::ModuleVar;
+            } else if self.seen_import {
+                // Build a single ModulePath across `from foo`, `from foo::bar`,
+                // and `from crate::math::vec2` (skipping whitespace between).
+                if self.last_significant_is_from() {
+                    kind = TokenKind::ModulePath;
+                } else if self.last_significant_kind() == Some(TokenKind::ModulePath) {
+                    self.add_to_value(&value);
+                    return Consumed::Consumed(consumed);
+                } else if self.value(true) != Some(" ".to_string()) {
+                    self.add_to_value(&value);
+                    return Consumed::Consumed(consumed);
+                } else {
+                    kind = TokenKind::ModuleVar;
+                }
+            } else {
+                match self.last_token() {
+                    Some(token) if token.value == "func" => kind = TokenKind::ReturnType,
+                    Some(_) if self.end_kind() == Some(TokenKind::ParametersEnd) => {
+                        if self.value(true) == Some(":".to_string()) {
+                            if self.current_char() == '?' || self.current_char() == '!' {
+                                let ch = self.current_char();
+                                self.next_char();
+                                value.push(ch);
+                            }
+
+                            kind = TokenKind::ParamType
+                        } else {
+                            kind = TokenKind::Param
+                        }
+                    }
+                    _ => kind = TokenKind::Identifier,
+                }
+            }
+        }
+
+        if consumed > 0 {
+            self.token(kind, value);
+        }
+
+        Consumed::consume(consumed)
+    }
+
+    pub fn whitespace_token(&mut self) -> Consumed {
+        let mut consumed = 0;
+        let mut value = String::new();
+        let kind = TokenKind::Whitespace;
+
+        if self.current_char() == ' ' {
+            value.push(self.current_char());
+            self.next_char();
+            consumed += 1;
+
+            while self.current_char() == ' ' && self.chunk_column < self.chunk.len() {
+                value.push(self.current_char());
+                self.next_char();
+                consumed += 1;
+            }
+        }
+
+        self.token(kind, value);
+
+        Consumed::consume(consumed)
+    }
+
+    pub fn line_break_token(&mut self) -> Consumed {
+        let mut consumed = 0;
+        let mut value = String::new();
+        let kind = TokenKind::Newline;
+
+        if self.current_char() == '\n' && self.kind() != Some(TokenKind::Newline) {
+            // A line ending in a binary/infix operator (`a &&`, `x +`, `obj.`)
+            // or `::` is a *continuation*, not a statement end — appending `;`
+            // would produce `a &&;`. Postfix operators (`?`, `++`, `--`) DO end
+            // a statement, so they keep the `;`.
+            let ends_with_continuation = match self.last_token() {
+                Some(t) if t.kind == TokenKind::Dot => true,
+                Some(t) if t.kind == TokenKind::Operator => {
+                    // Postfix `++` / `--` end a statement (keep the `;`). The
+                    // tokenizer emits them as two single-char `+`/`-` operator
+                    // tokens, so the last token alone looks like a binary `+`
+                    // (a continuation). Detect the pair so `count++\n if ...`
+                    // gets its terminator instead of fusing into the next line.
+                    let is_postfix_pair = (t.value == "+" || t.value == "-")
+                        && self.second_last_nonws_value().as_deref() == Some(t.value.as_str());
+                    !is_postfix_pair && !matches!(t.value.as_str(), "?" | "++" | "--")
+                }
+                _ => false,
+            };
+            match self.kind() {
+                _ if ends_with_continuation
+                    || (self.expect_match_brace && self.match_paren_depth == 0)
+                    || matches!(
+                        self.end_kind(),
+                        Some(TokenKind::ParametersEnd)
+                            | Some(TokenKind::ParenthesesEnd)
+                            | Some(TokenKind::BracketEnd)
+                    ) =>
+                {
+                    value.push(self.current_char());
+                }
+                // A `}` that closed a struct literal in value position
+                // (`mut p = Point { x: 1, y: 2 }`) is an EXPRESSION and needs a
+                // terminator, unlike a block close (`if {...}`, fn body). Pick
+                // `,` when that literal is itself a field value inside an
+                // enclosing match arm / struct literal, else `;`.
+                Some(TokenKind::BraceEnd) if self.last_closed_brace_was_struct => {
+                    let separator = if matches!(self.brace_is_match.last(), Some(&true))
+                        || matches!(self.brace_is_struct.last(), Some(&true))
+                    {
+                        ","
+                    } else {
+                        ";"
+                    };
+                    value.push_str(&format!("{}{}", separator, self.current_char()));
+                }
+                Some(TokenKind::BraceStart) |
+                Some(TokenKind::BracketStart) |
+                Some(TokenKind::ParenthesesStart) |
+                Some(TokenKind::ParametersStart) |
+                Some(TokenKind::BraceEnd) |
+                // `,` already separates items (function args, match arms,
+                // collection literals); appending a `;` would produce `,;`
+                // which Rust rejects inside match blocks.
+                Some(TokenKind::Comma) => {
+                    value.push(self.current_char());
+                },
+                _ => {
+                    // Inside a `match` body, line endings between arms must
+                    // be `,` not `;` — `_ => 2;` is a parse error in Rust,
+                    // while `_ => 2,` is correct (and a trailing comma is
+                    // fine right before `}`). The same holds for the fields of
+                    // a multi-line struct literal (`Vec2 {\n x: 1,\n y: 2\n}`):
+                    // a `;` after the last field would break it, a `,` is fine.
+                    let separator = if matches!(self.brace_is_match.last(), Some(&true))
+                        || matches!(self.brace_is_struct.last(), Some(&true))
+                    {
+                        ","
+                    } else {
+                        ";"
+                    };
+                    value.push_str(&format!("{}{}", separator, self.current_char()));
+                }
+            }
+            self.next_char();
+            consumed += 1;
+
+            if self.seen_import {
+                self.seen_import = false;
+                self.set_kind(TokenKind::ModulePath);
+            }
+        } else if self.current_char() == '\n' {
+            value.push(self.current_char());
+            self.next_char();
+            consumed += 1;
+        }
+
+        self.token(kind, value);
+
+        Consumed::consume(consumed)
+    }
+
+    pub fn comment_token(&mut self) -> Consumed {
+        let mut consumed = 0;
+        let mut value = String::new();
+
+        if self.current_char() == '/' && self.peek() == '/' {
+            value.push(self.current_char());
+            self.next_char();
+            consumed += 1;
+
+            value.push(self.current_char());
+            self.next_char();
+            consumed += 1;
+
+            // Doc comment (like Rust): `///` (outer) or `//!` (inner), but NOT
+            // `////` (which is a plain comment). Doc comments are preserved
+            // through transpilation and surfaced by the LSP; `//` is dropped.
+            let is_doc =
+                (self.current_char() == '/' && self.peek() != '/') || self.current_char() == '!';
+            let kind = if is_doc {
+                TokenKind::DocComment
+            } else {
+                TokenKind::Comment
+            };
+
+            while self.current_char() != '\n' && self.current_char() != '\0' {
+                value.push(self.current_char());
+                self.next_char();
+                consumed += 1;
+            }
+
+            self.token(kind, value);
+        }
+
+        Consumed::consume(consumed)
+    }
+
+    pub fn regex_token(&mut self) -> Consumed {
+        let mut consumed = 0;
+        let mut value = String::new();
+        let kind = TokenKind::Regex;
+
+        // Only consider regex if it starts with '/'
+        if self.current_char() != '/' {
+            return Consumed::consume(0);
+        }
+
+        // Check if it's not a comment (//), compound assignment (/=), or spaced division (/ )
+        if self.peek() == '/' || self.peek() == ' ' || self.peek() == '=' {
+            return Consumed::consume(0);
+        }
+
+        // Division vs. regex disambiguation (JS-style): a `/` is the DIVISION
+        // operator when it follows an operand — an identifier, number, string,
+        // or a closing `)` / `]`. A regex literal `/.../ ` is only recognised
+        // when a value is expected (start of expression: after `=`, `(`, `,`,
+        // an operator, `return`, etc.). Without this, `a / b` lexed `/ b /...`
+        // as a regex and arithmetic division was broken.
+        let last_significant = self.tokens.iter().rev().find(|t| {
+            !matches!(
+                t.kind,
+                TokenKind::Whitespace
+                    | TokenKind::Newline
+                    | TokenKind::Comment
+                    | TokenKind::DocComment
+            )
+        });
+        if let Some(prev) = last_significant {
+            // `Param` covers field names after `.` (`self.size.x / 2`); bare
+            // `self` / bool keywords are operands too. Do NOT treat `return`
+            // or other statement keywords as operands — `/foo/` after them
+            // is a regex literal.
+            let prev_is_operand = matches!(
+                prev.kind,
+                TokenKind::Identifier
+                    | TokenKind::Param
+                    | TokenKind::ParamType
+                    | TokenKind::ReturnType
+                    | TokenKind::Number
+                    | TokenKind::String
+                    | TokenKind::InterpolatedString
+                    | TokenKind::ParenthesesEnd
+                    | TokenKind::ParametersEnd
+                    | TokenKind::BracketEnd
+                    | TokenKind::BraceEnd
+            ) || (prev.kind == TokenKind::Keyword
+                && matches!(
+                    prev.value.as_str(),
+                    "self"
+                        | "true"
+                        | "false"
+                        | "f32"
+                        | "f64"
+                        | "i32"
+                        | "i64"
+                        | "u32"
+                        | "u64"
+                        | "usize"
+                        | "isize"
+                        | "u8"
+                        | "u16"
+                        | "i8"
+                        | "i16"
+                ));
+            if prev_is_operand {
+                // Division — let operator_token handle the `/`.
+                return Consumed::consume(0);
+            }
+        }
+
+        // Process only from current position in chunk. Cloned so we can
+        // re-borrow self mutably for `self.error(...)` if the regex is
+        // unterminated.
+        let remaining_chunk: String = self.chunk[self.chunk_column..].to_string();
+
+        // Check again in chunk if it's a comment
+        if remaining_chunk.starts_with("//") {
+            return Consumed::consume(0);
+        }
+
+        if let Some(cap) = REGEX_LITERAL.captures(&remaining_chunk) {
+            let start = cap.get(1).unwrap().start();
+            let end_cap = cap.get(3);
+
+            if end_cap.is_none() {
+                self.error("Unterminated regex literal");
+                return Consumed::consume(0);
+            }
+
+            let end = end_cap.unwrap().end();
+            value.push_str(&remaining_chunk[start..end]);
+            consumed = end - start;
+
+            // Advance chunk_column instead of draining
+            for _ in 0..consumed {
+                self.next_char();
+            }
+        }
+
+        self.token(kind, value);
+
+        Consumed::consume(consumed as isize)
+    }
+
+    pub fn error(&mut self, message: &str) {
+        // Collect errors instead of aborting the process. The cforge CLI
+        // surfaces these and exits; the LSP turns them into diagnostics.
+        let (line, column, _) = self.get_line_and_column(self.chunk_column);
+        let formatted = format!("{}\nLine: {}:{}", message, line + 1, column + 1);
+        self.errors.push(formatted);
+    }
+
+    pub fn value(&self, use_origin: bool) -> Option<String> {
+        let token = self.tokens.last();
+
+        token?;
+
+        let token = token.unwrap();
+        let value = token.value.clone();
+        let origin = token.origin.clone();
+
+        if use_origin && origin.is_some() {
+            return Some(origin.unwrap().value.clone());
+        }
+
+        Some(value)
+    }
+
+    pub fn add_to_value(&mut self, value: &str) {
+        if self.last_token().is_none() {
+            return;
+        }
+
+        let token = self.tokens.last_mut().unwrap();
+        token.value.push_str(value);
+    }
+
+    pub fn last_token(&self) -> Option<&Token> {
+        self.tokens
+            .iter()
+            .rfind(|t| t.kind != TokenKind::Whitespace)
+    }
+
+    /// Last token that isn't whitespace / newline / comment — used so
+    /// `from   crate::…` still sees `from` across spaces.
+    fn last_significant(&self) -> Option<&Token> {
+        self.tokens.iter().rev().find(|t| {
+            !matches!(
+                t.kind,
+                TokenKind::Whitespace
+                    | TokenKind::Newline
+                    | TokenKind::Comment
+                    | TokenKind::DocComment
+            )
+        })
+    }
+
+    fn last_significant_kind(&self) -> Option<TokenKind> {
+        self.last_significant().map(|t| t.kind)
+    }
+
+    fn last_significant_is_from(&self) -> bool {
+        self.last_significant()
+            .map(|t| t.kind == TokenKind::From || t.value == "from")
+            .unwrap_or(false)
+    }
+
+    /// Value of the second-to-last non-whitespace token, if any. Used to
+    /// detect postfix `++` / `--`, which the tokenizer emits as two
+    /// single-char `+` / `-` operators rather than one token.
+    fn second_last_nonws_value(&self) -> Option<String> {
+        self.tokens
+            .iter()
+            .rev()
+            .filter(|t| t.kind != TokenKind::Whitespace)
+            .nth(1)
+            .map(|t| t.value.clone())
+    }
+
+    pub fn token(&mut self, kind: TokenKind, value: String) -> &mut Token {
+        let length = value.len();
+
+        // If the length is 0, we want to modify the last token
+        if length == 0 {
+            if self.tokens.is_empty() {
+                return self.token(TokenKind::Unknown, " ".to_string());
+            }
+
+            return self.tokens.last_mut().unwrap();
+        }
+
+        // The `last_closed_brace_was_struct` flag is set when a `}` closes a
+        // struct literal and read by the very next `line_break_token`. Keep it
+        // alive across the closing `}` itself, intervening whitespace, and the
+        // terminating newline; clear it as soon as any other token appears so a
+        // later, unrelated `}`-less statement doesn't pick up a stale `;`.
+        if !matches!(
+            kind,
+            TokenKind::BraceEnd | TokenKind::Newline | TokenKind::Whitespace
+        ) {
+            self.last_closed_brace_was_struct = false;
+        }
+
+        let mut token = Token::new(kind, value, length, Data::None, false);
+        token.set_location_data(self.create_location_data(self.chunk_offset, length));
+
+        match kind {
+            TokenKind::BraceStart
+            | TokenKind::BracketStart
+            | TokenKind::ParametersStart
+            | TokenKind::ParenthesesStart => {
+                self.last_end().unwrap().set_origin(token.clone());
+            }
+            _ => {}
+        }
+
+        self.tokens.push(token.clone());
+        self.tokens.last_mut().unwrap()
+    }
+
+    pub fn skip_end(&mut self) {
+        if self.ends.is_empty() {
+            return;
+        }
+
+        self.ends.remove(self.ends.len() - 1);
+    }
+
+    pub fn last_end(&mut self) -> Option<&mut Token> {
+        self.ends.last_mut()
+    }
+
+    pub fn end(&mut self, kind: TokenKind, value: String) -> &mut EndToken {
+        self.ends.push(EndToken::new_end(
+            kind,
+            value.clone(),
+            value.len(),
+            Data::None,
+        ));
+
+        self.ends.last_mut().unwrap()
+    }
+
+    pub fn set_kind(&mut self, kind: TokenKind) {
+        let token = self.tokens.last_mut();
+
+        if token.is_some() {
+            token.unwrap().kind = kind;
+        }
+    }
+
+    pub fn kind(&self) -> Option<TokenKind> {
+        let token = &self.tokens.last();
+
+        if token.is_some() {
+            return Some(token.unwrap().clone().kind);
+        }
+
+        None
+    }
+
+    pub fn end_kind(&self) -> Option<TokenKind> {
+        let token = &self.ends.last();
+
+        if token.is_some() {
+            return Some(token.unwrap().clone().kind);
+        }
+
+        None
+    }
+
+    pub fn create_location_data(&self, offset_in_chunk: usize, length: usize) -> LocationData {
+        let last_char = if length > 0 { length - 1 } else { 0 };
+
+        let (first_line, first_column, range_start) = self.get_line_and_column(offset_in_chunk);
+        let (last_line, last_column, end_offset) =
+            self.get_line_and_column(offset_in_chunk + last_char);
+
+        let range = (
+            range_start,
+            if length > 0 {
+                end_offset + 1
+            } else {
+                end_offset
+            },
+        );
+
+        LocationData {
+            first_line,
+            first_column,
+            last_line,
+            last_column,
+            range,
+        }
+    }
+
+    pub fn get_location_data_compensation(&self, start: usize, mut end: usize) -> usize {
+        // Every read below is `get(current)` with `current >= start`; past the
+        // table's end they're all `None`, so the sum is 0. Without this the
+        // `start == end` case spun the full 1000-iteration cap on every token
+        // (the table is empty unless the source had `\r` / a BOM).
+        if start >= self.location_data_compensations.len() {
+            return 0;
+        }
+        let mut total_compensation = 0;
+        let initial_end = end;
+        let mut current = start;
+        let mut iterations = 0;
+
+        while start >= end && iterations < 1000 {
+            iterations += 1;
+
+            if current == end && start != initial_end {
+                break;
+            }
+
+            let compensation = self.location_data_compensations.get(current);
+
+            if compensation.is_some() {
+                let compensation = compensation.unwrap();
+                total_compensation += compensation;
+                end += compensation;
+            }
+
+            current += 1;
+
+            // Additional safety condition
+            if current >= self.source.len() + 1000 {
+                break;
+            }
+        }
+
+        total_compensation
+    }
+
+    #[allow(unused_assignments)]
+    pub fn get_line_and_column(&self, offset: usize) -> (isize, usize, usize) {
+        let compensation =
+            self.get_location_data_compensation(self.chunk_offset, self.chunk_offset + offset);
+        let s: &str;
+        let mut line_count: usize = 0;
+        let mut column = 0;
+        let mut previous_lines_compensation = 0;
+        let mut column_compensation = 0;
+
+        if offset == 0 {
+            return (
+                self.chunk_line,
+                self.chunk_column + compensation,
+                self.chunk_offset + compensation,
+            );
+        }
+
+        if offset >= self.chunk.len() {
+            s = &self.chunk;
+        } else {
+            let end = match offset {
+                o if o > 0 => o,
+                _ => self.chunk.len(),
+            };
+
+            // Floor `end` to the nearest valid UTF-8 char boundary so the slice
+            // never panics on source with multi-byte characters.
+            let raw_end = end.min(self.chunk.len());
+            let safe_end = (0..=raw_end)
+                .rev()
+                .find(|&k| self.chunk.is_char_boundary(k))
+                .unwrap_or(0);
+            s = &self.chunk[0..safe_end];
+        }
+
+        line_count = self.count_occurrences(s, "\n");
+        column = self.chunk_column;
+
+        if line_count > 0 {
+            column = s.rsplit('\n').next().unwrap_or("").len();
+            previous_lines_compensation = self.get_location_data_compensation(
+                self.chunk_offset,
+                self.chunk_offset + offset - column,
+            );
+
+            column_compensation = self.get_location_data_compensation(
+                self.chunk_offset + offset - previous_lines_compensation - column,
+                self.chunk_offset + offset + previous_lines_compensation,
+            );
+        } else {
+            column += s.len();
+            column_compensation = compensation;
+        }
+
+        (
+            self.chunk_line + line_count as isize,
+            column + column_compensation,
+            self.chunk_offset + offset + compensation,
+        )
+    }
+
+    pub fn count_occurrences(&self, string: &str, substr: &str) -> usize {
+        if substr.is_empty() {
+            return usize::MAX; // Use usize::MAX to represent infinity
+        }
+        let mut num = 0;
+        let mut pos = 0;
+
+        while let Some(p) = string[pos..].find(substr) {
+            num += 1;
+            pos += p + 1; // Increment position to continue search
+        }
+
+        num
+    }
+
+    // pub fn next_chunk(&self) -> String {
+    //     self.source.get(self.index..).unwrap_or_default().to_owned()
+    // }
+
+    pub fn clean_source(&mut self) {
+        let re = &*CARRIAGE_RETURN;
+        let mut thus_far = 0;
+        let mut source = &self.source;
+
+        if !source.is_empty() && source.chars().nth(0).unwrap() as u32 == BOM {
+            self.source = source.chars().skip(1).collect::<String>();
+            source = &self.source;
+            self.location_data_compensations[0] = 1;
+            thus_far += 1;
+        }
+
+        if TRAILING_SPACES.is_match(source) {
+            self.source = TRAILING_SPACES.replace_all(source, "").to_string();
+            source = &self.source;
+            self.chunk_line -= 1;
+            self.location_data_compensations.insert(
+                0,
+                self.location_data_compensations.first().unwrap_or(&1) - 1,
+            );
+        }
+
+        for mat in re.find_iter(source) {
+            let offset = mat.start();
+
+            while self.location_data_compensations.len() < (thus_far + offset) + 1 {
+                self.location_data_compensations.push(0);
+            }
+
+            self.location_data_compensations[thus_far + offset] = 1;
+            thus_far += offset;
+        }
+
+        self.source = re.replace_all(source, "").to_string();
+    }
+
+    fn current_char(&self) -> char {
+        // Use proper UTF-8 indexing.
+        if self.chunk_column >= self.chunk.len() {
+            // Past end of chunk — return NUL so identifier/number loops
+            // terminate. Earlier code returned `chunk[0]` here, which made
+            // a source ending in `[A-Za-z_]` re-enter the identifier
+            // scanner forever (`current_char()` kept yielding the file's
+            // first char while `next_char()` clamped at `chunk.len()`).
+            return '\0';
+        }
+        if self.chunk.is_char_boundary(self.chunk_column) {
+            self.chunk[self.chunk_column..]
+                .chars()
+                .next()
+                .unwrap_or('\0')
+        } else {
+            // Misaligned UTF-8 position (shouldn't normally happen).
+            '\0'
+        }
+    }
+
+    /// Peek the next non-space/tab character from the current chunk position
+    /// without advancing. Used to disambiguate `func name(...)` (void return)
+    /// from `func Type name(...)`: if a `(` immediately follows the first
+    /// identifier after `func`, that identifier is the function name.
+    fn peek_significant_char(&self) -> Option<char> {
+        self.chunk
+            .char_indices()
+            .filter(|(pos, _)| *pos >= self.chunk_column)
+            .map(|(_, ch)| ch)
+            .find(|ch| *ch != ' ' && *ch != '\t')
+    }
+
+    fn next_char(&mut self) {
+        // Find the next character boundary
+        if let Some((next_pos, _)) = self
+            .chunk
+            .char_indices()
+            .find(|(pos, _)| *pos > self.chunk_column)
+        {
+            self.chunk_column = next_pos;
+        } else {
+            // End of string
+            self.chunk_column = self.chunk.len();
+        }
+    }
+
+    fn peek(&self) -> char {
+        self.chunk
+            .chars()
+            .nth(self.chunk_column + 1)
+            .unwrap_or_default()
+    }
+}

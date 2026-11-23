@@ -1,0 +1,47 @@
+{
+  "Function": {
+    "prefix": "func",
+    "body": ["func ${1:void} ${2:name}(${3}) {", "    ${0}", "}"],
+    "description": "Declare a function"
+  },
+  "Guard": {
+    "prefix": "guard",
+    "body": ["guard ${1:condition} else {", "    return ${2}", "}", "${0}"],
+    "description": "guard — early exit, like Swift"
+  },
+  "Guard let": {
+    "prefix": "guardlet",
+    "body": ["guard let ${1:Some(value)} = ${2:expr} else {", "    return ${3}", "}", "${0}"],
+    "description": "guard let — bind in the enclosing scope"
+  },
+  "Defer": {
+    "prefix": "defer",
+    "body": ["defer {", "    ${0}", "}"],
+    "description": "defer — runs when the scope exits"
+  },
+  "Struct": {
+    "prefix": "struct",
+    "body": ["struct ${1:Name} {", "    ${2:field}: ${3:i32}", "}"],
+    "description": "Declare a struct"
+  },
+  "Impl": {
+    "prefix": "impl",
+    "body": ["impl ${1:Name} {", "    func ${2:void} ${3:method}(self) {", "        ${0}", "    }", "}"],
+    "description": "Implementation block"
+  },
+  "Match": {
+    "prefix": "match",
+    "body": ["match ${1:value} {", "    ${2:pattern} => ${3:result},", "    _ => ${0}", "}"],
+    "description": "Pattern match"
+  },
+  "Import": {
+    "prefix": "import",
+    "body": ["import { ${1:name} } from ${2:module}"],
+    "description": "Import from a module"
+  },
+  "Main": {
+    "prefix": "main",
+    "body": ["func void main() {", "    ${0}", "}"],
+    "description": "Program entry point"
+  }
+}

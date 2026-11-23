@@ -1,11 +1,14 @@
 # Changelog
 
-All notable changes to Copper / cforge. Versions follow the project's
+All notable changes to Mikasa / cforge. Versions follow the project's
 CalVer scheme (`0.YY.M`, stamped from the build date).
 
 ## [Unreleased]
 
 ### Added
+- **`cforge update`** — downloads the newest `nightly*` release of
+  `liy77/copper-lang` whose asset matches this OS (`apple`/`darwin`,
+  `windows`, `linux`) and replaces the running `cforge` binary.
 - **`cforge format`** — a pretty-printer for MUI (`.mui` / `.crm`) files. Tokenizes
   the source (keeping comments + strings verbatim), builds a shallow node tree and
   re-emits it with a **fit-or-break** rule: an element call `Name(prop: v, …)` that
@@ -70,7 +73,7 @@ CalVer scheme (`0.YY.M`, stamped from the build date).
   `func Option<T> find(self, xs: Vec<T>)` no longer silently drops the method.
   `process_impl_methods` now gobbles the `<…>` after the return-type base (so it
   finds the real method name) and on param types (so `Vec<T>` isn't split at the
-  inner comma). New example: `examples/copper/methods.crs`.
+  inner comma). New example: `examples/mikasa/methods.crs`.
 - **Copper: `impl` method bodies now lower through the real statement machinery**
   (a sub-parser) instead of a naive token-join. Multi-statement bodies get `let`
   injection and `;` terminators, instead of collapsing onto one invalid line
@@ -83,11 +86,11 @@ CalVer scheme (`0.YY.M`, stamped from the build date).
   get a spurious `;`. The tokenizer tracks struct-literal braces (separating
   fields with `,`) and suppresses the statement `;` after a line that ends in a
   binary/infix operator (`a &&` / `x +` / `obj.`). Regression tests:
-  `crates/copper-parser/tests/impl_methods.rs`.
+  `crates/mikasa-parser/tests/impl_methods.rs`.
 
 ## [v0.26.6] - 2026-06-03
 
-First tagged release. Copper is a high-level language that transpiles to Rust,
+First tagged release. Mikasa is a high-level language that transpiles to Rust,
 shipped as the `cforge` compiler, with a declarative UI front-end (**MUI**) on
 top of the mocida toolkit.
 
@@ -110,10 +113,10 @@ top of the mocida toolkit.
   styling + anchors, reusable components with params + cross-file `import`,
   `app.bundle` assets, and **`Video` / `WebView`** elements (runtime + codegen),
   with cross-platform `Video` corner `radius`.
-- **VS Code extension** for Copper + MUI.
+- **VS Code extension** for Mikasa + MUI.
 - **MUI-based GUI installer** (declarative `.mui`, no Tauri/webview shell) with a
   scope-detecting install flow.
-- **Examples** under `examples/copper/` (language features) and `examples/mui/`
+- **Examples** under `examples/mikasa/` (language features) and `examples/mui/`
   (hello, counter, keyboard, styled, app, card, dashboard, bundle-demo, crm,
   video, webview).
 - Cross-platform Python tooling (`scripts/`), CalVer + git-hash versioning, and

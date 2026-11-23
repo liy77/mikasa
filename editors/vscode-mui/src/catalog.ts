@@ -282,11 +282,11 @@ export interface KeywordDef {
   doc: string;
 }
 
-// MUI/Mocida-specific words that are NOT Copper keywords — the markup + the
-// reactivity primitives. Copper's own keywords (func, mut, if, struct, impl,
+// MUI/Mocida-specific words that are NOT Mikasa keywords — the markup + the
+// reactivity primitives. Mikasa's own keywords (func, mut, if, struct, impl,
 // import, …) and primitive types are loaded from the SHARED copper-lexicon.json
-// at activation (see loadCopperLexicon) so their text is identical to the
-// Copper extension and can never drift.
+// at activation (see loadMikasaLexicon) so their text is identical to the
+// Mikasa extension and can never drift.
 export const MUI_KEYWORDS: KeywordDef[] = [
   { label: 'view', detail: 'view Name(props) { ... }',
     doc: 'Declares a component. Props are typed parameters; the body is a widget tree.' },
@@ -298,15 +298,15 @@ export const MUI_KEYWORDS: KeywordDef[] = [
     doc: 'A reactive side effect: runs once on mount and again whenever a signal it reads changes.' },
 ];
 
-// Filled in by loadCopperLexicon() at activation. Until then they're empty, so
+// Filled in by loadMikasaLexicon() at activation. Until then they're empty, so
 // hover/completion simply fall back to the MUI-only set.
 export let COPPER_KEYWORDS: KeywordDef[] = [];
 export let COPPER_TYPES: KeywordDef[] = [];
 
 /**
- * Combined keyword list (MUI extras + Copper keywords) used by completion.
- * MUI entries win on label collisions (none today), so the Copper docs apply
- * to func/if/for/match/import/mut/… exactly as in the Copper extension.
+ * Combined keyword list (MUI extras + Mikasa keywords) used by completion.
+ * MUI entries win on label collisions (none today), so the Mikasa docs apply
+ * to func/if/for/match/import/mut/… exactly as in the Mikasa extension.
  */
 export function allKeywords(): KeywordDef[] {
   const seen = new Set(MUI_KEYWORDS.map((k) => k.label));
@@ -314,11 +314,11 @@ export function allKeywords(): KeywordDef[] {
 }
 
 /**
- * Load the shared Copper lexicon (keywords + primitive types) and populate
+ * Load the shared Mikasa lexicon (keywords + primitive types) and populate
  * COPPER_KEYWORDS / COPPER_TYPES. `raw` is the parsed JSON. Falls back to the
  * embedded copy when the canonical file isn't available (e.g. packaged vsix).
  */
-export function loadCopperLexicon(raw?: unknown): void {
+export function loadMikasaLexicon(raw?: unknown): void {
   const data = (raw ?? EMBEDDED_COPPER_LEXICON) as {
     keywords?: KeywordDef[];
     types?: KeywordDef[];
@@ -383,7 +383,7 @@ export function isKnownProp(widget: WidgetDef | undefined, name: string): boolea
   return !!widget && widget.props.includes(name);
 }
 
-/** Look up any keyword (MUI or Copper) or primitive type by exact label. */
+/** Look up any keyword (MUI or Mikasa) or primitive type by exact label. */
 export function keywordByLabel(label: string): KeywordDef | undefined {
   return (
     MUI_KEYWORDS.find((k) => k.label === label) ??

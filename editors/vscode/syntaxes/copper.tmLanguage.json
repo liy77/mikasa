@@ -1,8 +1,9 @@
 {
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-  "name": "Copper",
+  "name": "Mikasa",
   "scopeName": "source.copper",
   "patterns": [
+    { "include": "source.mui" },
     { "include": "#comments" },
     { "include": "#strings" },
     { "include": "#macros" },
@@ -65,16 +66,16 @@
       "patterns": [
         {
           "name": "keyword.control.copper",
-          "match": "\\b(if|else|match|loop|while|for|in|break|continue|return|yield)\\b"
+          "match": "\\b(if|else|guard|defer|match|loop|while|for|in|break|continue|return|yield)\\b"
         },
         {
           "comment": "Visibility / memory / safety / linkage / async modifiers.",
           "name": "storage.modifier.copper",
-          "match": "\\b(pub|public|unsafe|extern|async|await|static|const|dyn|where|mut|ref|move)\\b"
+          "match": "\\b(pub|public|unsafe|extern|async|await|static|const|dyn|where|mut|ref|move|own)\\b"
         },
         {
           "name": "keyword.declaration.copper",
-          "match": "\\b(func|struct|class|impl|trait|enum|let|import|from|as|use)\\b"
+          "match": "\\b(func|struct|class|impl|trait|enum|let|import|from|as|use|type|mod)\\b"
         },
         {
           "name": "constant.language.copper",
@@ -106,7 +107,7 @@
     "functions": {
       "patterns": [
         {
-          "comment": "Copper function declaration: `func ReturnType name(...)`.",
+          "comment": "Mikasa function declaration: `func ReturnType name(...)`.",
           "match": "\\b(func)\\s+([A-Za-z_][A-Za-z0-9_]*(?:<[^>]+>)?)\\s+([a-z_][A-Za-z0-9_]*)\\s*\\(",
           "captures": {
             "1": { "name": "keyword.declaration.copper" },

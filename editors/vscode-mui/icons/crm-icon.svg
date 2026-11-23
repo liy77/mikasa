@@ -1,11 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 420" width="420" height="420" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Copper + Mocida (.crm)">
-  <title>Copper + Mocida — .crm</title>
-  <!-- .crm = Copper + Mocida. The Copper mark (a "C" inside a cog, matching
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 420" width="420" height="420" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Mikasa + Mocida (.crm)">
+  <title>Mikasa + Mocida — .crm</title>
+  <!-- .crm = Mikasa + Mocida. The Mikasa mark (a "C" inside a cog, matching
        editors/vscode/icons/crs-icon) occupies the top-left; the Mocida mark
        (two overlapping squares) sits in the bottom-right, fully inside the
-       canvas. Reads as "the Copper icon, with Mocida". -->
+       canvas. Reads as "the Mikasa icon, with Mocida". -->
 
-  <!-- ===== Copper cog + C, scaled ~0.46, anchored top-left ===== -->
+  <!-- ===== Mikasa cog + C, scaled ~0.46, anchored top-left ===== -->
   <!-- cog centre (185,185) -> (140,140): translate = 140 - 185*0.46 = 54.9 -->
   <g transform="translate(54.9 54.9) scale(0.46)">
     <g fill="#3b6fd4">

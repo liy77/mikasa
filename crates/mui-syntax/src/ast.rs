@@ -4,11 +4,11 @@
 //! [`Node`]s — elements (mocida widgets) plus reactive glue (`let signal`,
 //! `effect`) and control flow (`if` / `for` / `match`). Embedded Copper —
 //! prop expressions, handler bodies, `${...}` interpolation — is parsed into
-//! [`copper_syntax::expr`] trees so the same typed AST powers both the dev
+//! [`mikasa_syntax::expr`] trees so the same typed AST powers both the dev
 //! interpreter/JIT and the release codegen.
 
-use copper_syntax::ast::Span;
-use copper_syntax::expr::{Block, Expr};
+use mikasa_syntax::ast::Span;
+use mikasa_syntax::expr::{Block, Expr};
 
 /// A parsed `.mui` / `.crm` document.
 #[derive(Debug, Clone)]
@@ -45,7 +45,8 @@ impl ImportKind {
             .to_ascii_lowercase();
         match ext.as_str() {
             "rs" => ImportKind::Rust,
-            "crs" => ImportKind::Copper,
+            // `.mika` is the recommended source extension; `.crs` still imports.
+            ext if mikasa_syntax::ext::is_source(ext) => ImportKind::Copper,
             _ => ImportKind::Mui, // .mui, .crm, or unspecified
         }
     }
@@ -151,7 +152,22 @@ pub struct AppConfig {
     /// its own title bar) or `"native"`/`None` (the OS title bar). Accepts the
     /// `decorations` (`none`/`default`) and `customTitlebar` (`true`) aliases.
     pub titlebar: Option<String>,
+    /// CSS `@font-face`-style external fonts declared on the app:
+    /// `fonts: [FontFace("Inter", "/fonts/Inter.ttf"), …]` or
+    /// `FontFace { family: "Inter", src: "https://…" }`. Applied before the
+    /// first paint so `Text(font: "Inter")` resolves like `font-family` in CSS.
+    pub fonts: Vec<FontFace>,
     pub span: Span,
+}
+
+/// One `@font-face` entry from `App() { fonts: [...] }`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FontFace {
+    /// CSS `font-family` name exposed to `Text(font: …)`. Empty → use the name
+    /// embedded in the font file.
+    pub family: String,
+    /// Filesystem / MEMFS path or `http(s)://` URL (CSS `src: url(...)`).
+    pub src: String,
 }
 
 /// `view Name(params) { body }`.
@@ -293,7 +309,9 @@ impl Handler {
     /// Every recognised effect of a `;`-separated body, in order
     /// (`{ kind = t ; open = "0" ; n += 1 }`).
     pub fn actions(&self) -> Vec<HandlerAction> {
-        split_statements(&self.raw).filter_map(parse_handler_action).collect()
+        split_statements(&self.raw)
+            .filter_map(parse_handler_action)
+            .collect()
     }
 }
 
@@ -392,12 +410,26 @@ fn parse_handler_action(raw: &str) -> Option<HandlerAction> {
     // `name = ...`
     if toks.len() >= 3 && is_ident(toks[0]) && toks[1] == "=" {
         let rhs = &toks[2..];
-        // `name = <int>`
+        // `name = <int>` / `name = true` / `name = false`
+        // Bool signals ride the int channel (false=0, true=1), so `open = true`
+        // must become SetInt — not a string — or the assignment is a silent no-op.
         if rhs.len() == 1 {
             if let Ok(v) = rhs[0].parse::<i64>() {
                 return Some(HandlerAction::SetInt {
                     name: toks[0].to_string(),
                     value: v,
+                });
+            }
+            if rhs[0] == "true" {
+                return Some(HandlerAction::SetInt {
+                    name: toks[0].to_string(),
+                    value: 1,
+                });
+            }
+            if rhs[0] == "false" {
+                return Some(HandlerAction::SetInt {
+                    name: toks[0].to_string(),
+                    value: 0,
                 });
             }
             // `name = "literal"` — string signal assignment.
@@ -415,9 +447,9 @@ fn parse_handler_action(raw: &str) -> Option<HandlerAction> {
             let values: Vec<String> = inner
                 .iter()
                 .filter(|t| **t != ",")
-                .filter_map(|t| string_literal(t).or_else(|| {
-                    t.parse::<i64>().ok().map(|n| n.to_string())
-                }))
+                .filter_map(|t| {
+                    string_literal(t).or_else(|| t.parse::<i64>().ok().map(|n| n.to_string()))
+                })
                 .collect();
             if values.is_empty() {
                 return Some(HandlerAction::ClearList {
@@ -548,6 +580,24 @@ mod handler_action_tests {
             Some(HandlerAction::SetStr {
                 name: "status".into(),
                 value: "off".into()
+            })
+        );
+    }
+
+    #[test]
+    fn parses_set_bool() {
+        assert_eq!(
+            parse_handler_action("nav_open = true"),
+            Some(HandlerAction::SetInt {
+                name: "nav_open".into(),
+                value: 1
+            })
+        );
+        assert_eq!(
+            parse_handler_action("nav_open = false"),
+            Some(HandlerAction::SetInt {
+                name: "nav_open".into(),
+                value: 0
             })
         );
     }

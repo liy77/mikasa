@@ -1,6 +1,9 @@
-# Installing Copper
+# Installing Mikasa
 
-The Copper compiler ships with a universal installer that exposes `cforge`
+> **Copper is now Mikasa.** The language was renamed (Copper → Mikasa, Alloy →
+> Astra). The toolchain binary is now `mikasa`.
+
+The Mikasa compiler ships with a universal installer that exposes `cforge`
 globally on your system. Installers live in [`scripts/`](../scripts) at the
 project root.
 
@@ -42,15 +45,15 @@ Restart your terminal after installation so the new `PATH` is picked up.
 
 ```sh
 # Compile and run
-cforge run main.crs
+mikasa run main.mika
 
-# Run the default file (main.crs in cwd)
+# Run the default file (main.mika in cwd)
 cforge run
 
 # Compile only
-cforge -c -i main.crs
+mikasa build main.mika
 
-# Compile every .crs in a directory
+# Compile every .mika in a directory
 cforge -c -i src/
 
 # Show help
@@ -84,12 +87,12 @@ forward to the matching `.py`.
 The repo ships sample programs in [`examples/`](../examples):
 
 ```sh
-cforge run examples/copper/loops.crs
-cforge run examples/copper/interpolation.crs
-cforge run examples/copper/collections.crs
-cforge run examples/copper/matching.crs
-cforge run examples/copper/optional.crs
-cforge run examples/copper/ternary.crs
+cforge run examples/copper/loops.mika
+cforge run examples/copper/interpolation.mika
+cforge run examples/copper/collections.mika
+cforge run examples/copper/matching.mika
+cforge run examples/copper/optional.mika
+cforge run examples/copper/ternary.mika
 ```
 
 ## Uninstall

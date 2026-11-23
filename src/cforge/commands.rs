@@ -1,11 +1,12 @@
-//! `cforge init` and `cforge install` — project scaffolding and a
+//! `mikasa init` and `mikasa install` — project scaffolding and a
 //! cargo-free way to add dependencies straight into `properties.kson`.
 //!
-//! Neither command touches the transpile pipeline. `init` writes a fresh
-//! project skeleton; `install` resolves a crate version off crates.io
-//! (reusing [`check_version_exists`]) and edits the `$dependencies` block
-//! of `properties.kson` in place as text — the KSON parser is read-only
+//! Neither command requires cargo/rustc. `init` writes a fresh project
+//! skeleton; `install` resolves a crate version off crates.io (reusing
+//! [`check_version_exists`]) and edits the `$dependencies` block of
+//! `properties.kson` in place as text — the KSON parser is read-only
 //! (it shells out to `lson`), so we never round-trip through it.
+//! Optional `cargo fetch` only runs when cargo is already on PATH.
 
 use colored::Colorize;
 use std::collections::HashMap;
@@ -16,17 +17,17 @@ use crate::cforge::pretty;
 
 const PROPERTIES_FILE: &str = "properties.kson";
 /// Lock file pinning every dependency to the exact resolved version, so
-/// `cforge install` is reproducible (the `lson`/kson counterpart of Cargo.lock).
+/// `mikasa install` is reproducible (the `lson`/kson counterpart of Cargo.lock).
 const LOCK_FILE: &str = "properties.lock";
 
-/// `cforge init` — scaffold `properties.kson`, `main.crs` and `.gitignore`
+/// `mikasa init` — scaffold `properties.kson`, `main.mika` and `.gitignore`
 /// in the current directory. Existing files are never overwritten.
 pub fn init() {
     let project_name = env::current_dir()
         .ok()
         .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
         .filter(|n| !n.is_empty())
-        .unwrap_or_else(|| "copper-app".to_string());
+        .unwrap_or_else(|| "mikasa-app".to_string());
 
     // properties.kson — the heart of the project. Refuse to clobber it.
     if Path::new(PROPERTIES_FILE).exists() {
@@ -46,29 +47,30 @@ pub fn init() {
         println!("✅ Created {}", PROPERTIES_FILE.green());
     }
 
-    // main.crs — entry point. Top-level statements are wrapped into
+    // main.mika — entry point. Top-level statements are wrapped into
     // `fn main()` by the parser, so a bare `println!` is the whole program.
-    if Path::new("main.crs").exists() {
+    if Path::new("main.mika").exists() {
         println!(
             "⚠️  {} already exists — leaving it untouched.",
-            "main.crs".yellow()
+            "main.mika".yellow()
         );
     } else {
-        let main_src = "// Welcome to Copper! Run this with: cforge run main.crs\nprintln!(\"Hello, Copper!\")\n";
-        if let Err(e) = fs::write("main.crs", main_src) {
-            eprintln!("❌ Failed to write main.crs: {}", e);
+        let main_src = "// Welcome to Mikasa! Run this with: mikasa run main.mika\nprintln!(\"Hello, Mikasa!\")\n";
+        if let Err(e) = fs::write("main.mika", main_src) {
+            eprintln!("❌ Failed to write main.mika: {}", e);
             std::process::exit(1);
         }
-        println!("✅ Created {}", "main.crs".green());
+        println!("✅ Created {}", "main.mika".green());
     }
 
     // .gitignore — keep the transpiler output and Rust build dir out of VCS.
     ensure_gitignore();
 
     println!(
-        "\n🎉 Project {} ready. Try {} to build and run it.",
+        "\n🎉 Project {} ready. Try {} (Astra, no cargo) or {} (native).",
         project_name.bold(),
-        "cforge run".cyan()
+        "mikasa run main.mika".cyan(),
+        "mikasa build main.mika".cyan()
     );
 }
 
@@ -107,14 +109,14 @@ fn ensure_gitignore() {
     }
 }
 
-/// `cforge install <name>[@version]` — resolve a version off crates.io and
+/// `mikasa install <name>[@version]` — resolve a version off crates.io and
 /// record it in the `$dependencies` block of `properties.kson`.
 pub async fn install(spec: &str) {
     if !Path::new(PROPERTIES_FILE).exists() {
         eprintln!(
             "❌ No {} found. Run {} first.",
             PROPERTIES_FILE.yellow(),
-            "cforge init".cyan()
+            "mikasa init".cyan()
         );
         std::process::exit(1);
     }
@@ -126,7 +128,7 @@ pub async fn install(spec: &str) {
     };
 
     if name.is_empty() {
-        eprintln!("❌ Usage: cforge install <name>[@version]");
+        eprintln!("❌ Usage: mikasa install <name>[@version]");
         std::process::exit(1);
     }
 
@@ -187,15 +189,15 @@ pub async fn install(spec: &str) {
     }
 }
 
-/// `cforge install` with no package — resolve and download **every** dependency
-/// listed in `properties.kson`, then write a `properties.lock` pinning the exact
-/// versions. Already-locked deps are reused (reproducible); only new or unlocked
-/// ones hit the network. Finishes by running `cargo fetch` to pull the crates
-/// into the local registry cache.
+/// `mikasa install` with no package — resolve **every** dependency listed in
+/// `properties.kson`, then write a `properties.lock` pinning the exact versions.
+/// Already-locked deps are reused (reproducible); only new or unlocked ones hit
+/// the network. If cargo is on PATH, also runs `cargo fetch` to warm the
+/// registry cache — otherwise the lock alone is enough (no cargo required).
 pub async fn install_all() {
     if !Path::new(PROPERTIES_FILE).exists() {
         pretty::fail(&format!(
-            "No {} found. Run `cforge init` first.",
+            "No {} found. Run `mikasa init` first.",
             PROPERTIES_FILE
         ));
         std::process::exit(1);
@@ -222,10 +224,18 @@ pub async fn install_all() {
     let mut done = 0usize;
     for (name, req) in &deps {
         pb.set(done, &format!("resolving {name} {req}"));
+        // Local path or inline object dependency — keep as-is without hitting crates.io.
+        if req.starts_with("path:") || req.starts_with('{') {
+            resolved.push((name.clone(), req.clone()));
+            reused += 1;
+            done += 1;
+            pb.set(done, &format!("{name} (local/custom)"));
+            continue;
+        }
         // Reuse the locked version when present and the request still names it
         // (exact pin) — that's the reproducible fast path, no network.
         if let Some(v) = lock.get(name) {
-            if req == v || req == "*" || req.is_empty() {
+            if req == v || req == "*" || req.is_empty() || v.starts_with(&format!("{req}.")) {
                 resolved.push((name.clone(), v.clone()));
                 reused += 1;
                 done += 1;
@@ -275,11 +285,25 @@ pub async fn install_all() {
     cargo_fetch_locked(&resolved).await;
 }
 
-/// Generate a Cargo manifest from the resolved set and run `cargo fetch` so the
-/// crates are downloaded ahead of the first build. Best-effort: a failure (e.g.
-/// offline) is a warning, not fatal — the lock is already written.
+/// Optionally warm the cargo registry when cargo is available. Never required
+/// for `mikasa install` itself — the lock file is already written.
 async fn cargo_fetch_locked(_resolved: &[(String, String)]) {
     use std::process::Command;
+
+    let cargo_ok = Command::new("cargo")
+        .arg("-V")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if !cargo_ok {
+        pretty::ok(
+            "Lock written. Skipping crate download (cargo not on PATH) — \
+             install Rust later only if you need `mikasa build`.",
+        );
+        return;
+    }
 
     // Build ./dist/rust/Cargo.toml from properties.kson + a stub entry so the
     // manifest is valid for `cargo fetch` (which reads deps but doesn't build).
@@ -299,7 +323,7 @@ async fn cargo_fetch_locked(_resolved: &[(String, String)]) {
     match status {
         Ok(o) if o.status.success() => sp.done("Crates downloaded into the cargo cache."),
         Ok(o) => {
-            sp.fail("cargo fetch failed");
+            sp.fail("cargo fetch failed (lock is still valid)");
             let err = String::from_utf8_lossy(&o.stderr);
             for line in err.lines().take(4) {
                 pretty::step(line);
@@ -361,8 +385,8 @@ fn write_lock(pairs: &[(String, String)]) -> std::io::Result<()> {
     let mut sorted: Vec<(String, String)> = pairs.to_vec();
     sorted.sort_by(|a, b| a.0.cmp(&b.0));
     let mut out = String::new();
-    out.push_str("# Auto-generated by cforge — pinned dependency versions.\n");
-    out.push_str("# Do not edit by hand; run `cforge install` to regenerate.\n\n");
+    out.push_str("# Auto-generated by mikasa — pinned dependency versions.\n");
+    out.push_str("# Do not edit by hand; run `mikasa install` to regenerate.\n\n");
     out.push_str("$locked\n");
     for (name, version) in &sorted {
         out.push_str(&format!("    {} = \"{}\"\n", name, version));
@@ -437,4 +461,75 @@ fn join_lines(lines: &[String], original: &str) -> String {
         out.push('\n');
     }
     out
+}
+
+/// `cforge remove <name>` — remove a dependency from `properties.kson` and `properties.lock`.
+pub fn remove(name: &str) {
+    if !Path::new(PROPERTIES_FILE).exists() {
+        pretty::fail(&format!("No {} found.", PROPERTIES_FILE));
+        std::process::exit(1);
+    }
+    let Ok(text) = fs::read_to_string(PROPERTIES_FILE) else {
+        pretty::fail(&format!("Could not read {}.", PROPERTIES_FILE));
+        std::process::exit(1);
+    };
+    let mut lines: Vec<String> = Vec::new();
+    let mut removed = false;
+    let key_prefix = format!("{name} ");
+    let key_eq = format!("{name}=");
+    for line in text.lines() {
+        let trimmed = line.trim_start();
+        if (line.starts_with(' ') || line.starts_with('\t'))
+            && (trimmed.starts_with(&key_prefix) || trimmed.starts_with(&key_eq))
+        {
+            removed = true;
+            continue;
+        }
+        lines.push(line.to_string());
+    }
+    if !removed {
+        pretty::warn(&format!(
+            "Dependency `{name}` not found in {PROPERTIES_FILE}."
+        ));
+        return;
+    }
+    let _ = fs::write(PROPERTIES_FILE, join_lines(&lines, &text));
+    let mut locked = read_lock();
+    if locked.remove(name).is_some() {
+        let pairs: Vec<(String, String)> = locked.into_iter().collect();
+        let _ = write_lock(&pairs);
+    }
+    pretty::ok(&format!(
+        "Removed {} from {}",
+        name.green(),
+        PROPERTIES_FILE
+    ));
+}
+
+/// `cforge list` — print all declared dependencies and their locked versions.
+pub fn list() {
+    if !Path::new(PROPERTIES_FILE).exists() {
+        pretty::fail(&format!("No {} found.", PROPERTIES_FILE));
+        return;
+    }
+    let deps = read_dependencies();
+    let lock = read_lock();
+    pretty::head(&format!("Dependencies in {PROPERTIES_FILE}"));
+    if deps.is_empty() {
+        println!("  (no dependencies declared)");
+        return;
+    }
+    for (name, spec) in deps {
+        let locked = lock
+            .get(&name)
+            .map(|v| format!(" (locked: {v})"))
+            .unwrap_or_default();
+        println!(
+            "  {} {} {}{}",
+            name.green().bold(),
+            "=>".yellow(),
+            spec.cyan(),
+            locked.dimmed()
+        );
+    }
 }

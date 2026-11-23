@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Build, package and install Copper's VSCode editor extensions straight into
+Build, package and install Mikasa's VSCode editor extensions straight into
 your local VSCode — no Marketplace round-trip.
 
 For every extension under editors/ that has a package.json (currently the
-Copper `.crs` extension and the MUI `.mui`/`.crm` extension) it:
+Mikasa `.mika` extension and the MUI `.mui`/`.crm` extension) it:
 
   1. npm install            — pull the build deps (typescript, language client)
   2. npm run compile        — tsc → out/extension.js
@@ -122,14 +122,14 @@ def package_and_install(ext_dir, npm, npx, code, package_only):
 def main():
     ap = argparse.ArgumentParser(
         prog="install_extensions.py",
-        description="Build, package and install the Copper VSCode extensions.",
+        description="Build, package and install the Mikasa VSCode extensions.",
     )
     ap.add_argument("names", nargs="*", help="extension folder names under editors/ (default: all)")
     ap.add_argument("--package-only", action="store_true", help="build the .vsix but don't install")
     ap.add_argument("--list", action="store_true", help="list discovered extensions and exit")
     args = ap.parse_args()
 
-    banner("Copper", "Editor Extensions")
+    banner("Mikasa", "Editor Extensions")
 
     extensions = discover_extensions(args.names)
     if not extensions:

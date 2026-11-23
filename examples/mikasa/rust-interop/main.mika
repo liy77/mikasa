@@ -1,0 +1,12 @@
+// Mixing Rust + Mikasa. `import { fib } from math` resolves to the sibling
+// `math.rs`. Astra compiles it to wasm (plain `pub fn` is auto-wrapped);
+// `mikasa run` also links it natively via the transpile path.
+//
+//   astra run examples/mikasa/rust-interop/main.mika
+//   mikasa vm run examples/mikasa/rust-interop/main.mika
+import { fib } from math
+
+func main() {
+    mut n = 10
+    println("fib(${n}) = ${fib(n)}")
+}

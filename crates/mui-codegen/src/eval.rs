@@ -3,7 +3,7 @@
 //! live signal values each rebuild. Reactivity is whole-view rebuild, not
 //! const-folding — nothing here is evaluated at codegen time.
 
-use copper_syntax::expr::{BinOp, Expr, ExprKind, Literal, UnOp};
+use mikasa_syntax::expr::{BinOp, Expr, ExprKind, Literal, UnOp};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SigKind {
@@ -37,8 +37,7 @@ pub fn expr_to_rust(
             Some(SigKind::Int) => Ok(format!("{}.borrow().get()", sig_var(name))),
             Some(SigKind::Str) => Ok(format!("{}.borrow().get()", sig_var(name))),
             Some(SigKind::List) => Ok(format!("{}.borrow().clone()", sig_var(name))),
-            None => env(name)
-                .ok_or_else(|| format!("unknown name `{name}` in control-flow expr")),
+            None => env(name).ok_or_else(|| format!("unknown name `{name}` in control-flow expr")),
         },
         ExprKind::Unary { op, expr } => {
             let inner = expr_to_rust(expr, sig, env)?;
@@ -108,10 +107,7 @@ pub fn expr_to_rust(
         } => {
             let s = expr_to_rust(start, sig, env)?;
             let en = expr_to_rust(end, sig, env)?;
-            Ok(format!(
-                "({s}..{}{en})",
-                if *inclusive { "=" } else { "" }
-            ))
+            Ok(format!("({s}..{}{en})", if *inclusive { "=" } else { "" }))
         }
         other => Err(format!(
             "unsupported expression {other:?} in control-flow position"
@@ -149,7 +145,7 @@ pub fn collect_reads(expr: &Expr, out: &mut Vec<String>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use copper_syntax::expr::parse_expr;
+    use mikasa_syntax::expr::parse_expr;
 
     fn sig(name: &str) -> Option<SigKind> {
         match name {

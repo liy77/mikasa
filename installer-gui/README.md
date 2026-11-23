@@ -1,6 +1,6 @@
-# Copper GUI Installer
+# Mikasa GUI Installer
 
-A graphical installer for the Copper toolchain, built with **MUI** (Copper's
+A graphical installer for the Mikasa toolchain (formerly Copper), built with **MUI** (Mikasa's
 own declarative UI over the mocida toolkit) — no web stack, no Tauri. A
 clickable alternative to `scripts/install.py`: pick install scope, install
 directory, hit Install. Windows-first.

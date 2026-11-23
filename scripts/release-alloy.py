@@ -106,7 +106,7 @@ def main():
     args = ap.parse_args()
 
     version = alloy_version()
-    print(f"Alloy runtime release v{version}")
+    print(f"Astra runtime release v{version}")
 
     if args.host:
         h = host_target()

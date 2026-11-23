@@ -2,35 +2,50 @@
 
 Context for AI assistants on **copper-lang** — traps, invariants, conventions.
 
+> **Copper is now Mikasa, and Alloy is now Astra.** The rename is branding:
+> docs, window titles, and logos say Mikasa / Astra. The toolchain binary is
+> `mikasa` (formerly `cforge`). The interpreter binary (`alloy`), crate names
+> (`copper-*`, `astra-vm`), and module paths stay as they are — do not rename
+> them to match the brand.
+>
+> Extensions (`crates/mikasa-syntax/src/ext.rs`): `.mika` source, `.ast`
+> bytecode, `.mklib` library, `.mipkg` package. `.crs` and `.loy` still load
+> and must keep loading — they are legacy, not removed. New output uses the
+> new names.
+>
+> `.mika` is also the MocidaUI file. A `.mika` that declares a `view` or an
+> `App()` is a UI document (`source_is_mui`); a plain one transpiles. `.crm`
+> is retired — it still opens, with a warning, and nothing new should use it.
+
 ## What this project is
 
-Copper transpiles to Rust. Binary: `cforge`. Pipeline:
+Mikasa (formerly Copper) transpiles to Rust. Binary: `mikasa`. Pipeline:
 `.crs` → tokenizer → token rewrites → parser → Rust source → `cargo build`.
 
-**Second engine: Alloy** (`crates/alloy-vm`, binary `alloy`) — tree-walking interpreter
-over the shared `copper-syntax` AST. Instant like `python`; no transpile, no cargo.
-Design specs: `docs/superpowers/specs/2026-06-22-alloy-vm-design.md`.
+**Second engine: Astra** (formerly Alloy; `crates/astra-vm`, binary `alloy`) — tree-walking interpreter
+over the shared `mikasa-syntax` AST. Instant like `python`; no transpile, no cargo.
+Design specs: `docs/superpowers/specs/2026-06-22-astra-vm-design.md`.
 
 ## Repository layout (canonical)
 
 ```
 crates/
-  copper-syntax/    tokenizer + AST (shared by cforge, alloy, LSPs)
-  copper-parser/    streaming transpiler parser
-  alloy-vm/         Alloy interpreter lib + `alloy` CLI
+  mikasa-syntax/    tokenizer + AST (shared by cforge, alloy, LSPs)
+  mikasa-parser/    streaming transpiler parser
+  astra-vm/         Astra interpreter lib + `alloy` CLI
                     src/{value,env,error,interp,bytecode,loader,stdlib,stdlib_ext,wasm,intrinsics}.rs
-  copper-lsp/       Copper language server
-  mui-syntax/       MUI (.mui/.crm) parser
+  mikasa-lsp/       Mikasa language server
+  mui-syntax/       MocidaUI parser (.mui, and .mika files with a view)
   mui-codegen/      MUI → Rust codegen (M5)
   mui-lsp/          MUI language server
 src/                cforge entrypoint + re-exports from crates (historical; real code is in crates/)
-alloy-gui/          Dual-mode alloy GUI host (MUI; own workspace; links mocida)
-std/cstd.crs        Copper stdlib — single source for both cforge and alloy
-docs/superpowers/specs/   Design specs (alloy-vm, bytecode, gui, check-miri, wasm-interop, mui-codegen)
-docs/TODO.md        Backlog with priorities
+astra-gui/          Dual-mode alloy GUI host (MUI; own workspace; links mocida)
+std/cstd.mika        Mikasa stdlib — single source for both cforge and alloy
+docs/superpowers/specs/   Design specs (astra-vm, bytecode, gui, check-miri, wasm-interop, mui-codegen)
+docs/TODO.md        Backlog index → TODO-mikasa.md / TODO-astra.md
 ```
 
-## MUI files (`.mui` / `.crm`)
+## MocidaUI files (`.mui`, and `.mika` with a `view`)
 
 Two verbs:
 - **`cforge run foo.mui`** — dev render (M1): shells out to `mui-dev` (never links mocida directly). Resolution: `MUI_DEV_BIN` env → `mocida-rs/target/` → `cargo run -p mui-dev` (found via `MOCIDA_RS_DIR` or sibling `mocida/mocida-rs`).
@@ -38,7 +53,7 @@ Two verbs:
 
 Handlers + live reactivity are emitted as comments/placeholders — M3/M4 evaluator work pending.
 
-## Alloy — commands, .loy, imports
+## Astra — commands, .ast, imports
 
 **Commands:**
 - `alloy run file.crs` — instant interpret.
@@ -47,7 +62,7 @@ Handlers + live reactivity are emitted as comments/placeholders — M3/M4 evalua
 - `alloy check file.crs [--no-miri]` — verify via real rustc + Miri.
 - `cforge vm run/build` / `cforge check` — same VM via cforge.
 
-**`.loy` format** (`crates/alloy-vm/src/bytecode.rs`):
+**`.loy` format** (`crates/astra-vm/src/bytecode.rs`):
 `magic b"ALLOYBC\0"` + `fmt_ver: u16 LE` + bincode(alloy_ver) + bincode(payload).
 v1 = `Vec<Item>` (AST). v2 = `Vec<Item>` + `Vec<WasmModule { names, bytes }>` (wasm embedded). v1 still loadable.
 
@@ -56,7 +71,7 @@ v1 = `Vec<Item>` (AST). v2 = `Vec<Item>` + `Vec<WasmModule { names, bytes }>` (w
 | `import { x } from …` | Resolution |
 | --- | --- |
 | `fs`, `time`, `url`, `net`, `ws`, `json`, `crypto`, `http` | Native Rust in `stdlib.rs` / `stdlib_ext.rs` |
-| `cstd` | Interpreted from `std/cstd.crs` (merged); 4 native exceptions: `run`, `list_dir`, `append_file`, `rand_int` (`CSTD_NATIVE`) |
+| `cstd` | Interpreted from `std/cstd.mika` (merged); 4 native exceptions: `run`, `list_dir`, `append_file`, `rand_int` (`CSTD_NATIVE`) |
 | `math` (sibling `.crs`) | Parsed + merged recursively; bundled into `.loy` |
 | `foo` (sibling `.rs`) | Compiled to wasm32 once (cached in `~/.alloy/cache` by hash), run via `wasmi`. Prototype ABI: `i64`/`bool`, requires `#[no_mangle] pub extern "C"`. Plain `pub fn` → `LoadOutcome::NeedsCforge`. |
 
@@ -92,7 +107,7 @@ v1 = `Vec<Item>` (AST). v2 = `Vec<Item>` + `Vec<WasmModule { names, bytes }>` (w
 - **`match` arms use `,` not `;`** — enforced via `brace_is_match.last()` in `line_break_token`. Don't disable.
 - **Don't stub the parser back to a minimal echo.** Happened once (cd22d82); restoration was non-trivial.
 
-### copper-syntax AST parser (Alloy)
+### mikasa-syntax AST parser (Astra)
 
 - **Recoverable parser** — partial tree + `ParseError`s on bad input. `alloy run` rejects non-empty `prog.errors`. Earlier these were silently discarded (`_errs`).
 - **Inside `(...)` identifiers are `Param`/`ParamType`, not `Identifier`.** `expect_ident` and closure-param parsing must accept both.
@@ -110,9 +125,9 @@ v1 = `Vec<Item>` (AST). v2 = `Vec<Item>` + `Vec<WasmModule { names, bytes }>` (w
 - **`scripts/uninstall.py` must be self-contained** — it's copied to the install dir (away from `_pretty.py`), so it MUST NOT `import _pretty`. All other scripts import it freely.
 - New scripts: inherit `_pretty.py` styling; resolve root via `Path(__file__).resolve().parent.parent` — no `cd`.
 
-### Alloy GUI host (mocida)
+### Astra GUI host (mocida)
 
-Build `alloy-gui/` against sibling `mocida-rs` at `/Volumes/MCUDevDisk/mocida/mocida-rs`.
+Build `astra-gui/` against sibling `mocida-rs` at `/Volumes/MCUDevDisk/mocida/mocida-rs`.
 Required env vars: `MOCIDA_INCLUDE_DIR`, `MOCIDA_LIB_DIR`, `MOCIDA_LIB_NAME=mocida`, `MOCIDA_STATIC=0`, `SDL3_INCLUDE_DIR`. Runtime: `DYLD_FALLBACK_LIBRARY_PATH=<mocida>/mocida/build`.
 
 **mui-runtime quirks (any `.mui` host must handle these):**
@@ -122,21 +137,21 @@ Required env vars: `MOCIDA_INCLUDE_DIR`, `MOCIDA_LIB_DIR`, `MOCIDA_LIB_NAME=moci
 - **`Image(source:"mocida://name")`** needs an absolute path registered via `mocida::bundle::set(...)` — relative resolution depends on CWD.
 - **Stack `align:` = cross-axis; `justify:` = main-axis.** `align: stretch` is NOT valid. To left-pin in a stretched column: explicit `width:` + `justify: start`.
 - **Resize is host-driven** — poll `UIApp_GetWidthG/HeightG` each tick; rebuild when size changes. Same for `take_dirty()` → `UIApp_SetChildren`.
-- **Hot-reload** reads `.mui` from disk each tick (mtime check). `backend.rs` is compiled in and cannot hot-reload.
+- **Hot-reload** reads `.mui` from disk each tick (mtime check). `backend.mika` is compiled in and cannot hot-reload.
 - **No native file picker** — use `rfd` crate for OS file dialog.
 
 ## Adding a new feature
 
 1. **Where does it live?** Tokenizer = atomic syntactic forms (`?.`, `$ident`). Token rewrite = macro-like context-local rewrites (`ternary.rs`). Parser dispatch = emission that needs result state.
-2. **New TokenKind:** add to `kind.rs`, emit in tokenizer, add dispatch arm in `parser/mod.rs`, add to `is_chain_breaker`, add `examples/copper/<feature>.crs`.
+2. **New TokenKind:** add to `kind.rs`, emit in tokenizer, add dispatch arm in `parser/mod.rs`, add to `is_chain_breaker`, add `examples/mikasa/<feature>.crs`.
 3. **Token rewrite:** `Vec<Token>` → `Vec<Token>`, iterate-until-fixed-point, synthetic tokens via `Token::new(..., generated: true)`, wire into `Parser::new` after whitespace filter.
-4. **Regression suite:** `for f in examples/copper/*.crs; do ./target/debug/cforge run "$f"; done`
+4. **Regression suite:** `for f in examples/mikasa/*.crs; do ./target/debug/cforge run "$f"; done`
 5. **Preserve `cforge --version`** output after touching `build.rs` or `main.rs`.
 
 ## What NOT to change without asking
 
 - Parser stub → don't echo-stub it (see cd22d82).
-- `main.crs` location → `cforge run` defaults to `./main.crs`.
+- `main.mika` location → `mikasa run` defaults to `./main.mika`.
 - `match`-block separator switch in `line_break_token` → makes arms use `,` not `;`.
 - Stacked `if`s in `symbol_token` → see tokenizer invariants.
 - `cforge_tokenizer_debug.log` → keep gitignored, not a feature.
@@ -145,20 +160,20 @@ Required env vars: `MOCIDA_INCLUDE_DIR`, `MOCIDA_LIB_DIR`, `MOCIDA_LIB_NAME=moci
 ## cstd standard library
 
 `import { ... } from cstd` → sets `result.cstd_used = true` → `Parser::transpile_cstd_module()`:
-1. `include_str!` of `std/cstd.crs` → tokenize + sub-parse.
+1. `include_str!` of `std/cstd.mika` → tokenize + sub-parse.
 2. Strip trailing `fn main() {}`.
 3. Promote `fn ` → `pub fn ` (auto; `pub func` doesn't work — `pub` leaks to next stmt).
 4. Append `std/cstd_native.rs` (deprecated; see policy below).
 5. Wrap in `#[allow(dead_code)] pub mod cstd { ... }` and prepend to `result.value`.
 
-**Constraints for `std/cstd.crs`:**
+**Constraints for `std/cstd.mika`:**
 - No multi-line method chains — tokenizer terminates at newlines; use temp vars.
 - No `&[T]` slice params — tokenized as vec literal (`&vec![T]`). Use `Vec<T>` or native.
-- No `cfg!(target_os = "windows")` — `parse_var` injects `let` before `=`, breaking macro.
+- `cfg!(...)` is a macro invocation. `parse_var` must not inject `let` before the `=` inside it (paren-depth guard + the `cfg!` lookahead).
 
 ## Standard-library policy
 
-**`std/*.crs` is written in Copper, not Rust.** `std/*_native.rs` is deprecated — do not add new native files. When Copper can't express something yet, fix the transpiler. A `.crs` may use Rust-native spellings, fully-qualified paths, method chains, generics, `format!` specifiers — those all transpile through.
+**`std/*.crs` is written in Mikasa, not Rust.** `std/*_native.rs` is deprecated — do not add new native files. When Copper can't express something yet, fix the transpiler. A `.crs` may use Rust-native spellings, fully-qualified paths, method chains, generics, `format!` specifiers — those all transpile through.
 
 ## `unsafe` support
 
@@ -174,7 +189,7 @@ Required env vars: `MOCIDA_INCLUDE_DIR`, `MOCIDA_LIB_DIR`, `MOCIDA_LIB_NAME=moci
 - **`obj?.field`** → `Option<&T>` (reference). Non-`Copy` payloads may need `.clone()`.
 - **Type aliases** (`type Foo = Bar<T>`) don't lower inside `static`/`as` casts.
 
-**Alloy:**
+**Astra:**
 - **No static borrow/ownership checking** — dynamic `Rc<RefCell>`; pointer aliasing doesn't propagate. Use `cforge` or `alloy check` for real borrow-checking.
 - **`&&`/`||` are not short-circuit** — both operands pre-evaluated before `eval_binary`.
 - **Wasm ABI is prototype-only** — `i64`/`bool` + `extern "C"` only. Strings/structs = next phase.
@@ -187,8 +202,8 @@ cargo build                    # debug
 cargo build --release          # release (what install.py runs)
 cargo fmt -- --check
 cargo clippy -- -D warnings
-cargo test                     # tests in copper-syntax interpolation
-for f in examples/copper/*.crs; do ./target/debug/cforge run "$f"; done
+cargo test                     # tests in mikasa-syntax interpolation
+for f in examples/mikasa/*.crs; do ./target/debug/cforge run "$f"; done
 python scripts/install.py      # reinstall; open NEW terminal after
 ```
 

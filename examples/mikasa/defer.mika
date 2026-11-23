@@ -1,0 +1,59 @@
+// Swift-style `defer`: the block runs when its scope exits, on every path,
+// and later defers run first.
+
+func void demo() {
+    println!("start")
+    defer {
+        println!("defer outer")
+    }
+    defer {
+        println!("defer inner")
+    }
+    println!("middle")
+    return
+}
+
+demo()
+
+func i32 early(n: i32) {
+    defer {
+        println!("cleanup")
+    }
+    guard n > 0 else {
+        return -1
+    }
+    return n
+}
+
+println!("-- early(-1)")
+println!("got ${early(-1)}")
+println!("-- early(3)")
+println!("got ${early(3)}")
+
+// A defer past a `return` never runs — control never reached it.
+func void skipped() {
+    return
+    defer {
+        println!("should not print")
+    }
+}
+
+skipped()
+
+// Scope exit by falling off the end of a block.
+func void block_exit() {
+    defer {
+        println!("block done")
+    }
+    println!("inside block")
+}
+
+block_exit()
+
+mut i = 0
+while i < 2 {
+    defer {
+        println!("iter $i done")
+    }
+    i = i + 1
+}

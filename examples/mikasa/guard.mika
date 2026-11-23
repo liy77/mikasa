@@ -1,0 +1,41 @@
+// Swift-style `guard`: the happy path falls through, the `else` must leave
+// the scope, and a `guard let` binding stays usable afterwards.
+
+func i32 labeled() {
+    mut n = 0
+    'outer: loop {
+        n = n + 1
+        guard n < 3 else {
+            break 'outer
+        }
+    }
+    return n
+}
+
+func i32 first_positive(xs: Vec<i32>) {
+    guard !xs.is_empty() else {
+        return -1
+    }
+    guard let Some(n) = xs.first().copied() else {
+        return -1
+    }
+    guard n > 0 else {
+        return 0
+    }
+    return n
+}
+
+func i32 clamp_or_skip(n: i32) {
+    guard n >= 0 else {
+        println!("negative, skipping")
+        return -1
+    }
+    return n
+}
+
+println!("first_positive([]) = ${first_positive(vec![])}")
+println!("first_positive([-3]) = ${first_positive(vec![-3])}")
+println!("first_positive([4, 5]) = ${first_positive(vec![4, 5])}")
+println!("clamp_or_skip(-2) = ${clamp_or_skip(-2)}")
+println!("clamp_or_skip(9) = ${clamp_or_skip(9)}")
+println!("labeled() = ${labeled()}")

@@ -1,3 +1,0 @@
-// Módulo Copper importado por app.crs (mesmo diretório).
-func int dobro(n: int) { return n * 2 }
-func int quadrado(n: int) { return n * n }

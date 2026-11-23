@@ -1,0 +1,154 @@
+// Astra GUI backend — 100% Mikasa.
+//
+// Pure decisions: version compare, release JSON, run/update copy.
+// The thin Rust host (src/main.rs) does I/O and asks this module what it means.
+
+func String current_version() {
+    return "0.1.0"
+}
+
+func String default_source() {
+    return "func main() {\n    println(\"hello from Astra\")\n}\n"
+}
+
+func String ready_message() {
+    return "ready — write Mikasa and hit Run"
+}
+
+func String running_status() {
+    return "running…"
+}
+
+// Shown text after a run. `error` is "" when the run succeeded.
+func String format_run_output(output: &str, error: &str) {
+    if error.is_empty() {
+        if output.is_empty() {
+            return "(no output)"
+        }
+        return output.to_string()
+    }
+    if output.is_empty() {
+        return error.to_string()
+    }
+    return format!("{}{}", output, error)
+}
+
+func String format_run_status(failed: bool) {
+    if failed {
+        return "failed"
+    }
+    return "ran"
+}
+
+func bool is_newer(latest: &str, current: &str) {
+    mut a = version_nums(latest)
+    mut b = version_nums(current)
+    mut i = 0
+    while i < 3 {
+        if a[i] != b[i] {
+            return a[i] > b[i]
+        }
+        i = i + 1
+    }
+    return false
+}
+
+func Vec<i64> version_nums(v: &str) {
+    mut clean = v.trim_start_matches('v')
+    mut out = vec![0, 0, 0]
+    mut i = 0
+    mut part = String::new()
+    for ch in clean.chars() {
+        if ch.is_ascii_digit() {
+            part.push(ch)
+        } else {
+            if i < 3 && !part.is_empty() {
+                out[i] = part.parse::<i64>().unwrap_or(0)
+                i = i + 1
+            }
+            if ch != '.' {
+                break
+            }
+            part = String::new()
+        }
+    }
+    if i < 3 && !part.is_empty() {
+        out[i] = part.parse::<i64>().unwrap_or(0)
+    }
+    return out
+}
+
+func String json_string(text: &str, field: &str) {
+    mut needle = format!("\"{}\"", field)
+    mut at = text.find(&needle)
+    if at.is_none() {
+        return String::new()
+    }
+    mut rest = &text[at.unwrap() + needle.len()..]
+    mut colon = rest.find(':')
+    if colon.is_none() {
+        return String::new()
+    }
+    mut after = rest[colon.unwrap() + 1..].trim_start()
+    if !after.starts_with('"') {
+        return String::new()
+    }
+    mut body = &after[1..]
+    mut end = body.find('"')
+    if end.is_none() {
+        return String::new()
+    }
+    return body[..end.unwrap()].to_string()
+}
+
+func String pick_asset(text: &str, os_key: &str) {
+    mut needle = "\"browser_download_url\""
+    mut from = 0
+    while from < text.len() {
+        mut slice = &text[from..]
+        mut rel = slice.find(needle)
+        if rel.is_none() {
+            break
+        }
+        mut url = json_string(&text[from + rel.unwrap()..], "browser_download_url")
+        if url.contains(os_key) {
+            return url
+        }
+        if os_key == "apple" && url.contains("darwin") {
+            return url
+        }
+        from = from + rel.unwrap() + needle.len()
+    }
+    return String::new()
+}
+
+// "current|latest|yes|asset" or "current|latest|no|asset"
+func String describe_update(release_json: &str, current: &str, os_key: &str) {
+    mut latest = json_string(release_json, "tag_name")
+    mut asset = pick_asset(release_json, os_key)
+    mut available = "no"
+    if is_newer(&latest, current) {
+        available = "yes"
+    }
+    return format!("{}|{}|{}|{}", current, latest, available, asset)
+}
+
+func String update_checking() {
+    return "Checking GitHub for a newer build…"
+}
+
+func String update_applied(latest: &str) {
+    return format!("Updated to {} — restart Astra.", latest)
+}
+
+func String update_failed(err: &str) {
+    return format!("Update failed: {}", err)
+}
+
+func String update_current(latest: &str) {
+    return format!("Already up to date ({}).", latest)
+}
+
+func String update_blurb() {
+    return "Astra checks GitHub releases for a newer nightly build."
+}

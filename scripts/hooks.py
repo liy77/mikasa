@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def main():
-    banner("Copper", "Git Hooks Setup")
+    banner("Mikasa", "Git Hooks Setup")
 
     if not shutil.which("git"):
         fail("git not found on PATH.")

@@ -6,11 +6,11 @@
 
 **Architecture:** The control-flow expression is transpiled to a Rust expression (`Expr → String`) and emitted *inside* the view function, so an `if`/`for`/`match` re-evaluates every time the view fn re-runs. Reactivity comes from a whole-view rebuild: structural signals flip a shared `dirty: Rc<Cell<bool>>`; an `App::on_tick` closure polls it each frame, snapshots signal values into a `Seed`, re-runs the view fn seeded with those values, and swaps the tree via `UIApp_SetChildren`. This mirrors the proven `mocida-rs/mui-runtime` model.
 
-**Tech Stack:** Rust; crates `mui-codegen`, `mui-syntax`, `copper-syntax`; runtime `mocida-rs` (`mocida` crate). No new external dependencies.
+**Tech Stack:** Rust; crates `mui-codegen`, `mui-syntax`, `mikasa-syntax`; runtime `mocida-rs` (`mocida` crate). No new external dependencies.
 
 ## Global Constraints
 
-- No new external crate dependencies. Reuse `copper_syntax::expr::parse_expr` and existing `mocida` APIs (`App::on_tick`, `App::as_ptr`, `App::set_children` / `sys::UIApp_SetChildren`).
+- No new external crate dependencies. Reuse `mikasa_syntax::expr::parse_expr` and existing `mocida` APIs (`App::on_tick`, `App::as_ptr`, `App::set_children` / `sys::UIApp_SetChildren`).
 - Signal kinds are limited to `Int` (`Signal<i32>`), `Str` (`Signal<String>`), and `List` (`Rc<RefCell<Vec<String>>>`). No arbitrary `Signal<Struct>`.
 - `match` patterns: literals and `_` wildcard only. No binds/destructuring.
 - Unsupported operators/expressions in a control-flow expression must produce a **clear codegen-time error** (a `Result` error or a generated `compile_error!`), never a silent wrong render.
@@ -36,7 +36,7 @@
 - Test: `crates/mui-syntax/src/lib.rs` (inline `#[cfg(test)]`) or `crates/mui-syntax/tests/`
 
 **Interfaces:**
-- Consumes: existing `Parser` helpers (`eat`, `peek_val`, `bump`, `parse_block`, `expect_ident`, `span_of`), `copper_syntax::expr::parse_expr`.
+- Consumes: existing `Parser` helpers (`eat`, `peek_val`, `bump`, `parse_block`, `expect_ident`, `span_of`), `mikasa_syntax::expr::parse_expr`.
 - Produces: `Node::Match { scrutinee: Expr, arms: Vec<MatchArm>, span }` where `MatchArm { pattern: String, body: Vec<Node>, span }` is filled with the real scrutinee expr and one entry per `pattern => body` arm.
 
 - [ ] **Step 1: Write the failing test**
@@ -75,7 +75,7 @@ Expected: FAIL — `arms.len()` is 0 (current stub returns `arms: Vec::new()`).
 
 - [ ] **Step 3: Rewrite `parse_match_node`**
 
-Replace the body-skipping stub. Capture the scrutinee tokens up to `{` (like `parse_if_node` captures `cond_raw`), parse it via `copper_syntax::expr::parse_expr`, then parse arms until the closing `}`:
+Replace the body-skipping stub. Capture the scrutinee tokens up to `{` (like `parse_if_node` captures `cond_raw`), parse it via `mikasa_syntax::expr::parse_expr`, then parse arms until the closing `}`:
 
 ```rust
 fn parse_match_node(&mut self) -> Option<Node> {
@@ -89,7 +89,7 @@ fn parse_match_node(&mut self) -> Option<Node> {
         if !tok.trim().is_empty() { scrut_parts.push(tok); }
     }
     let scrut_raw = scrut_parts.join(" ");
-    let scrutinee = copper_syntax::expr::parse_expr(&scrut_raw).0.unwrap_or_else(raw_expr);
+    let scrutinee = mikasa_syntax::expr::parse_expr(&scrut_raw).0.unwrap_or_else(raw_expr);
     let mut arms: Vec<MatchArm> = Vec::new();
     if self.eat("{") {
         while let Some(v) = self.peek_val() {
@@ -150,7 +150,7 @@ git commit -m "feat(mui-syntax): parse match arms (pattern => body) instead of s
 - Test: inline `#[cfg(test)]` in `eval.rs`
 
 **Interfaces:**
-- Consumes: `copper_syntax::expr::{Expr, ExprKind, Literal, BinOp, UnOp}`; a `SigKind` lookup `Fn(&str) -> Option<SigKind>` (defined in Task 3 but stub a local copy here — see note).
+- Consumes: `mikasa_syntax::expr::{Expr, ExprKind, Literal, BinOp, UnOp}`; a `SigKind` lookup `Fn(&str) -> Option<SigKind>` (defined in Task 3 but stub a local copy here — see note).
 - Produces:
   - `pub fn expr_to_rust(expr: &Expr, sig: &dyn Fn(&str) -> Option<SigKind>, env: &dyn Fn(&str) -> Option<String>) -> Result<String, String>` — returns a Rust expression string evaluating the Copper expr at runtime; `Err` describes the first unsupported construct.
   - `pub fn collect_reads(expr: &Expr, out: &mut Vec<String>)` — appends every bare `Ident` name referenced (so the lowering can subscribe those that are signals).
@@ -164,7 +164,7 @@ git commit -m "feat(mui-syntax): parse match arms (pattern => body) instead of s
 #[cfg(test)]
 mod tests {
     use super::*;
-    use copper_syntax::expr::parse_expr;
+    use mikasa_syntax::expr::parse_expr;
 
     fn sig(name: &str) -> Option<SigKind> {
         match name { "count" => Some(SigKind::Int), "status" => Some(SigKind::Str),
@@ -222,7 +222,7 @@ Expected: FAIL — `eval` module/functions don't exist.
 //! live signal values each rebuild. Reactivity is whole-view rebuild, not
 //! const-folding — nothing here is evaluated at codegen time.
 
-use copper_syntax::expr::{BinOp, Expr, ExprKind, Literal, UnOp};
+use mikasa_syntax::expr::{BinOp, Expr, ExprKind, Literal, UnOp};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SigKind { Int, Str, List }
@@ -668,7 +668,7 @@ Expected: FAIL — placeholder still emitted.
 
 ```rust
 Node::If { cond_raw, then, els, .. } => {
-    let parsed = copper_syntax::expr::parse_expr(cond_raw).0;
+    let parsed = mikasa_syntax::expr::parse_expr(cond_raw).0;
     let sig_lookup = |n: &str| sigs.kind(n);
     let env_lookup = |n: &str| env.get(n).map(|s| s.to_string());
     match parsed.as_ref().map(|c| crate::eval::expr_to_rust(c, &sig_lookup, &env_lookup)) {
