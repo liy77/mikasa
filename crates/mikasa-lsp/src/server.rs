@@ -58,6 +58,18 @@ impl Backend {
         // module isn't std/cstd, a sibling file, or a declared dependency.
         let dir = imports::dir_of_uri(uri);
         for imp in imports::parse_imports(&doc.text.to_string()) {
+            // A deprecated module still resolves, so say so without calling it
+            // an error. `cstd` is the one today; `mika` is the name.
+            if let Some(warning) = mikasa_syntax::ext::stdlib_deprecation(&imp.module) {
+                diagnostics.push(Diagnostic {
+                    range: doc.span_to_range(imp.module_span),
+                    severity: Some(DiagnosticSeverity::WARNING),
+                    source: Some("mikasa".to_string()),
+                    message: warning,
+                    tags: Some(vec![DiagnosticTag::DEPRECATED]),
+                    ..Default::default()
+                });
+            }
             if !imports::resolve(&imp.module, dir.as_deref()).is_found() {
                 diagnostics.push(Diagnostic {
                     range: doc.span_to_range(imp.module_span),
@@ -302,10 +314,14 @@ impl LanguageServer for Backend {
             for imp in imports::parse_imports(&doc.text.to_string()) {
                 if imp.module == word {
                     let res = imports::resolve(&imp.module, dir.as_deref());
+                    let mut value = res.describe(&imp.module);
+                    if let Some(warning) = mikasa_syntax::ext::stdlib_deprecation(&imp.module) {
+                        value = format!("**Deprecated.** {warning}\n\n{value}");
+                    }
                     return Ok(Some(Hover {
                         contents: HoverContents::Markup(MarkupContent {
                             kind: MarkupKind::Markdown,
-                            value: res.describe(&imp.module),
+                            value,
                         }),
                         range: Some(doc.span_to_range(imp.module_span)),
                     }));
@@ -520,6 +536,8 @@ impl LanguageServer for Backend {
                 label: e.name.clone(),
                 kind: Some(CompletionItemKind::KEYWORD),
                 detail: Some(e.doc.clone()),
+                tags: mikasa_syntax::ext::stdlib_deprecation(&e.name)
+                    .map(|_| vec![CompletionItemTag::DEPRECATED]),
                 ..Default::default()
             })
             .collect();
