@@ -39,7 +39,7 @@ crates/
   mui-codegen/      MUI → Rust codegen (M5)
   mui-lsp/          MUI language server
 src/                cforge entrypoint + re-exports from crates (historical; real code is in crates/)
-alloy-gui/          Dual-mode alloy GUI host (MUI; own workspace; links mocida)
+astra-gui/          Dual-mode alloy GUI host (MUI; own workspace; links mocida)
 std/cstd.crs        Mikasa stdlib — single source for both cforge and alloy
 docs/superpowers/specs/   Design specs (alloy-vm, bytecode, gui, check-miri, wasm-interop, mui-codegen)
 docs/TODO.md        Backlog with priorities
@@ -127,7 +127,7 @@ v1 = `Vec<Item>` (AST). v2 = `Vec<Item>` + `Vec<WasmModule { names, bytes }>` (w
 
 ### Astra GUI host (mocida)
 
-Build `alloy-gui/` against sibling `mocida-rs` at `/Volumes/MCUDevDisk/mocida/mocida-rs`.
+Build `astra-gui/` against sibling `mocida-rs` at `/Volumes/MCUDevDisk/mocida/mocida-rs`.
 Required env vars: `MOCIDA_INCLUDE_DIR`, `MOCIDA_LIB_DIR`, `MOCIDA_LIB_NAME=mocida`, `MOCIDA_STATIC=0`, `SDL3_INCLUDE_DIR`. Runtime: `DYLD_FALLBACK_LIBRARY_PATH=<mocida>/mocida/build`.
 
 **mui-runtime quirks (any `.mui` host must handle these):**
@@ -137,7 +137,7 @@ Required env vars: `MOCIDA_INCLUDE_DIR`, `MOCIDA_LIB_DIR`, `MOCIDA_LIB_NAME=moci
 - **`Image(source:"mocida://name")`** needs an absolute path registered via `mocida::bundle::set(...)` — relative resolution depends on CWD.
 - **Stack `align:` = cross-axis; `justify:` = main-axis.** `align: stretch` is NOT valid. To left-pin in a stretched column: explicit `width:` + `justify: start`.
 - **Resize is host-driven** — poll `UIApp_GetWidthG/HeightG` each tick; rebuild when size changes. Same for `take_dirty()` → `UIApp_SetChildren`.
-- **Hot-reload** reads `.mui` from disk each tick (mtime check). `backend.rs` is compiled in and cannot hot-reload.
+- **Hot-reload** reads `.mui` from disk each tick (mtime check). `backend.mika` is compiled in and cannot hot-reload.
 - **No native file picker** — use `rfd` crate for OS file dialog.
 
 ## Adding a new feature

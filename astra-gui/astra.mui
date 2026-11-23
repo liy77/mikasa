@@ -1,5 +1,6 @@
-// Astra — declarative GUI (MUI). Rendered by the native host `alloy-gui`
-// (src/main.rs), which links backend.rs and drives the signals below.
+// Astra — declarative GUI, written entirely in Mikasa. Rendered by the native
+// host in `astra-gui` (src/main.rs), which links `backend.mika` and drives the
+// signals below.
 //
 // Dark chrome with the dove's red (#e23b3b) as the single accent. Built on
 // the newer mocida chrome: NavBar for the top bar, SegmentedControl for the
@@ -14,8 +15,6 @@
 //   update_trigger (int)  host observes → checks/applies update
 //   update_status  (str)  result of the update
 
-import { run_source, read_file, check_update, apply_update, current_version } from "./backend.rs"
-
 App() {
   name: "Astra"
   width: 1080
@@ -24,7 +23,7 @@ App() {
   minHeight: 520
   background: #0c0c0f
   mainContent: AstraApp
-  host: "alloy-gui"
+  host: "astra-gui"
 }
 
 view AstraApp() {
@@ -52,7 +51,7 @@ view AstraApp() {
       Stack(orientation: horizontal, align: center, justify: spaceBetween,
         paddingLeft: 16, paddingRight: 16, width: Window.width, height: 60) {
         Stack(orientation: horizontal, align: center, gap: 12, height: 44) {
-          Image("mocida://icon", width: 40, height: 40, fillMode: fit,
+          Image("icon.png", width: 40, height: 40, fillMode: fit,
             antialiasing: true)
           Stack(orientation: vertical, gap: 1, align: left, justify: center) {
             Text("Astra", size: 18, color: #f4f4f5, weight: bold)
@@ -60,9 +59,9 @@ view AstraApp() {
           }
         }
         Stack(orientation: horizontal, align: center, gap: 6) {
-          NavButton("Playground", nav == 0, 0, nav)
-          NavButton("Runner", nav == 1, 1, nav)
-          NavButton("Updates", nav == 2, 2, nav)
+          NavButton("Playground", nav == 0, 0, nav, "code.png")
+          NavButton("Runner", nav == 1, 1, nav, "terminal.png")
+          NavButton("Updates", nav == 2, 2, nav, "update.png")
         }
       }
     }
@@ -94,13 +93,17 @@ view Playground(mode, source, output, run_trigger, wrap_output, status) {
       }
       Stack(orientation: horizontal, align: center, gap: 12) {
         Stack(orientation: horizontal, align: center, gap: 4) {
-          NavButton("Split", mode == 0, 0, mode)
-          NavButton("Editor", mode == 1, 1, mode)
-          NavButton("Output", mode == 2, 2, mode)
+          NavButton("Split", mode == 0, 0, mode, "split.png")
+          NavButton("Editor", mode == 1, 1, mode, "code.png")
+          NavButton("Output", mode == 2, 2, mode, "terminal.png")
         }
-        Button("Run", size: 14, width: 96, height: 34, radius: 9,
-          background: #e23b3b, textColor: #ffffff, cursor: pointer,
-          onClick: { status = "running…"; run_trigger = run_trigger + 1 })
+        Stack(orientation: horizontal, align: center, gap: 7, height: 34,
+          background: #e23b3b, radius: 9, paddingLeft: 14, paddingRight: 16,
+          cursor: pointer,
+          onClick: { status = "running…"; run_trigger = run_trigger + 1 }) {
+          Image("play.png", width: 15, height: 15, fillMode: fit)
+          Text("Run", size: 14, color: #ffffff, weight: bold)
+        }
       }
     }
 
@@ -127,15 +130,25 @@ view Playground(mode, source, output, run_trigger, wrap_output, status) {
 // One pill of the navigation. `on` is the active state, `index` the value it
 // writes into `target`. Buttons, not SegmentedControl: mocida double-frees
 // that widget when the tree rebuilds on resize.
-view NavButton(label, on, index, target) {
+// A nav pill with its icon. The icon sits beside the label because mocida's
+// Button paints text only; the glyph comes from the platform set (Material
+// Symbols on Windows and Linux, the same outlined weight on macOS, where
+// SF Symbols are not loadable from outside an Apple-signed bundle).
+view NavButton(label, on, index, target, icon) {
   if on {
-    Button(label, size: 13, height: 32, radius: 8, padding: 12,
-      background: #e23b3b, textColor: #ffffff, cursor: pointer,
-      onClick: { target = index })
+    Stack(orientation: horizontal, align: center, gap: 6, height: 32,
+      background: #e23b3b, radius: 8, paddingLeft: 10, paddingRight: 12,
+      cursor: pointer, onClick: { target = index }) {
+      Image(icon, width: 15, height: 15, fillMode: fit)
+      Text(label, size: 13, color: #ffffff)
+    }
   } else {
-    Button(label, size: 13, height: 32, radius: 8, padding: 12,
-      background: #1a1a1f, textColor: #8d8d95, cursor: pointer,
-      onClick: { target = index })
+    Stack(orientation: horizontal, align: center, gap: 6, height: 32,
+      background: #1a1a1f, radius: 8, paddingLeft: 10, paddingRight: 12,
+      cursor: pointer, onClick: { target = index }) {
+      Image(icon, width: 15, height: 15, fillMode: fit)
+      Text(label, size: 13, color: #8d8d95)
+    }
   }
 }
 
@@ -150,8 +163,8 @@ view EditorPane(source, w, h) {
       placeholder: "func main() {\n    println(\"hello from Astra\")\n}",
       width: w,
       height: h - 26,
-      background: #141418,
-      textColor: #f4f4f5,
+      background: #10141c,
+      textColor: #d6e2f0,
       borderColor: #2a2a32,
       borderWidth: 1,
       radius: 12,
@@ -172,9 +185,9 @@ view OutputPane(output, wrap_output, w, h) {
         knobColor: #ffffff, labelColor: #8d8d95, labelSize: 11,
         onChange: { |v| wrap_output = v })
     }
-    Rectangle(width: w, height: h - 32, background: #141418, radius: 12,
-      borderColor: #2a2a32, borderWidth: 1) {
-      Text(output, size: 13, color: #d6d6dc, align: left, vAlign: top, padding: 16,
+    Rectangle(width: w, height: h - 32, background: #0c1210, radius: 12,
+      borderColor: #1e3a2e, borderWidth: 1) {
+      Text(output, size: 13, color: #b6e3c4, align: left, vAlign: top, padding: 16,
         wrap: wrap_output)
     }
   }
@@ -210,13 +223,20 @@ view Runner(path_field, output, run_trigger, open_trigger, wrap_output, status) 
           onChange: { |v| path_field = v },
         )
         Stack(orientation: horizontal, gap: 10, align: center) {
-          Button("Choose file", size: 13, width: 130, height: 36, radius: 9,
-            background: #1e1e24, textColor: #d6d6dc, borderColor: #2e2e36,
-            borderWidth: 1, cursor: pointer,
-            onClick: { open_trigger = open_trigger + 1 })
-          Button("Run file", size: 13, width: 110, height: 36, radius: 9,
-            background: #e23b3b, textColor: #ffffff, cursor: pointer,
-            onClick: { status = "running…"; run_trigger = run_trigger + 1 })
+          Stack(orientation: horizontal, align: center, gap: 7, height: 36,
+            background: #1e1e24, radius: 9, paddingLeft: 12, paddingRight: 14,
+            borderColor: #2e2e36, borderWidth: 1, cursor: pointer,
+            onClick: { open_trigger = open_trigger + 1 }) {
+            Image("folder.png", width: 15, height: 15, fillMode: fit)
+            Text("Choose file", size: 13, color: #d6d6dc)
+          }
+          Stack(orientation: horizontal, align: center, gap: 7, height: 36,
+            background: #e23b3b, radius: 9, paddingLeft: 12, paddingRight: 14,
+            cursor: pointer,
+            onClick: { status = "running…"; run_trigger = run_trigger + 1 }) {
+            Image("play.png", width: 15, height: 15, fillMode: fit)
+            Text("Run file", size: 13, color: #ffffff, weight: bold)
+          }
         }
       }
     }
@@ -232,7 +252,7 @@ view Updates(version, update_status, update_trigger) {
     Glass(effect: liquid, radius: 20, padding: 28, tint: #16161b, tintOpacity: 0.94,
       width: 440) {
       Stack(orientation: vertical, align: center, gap: 14, width: 384) {
-        Image("mocida://astra-logo.png", width: 120, height: 120, fillMode: fit,
+        Image("icon.png", width: 120, height: 120, fillMode: fit,
           antialiasing: true)
         Text("Astra", size: 26, color: #f4f4f5, weight: bold)
         Text("Mikasa interpreter", size: 13, color: #8d8d95)
@@ -241,12 +261,15 @@ view Updates(version, update_status, update_trigger) {
 
         Text("installed  $version", size: 13, color: #c4c4cc)
 
-        Button("Check for updates", size: 14, width: 200, height: 40, radius: 10,
-          background: #e23b3b, textColor: #ffffff, cursor: pointer,
+        Stack(orientation: horizontal, align: center, justify: center, gap: 8,
+          width: 210, height: 40, background: #e23b3b, radius: 10, cursor: pointer,
           onClick: {
             update_status = "Checking for updates…"
             update_trigger = update_trigger + 1
-          })
+          }) {
+          Image("update.png", width: 16, height: 16, fillMode: fit)
+          Text("Check for updates", size: 14, color: #ffffff, weight: bold)
+        }
 
         if update_status == "" {
           Text("Astra checks GitHub for a newer nightly.", size: 12, color: #5c5c66,

@@ -9,7 +9,7 @@ println!("body   = {} bytes", r.body.len())
 println!("ok     = {}", r.is_ok())
 
 // POST a JSON payload; `.json()` returns a serde_json::Value to navigate.
-reply = post_json("https://httpbin.org/post", "{\"hello\":\"copper\"}")
+reply = post_json("https://httpbin.org/post", "{\"hello\":\"mikasa\"}")
 println!("post status = {}", reply.status)
 body = reply.json()
 println!("post echo   = {}", body["json"]["hello"])

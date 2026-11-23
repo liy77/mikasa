@@ -9,13 +9,13 @@
 //!
 //! The GUI half links mocida + mui-runtime; the CLI half does not touch them,
 //! so the same binary serves both. Build with:
-//!   cargo build --release --manifest-path alloy-gui/Cargo.toml
+//!   cargo build --release --manifest-path astra-gui/Cargo.toml
 //! (needs MOCIDA_INCLUDE_DIR / MOCIDA_LIB_DIR — see mocida-sys).
 
-// The backend is plain Rust sharing this crate's deps; pull it in directly
-// (the `import { ... } from "./backend.rs"` in alloy.mui is for the parser/host
-// wiring — here we call its functions ourselves).
-#[path = "../backend.rs"]
+// The GUI itself is Mikasa (`astra.mui`). This host is the one piece that has
+// to be Rust: it links mocida and drives the window. The logic it calls lives
+// in `backend.mika`, which the build script lowers to Rust before linking.
+#[path = "../backend.mika"]
 mod backend;
 
 use std::path::Path;
@@ -98,13 +98,46 @@ fn cli_run(file: &Path) -> ExitCode {
 // ===========================================================================
 
 /// The `.mui` baked into the binary (used in release / when the source file
-/// isn't on disk). In dev, the on-disk `alloy.mui` is preferred and watched for
+/// isn't on disk). In dev, the on-disk `astra.mui` is preferred and watched for
 /// changes so edits hot-reload live.
-const MUI_BAKED: &str = include_str!("../alloy.mui");
+const MUI_BAKED: &str = include_str!("../astra.mui");
 
-/// On-disk path of `alloy.mui` (next to the crate), for dev hot-reload.
+/// On-disk path of `astra.mui` (next to the crate), for dev hot-reload.
 fn mui_path() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("alloy.mui")
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("astra.mui")
+}
+
+/// Register the marks and button glyphs under absolute paths, so they resolve
+/// no matter which directory the binary was launched from.
+fn register_assets(manifest_dir: &std::path::Path) {
+    let _ = manifest_dir; // kept so the signature reads as the source of paths
+    let star = manifest_dir
+        .parent()
+        .map(|p| p.join("assets").join("astra-logo.png"))
+        .filter(|p| p.is_file());
+    if let Some(star) = star {
+        mocida::bundle::set("mocida://astra-logo.png", &star.to_string_lossy());
+    }
+    let mac_icon = manifest_dir.join("assets").join("astra-icon-mac.png");
+    if mac_icon.is_file() {
+        mocida::bundle::set("mocida://icon", &mac_icon.to_string_lossy());
+    }
+    let win_icon = manifest_dir.join("assets").join("astra-icon-win.png");
+    if win_icon.is_file() {
+        mocida::bundle::set("mocida://astra-icon-win.png", &win_icon.to_string_lossy());
+    }
+    for name in ["play", "code", "terminal", "update", "folder", "split"] {
+        let path = manifest_dir
+            .join("assets")
+            .join("icons")
+            .join(format!("{name}.png"));
+        if path.is_file() {
+            mocida::bundle::set(
+                &format!("mocida://icons/{name}.png"),
+                &path.to_string_lossy(),
+            );
+        }
+    }
 }
 
 /// Current `.mui` source: the on-disk file if present, else the baked copy.
@@ -123,6 +156,10 @@ fn run_gui() -> ExitCode {
 }
 
 fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
+    // Before anything else. The first failed lookup of a `mocida://` key
+    // caches that failure inside mocida, and App::new looks the icon up while
+    // it loads app.bundle — so the registration has to win that race.
+    register_assets(Path::new(env!("CARGO_MANIFEST_DIR")));
     use std::cell::RefCell;
     use std::collections::HashMap;
     use std::rc::Rc;
@@ -134,13 +171,23 @@ fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
     //    disk when available (dev hot-reload), else the baked copy.
     let mui_src = read_mui_source();
     let doc = mui_syntax::parse(&mui_src);
-    let view = mui_runtime::entry_view(&doc).ok_or("no view found in alloy.mui")?;
+    let view = mui_runtime::entry_view(&doc).ok_or("no view found in astra.mui")?;
     let view_name = view.name.clone();
     let cfg = mui_runtime::window_config(&doc, &view_name);
 
     // 2. Pre-creation flags (must precede App::new).
     mui_runtime::prefer_custom_titlebar(&cfg);
     mui_runtime::prefer_renderer(&cfg);
+
+    // Register every asset the window touches BEFORE it exists. The manifest
+    // is loaded here too, then overridden with absolute paths — its own
+    // entries are relative and only resolve from the crate directory.
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let bundle = manifest_dir.join("app.bundle");
+    if bundle.is_file() {
+        mocida::bundle::load_manifest(&bundle.to_string_lossy());
+    }
+    register_assets(manifest_dir);
 
     // Assets have to be registered before the window exists: the first frame
     // loads the logo, and a registration made afterwards never reaches it.
@@ -155,6 +202,23 @@ fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
     let win_icon = manifest_dir.join("assets").join("astra-icon-win.png");
     if win_icon.is_file() {
         mocida::bundle::set("mocida://astra-icon-win.png", &win_icon.to_string_lossy());
+    }
+    // The squircle mark, registered under the name the bundle manifest and the
+    // header both use. Done here so it resolves before the window opens.
+    let mac_icon = manifest_dir.join("assets").join("astra-icon-mac.png");
+    if mac_icon.is_file() {
+        mocida::bundle::set("mocida://icon", &mac_icon.to_string_lossy());
+    }
+    // Glyphs for the buttons. Material Symbols on every platform — SF Symbols
+    // only load inside an Apple-signed bundle.
+    for name in ["play", "code", "terminal", "update", "folder", "split"] {
+        let path = manifest_dir.join("assets").join("icons").join(format!("{name}.png"));
+        if path.is_file() {
+            mocida::bundle::set(
+                &format!("mocida://icons/{name}.png"),
+                &path.to_string_lossy(),
+            );
+        }
     }
 
     // 3. Load app.bundle (name, id) and register the icon with an ABSOLUTE
@@ -179,14 +243,15 @@ fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(star) = star {
         mocida::bundle::set("mocida://astra-logo.png", &star.to_string_lossy());
     }
-    let bundle = manifest_dir.join("app.bundle");
-    if bundle.is_file() {
-        mocida::bundle::load_manifest(&bundle.to_string_lossy());
-    }
+    // The manifest was already loaded (and its relative entries overridden
+    // with absolute paths) before the window flags, so nothing here reloads it.
 
     // 4. Create the window.
     let (br, bg, bb, _) = cfg.background;
     let mut app = App::new(&cfg.title, cfg.width, cfg.height)?;
+    // App::new reloads app.bundle from the CWD and wipes every registration
+    // made before it, so the absolute paths go in again now.
+    register_assets(manifest_dir);
     app.set_background_color(Color::rgb(br as i32, bg as i32, bb as i32));
     if let Some(name) = &cfg.name {
         mocida::bundle::set_name(name);
@@ -222,7 +287,7 @@ fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
     // 7. Build the initial tree, seed signals. `source_cell` holds the live
     //    `.mui` text so the on-tick hot-reload can swap it without a restart.
     let source_cell = Rc::new(RefCell::new(mui_src.clone()));
-    let loaded = mui_syntax::loader::load_from(&mui_src, Path::new("alloy.mui"));
+    let loaded = mui_syntax::loader::load_from(&mui_src, Path::new("astra.mui"));
     let components = loaded.registry();
     let (children, reactive) =
         mui_runtime::build_view_seeded(view, &components, &HashMap::new())?;
@@ -238,6 +303,10 @@ fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
     app.set_children(children);
 
     // 8. On-tick: handle Run/Open/Update requests + rebuild on resize / structural change.
+    // App::new reloads app.bundle a second time (from the exe dir) after every
+    // registration made before it, so the assets go in once more on the first
+    // tick — past both reloads — and the tree rebuilds so the images resolve.
+    let assets_registered = Rc::new(std::cell::Cell::new(false));
     let app_ptr = app.as_ptr();
     let tick_slot = Rc::clone(&slot);
     // Remember the last-seen trigger counters so we only act on a change.
@@ -264,7 +333,7 @@ fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
                 .map(|r| r.values())
                 .unwrap_or_default();
             let src = source_cell.borrow().clone();
-            let loaded = mui_syntax::loader::load_from(&src, Path::new("alloy.mui"));
+            let loaded = mui_syntax::loader::load_from(&src, Path::new("astra.mui"));
             let comps = loaded.registry();
             if let Some(v) = mui_runtime::entry_view(&loaded.entry) {
                 if let Ok((c, r)) = mui_runtime::build_view_seeded(v, &comps, &seed) {
@@ -278,8 +347,14 @@ fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
+    let assets_flag = Rc::clone(&assets_registered);
     app.on_tick(move || {
-        // (-1) Hot-reload: if alloy.mui changed on disk, reload + rebuild live.
+        if !assets_flag.get() {
+            assets_flag.set(true);
+            register_assets(Path::new(env!("CARGO_MANIFEST_DIR")));
+            rebuild();
+        }
+        // (-1) Hot-reload: if astra.mui changed on disk, reload + rebuild live.
         let cur_m = std::fs::metadata(mui_path())
             .ok()
             .and_then(|md| md.modified().ok());

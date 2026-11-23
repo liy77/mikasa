@@ -45,15 +45,15 @@ Restart your terminal after installation so the new `PATH` is picked up.
 
 ```sh
 # Compile and run
-cforge run main.crs
+mikasa run main.crs
 
 # Run the default file (main.crs in cwd)
 cforge run
 
 # Compile only
-cforge -c -i main.crs
+mikasa build main.crs
 
-# Compile every .crs in a directory
+# Compile every .mika in a directory
 cforge -c -i src/
 
 # Show help
@@ -87,12 +87,12 @@ forward to the matching `.py`.
 The repo ships sample programs in [`examples/`](../examples):
 
 ```sh
-cforge run examples/copper/loops.crs
-cforge run examples/copper/interpolation.crs
-cforge run examples/copper/collections.crs
-cforge run examples/copper/matching.crs
-cforge run examples/copper/optional.crs
-cforge run examples/copper/ternary.crs
+cforge run examples/copper/loops.mika
+cforge run examples/copper/interpolation.mika
+cforge run examples/copper/collections.mika
+cforge run examples/copper/matching.mika
+cforge run examples/copper/optional.mika
+cforge run examples/copper/ternary.mika
 ```
 
 ## Uninstall

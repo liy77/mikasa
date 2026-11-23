@@ -16,7 +16,7 @@
 ## What it is
 
 **Astra** is the [Mikasa](../../README.md) interpreter: a separate binary
-(`alloy`) that **executes `.crs` directly**, without transpiling to Rust or
+(`alloy`) that **executes `.mika` directly**, without transpiling to Rust or
 invoking `cargo`. It walks the same AST that the production transpiler (`cforge`)
 uses — so what runs in Astra is the same Mikasa that compiles natively.
 
@@ -24,19 +24,19 @@ Two targets, one language:
 
 | Tool | Path | Purpose |
 | --- | --- | --- |
-| `cforge` | `.crs` → Rust → `cargo build` | native release build |
-| **`alloy`** | `.crs` → AST → interpretation | fast iteration, scripting, REPL |
+| `cforge` | `.mika` → Rust → `cargo build` | native release build |
+| **`alloy`** | `.mika` → AST → interpretation | fast iteration, scripting, REPL |
 
-Rust compatibility is the central invariant: **the same `.crs` produces the
+Rust compatibility is the central invariant: **the same `.mika` produces the
 same behaviour** on both paths.
 
 ## Usage
 
 ```sh
-alloy run program.crs
+alloy run program.mika
 ```
 
-Example (`examples/copper/alloy-hello.crs`):
+Example (`examples/copper/alloy-hello.mika`):
 
 ```rust
 func int sum_to(n: int) {
@@ -55,14 +55,14 @@ func main() {
 ```
 
 ```sh
-$ alloy run examples/copper/alloy-hello.crs
+$ alloy run examples/copper/alloy-hello.mika
 Astra VM
 sum 1..5 = 10
 ```
 
 ## Supported today
 
-All 19 `examples/copper/*.crs` run under `alloy run`.
+All 19 `examples/copper/*.mika` run under `alloy run`.
 
 - Scalar literals (`int`, `float`, `bool`, `str`) and `"${expr}"` interpolation;
   `println!`/`print!` with `{}`/`{:?}` format args.
@@ -81,7 +81,7 @@ All 19 `examples/copper/*.crs` run under `alloy run`.
   `std::` intrinsics; only `run`/`list_dir`/`append_file`/`rand_int` stay
   native). `fs`, `time`, `url`, `net`, `ws` are pure Rust; `json`, `crypto`,
   `http` use serde_json / sha2 / hmac / ureq.
-- Local `.crs` imports merged (and bundled into `.loy`). **`.rs` imports run via
+- Local `.mika` imports merged (and bundled into `.loy`). **`.rs` imports run via
   embedded WebAssembly** — `rustc` compiles the `.rs` to wasm once (cached under
   `~/.alloy/cache`), `wasmi` runs it, the interpreter calls its exports. Mikasa
   stays interpreted; only the Rust leaves cross into wasm. Prototype: scalar

@@ -41,3 +41,5 @@ example.html
 
 # alloy-gui build artifacts
 alloy-gui/target/
+
+astra-gui/target/

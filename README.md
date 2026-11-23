@@ -72,7 +72,7 @@ servers in one shot.
 ```sh
 mikasa run ./main.mika         # transpile + cargo run
 mikasa build ./src             # compile only, directory input
-mikasa run examples/copper/loops.crs
+mikasa run examples/copper/loops.mika
 ```
 
 `mikasa run` and `mikasa build` warn when the file uses a legacy extension
@@ -146,8 +146,8 @@ Richer types (strings, `Vec`, structs) are the next phase.
 
 ### Astra GUI playground
 
-`alloy-gui/` is a dual-mode `alloy` binary that adds a MUI playground — open
-a `.crs` file, edit it, and see output live. Hot-reload re-evaluates on save;
+`astra-gui/` is a dual-mode `alloy` binary that adds a MUI playground — open
+a `.mika` file, edit it, and see output live. Hot-reload re-evaluates on save;
 resize splits output to the right on wide screens.
 
 ## Language features
@@ -172,7 +172,7 @@ Greeter::new("Brian".to_string()).hello()
 
 The class lowers to a Rust `struct` + `impl`. The constructor (same name
 as the class) becomes `pub fn new(...) -> Self`, and methods declared as
-`void name(self)` become `pub fn name(&self)`. Use `cforge run main.crs`
+`void name(self)` become `pub fn name(&self)`. Use `cforge run main.mika`
 to see it print `Hello, Brian!`.
 
 ### Loops, match, optional chaining, ternary
@@ -242,17 +242,17 @@ copper-lang/
 │   ├── mui-syntax/     # MocidaUI parser (.mui, and .mika files with a view)
 │   ├── mui-codegen/    # MUI → Rust codegen (M5 native path)
 │   └── mui-lsp/        # MUI language server
-├── alloy-gui/          # Astra GUI playground (MUI host, standalone workspace)
+├── astra-gui/          # Astra GUI playground (MUI host, standalone workspace)
 ├── installer-gui/      # Native MUI installer (Windows-first)
 ├── examples/
-│   ├── copper/         # .crs demos (loops, interpolation, matching, cstd, ...)
+│   ├── copper/         # .mika demos (loops, interpolation, matching, cstd, ...)
 │   └── mui/            # MocidaUI demos (hello, counter, keyboard, app, ...)
 ├── scripts/            # Python tooling: install / build / cleanup / diagnose / hooks
 ├── docs/               # INSTALL.md, TODO.md, design specs
 ├── std/                # Mikasa standard library (cstd.crs)
 ├── lson/               # LSON parser binaries (per-OS)
 ├── assets/             # Logos
-├── main.crs            # Default file for `cforge run` with no argument
+├── main.crs            # Default file for `mikasa run` with no argument
 ├── properties.kson     # Project metadata + dependencies
 ├── Cargo.toml          # Workspace root
 └── build.rs            # Stamps the build date into pre-release versions
@@ -262,19 +262,19 @@ copper-lang/
 
 ```sh
 # cforge (transpile → Rust)
-cforge run examples/copper/loops.crs           # loop / while / for / break / continue
-cforge run examples/copper/interpolation.crs   # "Hello $name", "${expr}"
-cforge run examples/copper/collections.crs     # vec literals, closures, ?
-cforge run examples/copper/matching.crs        # match arms, if let, while let
-cforge run examples/copper/optional.crs        # `?.` optional chaining
-cforge run examples/copper/ternary.crs         # `cond ? a : b`
-cforge run examples/copper/cstd.crs            # built-in stdlib (input, sleep, env, ...)
-cforge run examples/copper/unsafe.crs          # `unsafe func` and `unsafe { ... }` blocks
+mikasa run examples/copper/loops.mika           # loop / while / for / break / continue
+mikasa run examples/copper/interpolation.mika   # "Hello $name", "${expr}"
+mikasa run examples/copper/collections.mika     # vec literals, closures, ?
+mikasa run examples/copper/matching.mika        # match arms, if let, while let
+mikasa run examples/copper/optional.mika        # `?.` optional chaining
+mikasa run examples/copper/ternary.mika         # `cond ? a : b`
+mikasa run examples/copper/cstd.mika            # built-in stdlib (input, sleep, env, ...)
+mikasa run examples/copper/unsafe.mika          # `unsafe func` and `unsafe { ... }` blocks
 
 # Astra (interpreter — instant)
-alloy run examples/copper/loops.crs
-alloy run examples/copper/cstd.crs
-alloy build examples/copper/collections.crs -o collections.loy
+alloy run examples/copper/loops.mika
+alloy run examples/copper/cstd.mika
+alloy build examples/copper/collections.mika -o collections.loy
 alloy run collections.loy
 
 # MUI examples (need mui-dev on PATH):
@@ -289,7 +289,7 @@ cforge run examples/mui/app/app.mui
 Full backlog with details: [`docs/TODO.md`](./docs/TODO.md).
 
 **Language (cforge)**
-- [x] Core transpile pipeline (`.crs` → Rust), `cforge run` / `-c`
+- [x] Core transpile pipeline (`.mika` → Rust), `cforge run` / `-c`
 - [x] Variables, functions, classes/structs/impl, imports
 - [x] Loops, `match` (guards/`_`/`|`), `if let` / `while let`
 - [x] Optional chaining `?.`, ternary `?:`, string interpolation `"${expr}"`

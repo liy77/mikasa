@@ -1,4 +1,4 @@
-// `unsafe` blocks and unsafe functions in Copper.
+// `unsafe` blocks and unsafe functions in Mikasa.
 //
 // `unsafe func ...`     -> `unsafe fn ...`
 // `unsafe { ... }`      -> Rust unsafe block, identical semantics

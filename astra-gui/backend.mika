@@ -1,5 +1,5 @@
 //! Backend logic for the Astra GUI — std + the portable `alloy-vm` lib only
-//! (no mocida). Imported by `alloy.mui` (`import { run_source, ... } from
+//! (no mocida). Imported by `astra.mui` (`import { run_source, ... } from
 //! "./backend.rs"`) and called directly by the native host (`src/main.rs`).
 //!
 //! Everything here is platform-agnostic and unit-testable without a window;
