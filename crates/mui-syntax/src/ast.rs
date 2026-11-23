@@ -4,11 +4,11 @@
 //! [`Node`]s — elements (mocida widgets) plus reactive glue (`let signal`,
 //! `effect`) and control flow (`if` / `for` / `match`). Embedded Copper —
 //! prop expressions, handler bodies, `${...}` interpolation — is parsed into
-//! [`copper_syntax::expr`] trees so the same typed AST powers both the dev
+//! [`mikasa_syntax::expr`] trees so the same typed AST powers both the dev
 //! interpreter/JIT and the release codegen.
 
-use copper_syntax::ast::Span;
-use copper_syntax::expr::{Block, Expr};
+use mikasa_syntax::ast::Span;
+use mikasa_syntax::expr::{Block, Expr};
 
 /// A parsed `.mui` / `.crm` document.
 #[derive(Debug, Clone)]
@@ -46,7 +46,7 @@ impl ImportKind {
         match ext.as_str() {
             "rs" => ImportKind::Rust,
             // `.mika` is the recommended source extension; `.crs` still imports.
-            ext if copper_syntax::ext::is_source(ext) => ImportKind::Copper,
+            ext if mikasa_syntax::ext::is_source(ext) => ImportKind::Copper,
             _ => ImportKind::Mui, // .mui, .crm, or unspecified
         }
     }

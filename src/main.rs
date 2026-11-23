@@ -20,14 +20,14 @@
 pub mod cforge;
 pub mod utils;
 
-// Re-export the tokenizer module from copper-syntax so existing paths
+// Re-export the tokenizer module from mikasa-syntax so existing paths
 // (`crate::tokenizer::tokens::Token`, etc.) keep resolving. cforge drives
 // the same tokenizer the parser and LSP consume.
-pub use copper_syntax::tokenizer;
+pub use mikasa_syntax::tokenizer;
 
-// The parser now lives in its own crate (`copper-parser`). Re-export it at
+// The parser now lives in its own crate (`mikasa-parser`). Re-export it at
 // the crate root so `crate::parser::Parser` keeps resolving in cforge.
-pub use copper_parser::parser;
+pub use mikasa_parser::parser;
 
 use clap::{Arg, Command as ClapCommand};
 use std::process::Command as ProcessCommand;
@@ -216,14 +216,14 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
 fn warn_deprecated_extension(file: Option<&String>) {
     let Some(file) = file else { return };
     if let Some(ext) = path::Path::new(file).extension().and_then(|e| e.to_str()) {
-        if let Some(warning) = copper_syntax::ext::deprecation_warning(ext) {
+        if let Some(warning) = mikasa_syntax::ext::deprecation_warning(ext) {
             eprintln!("warning: {warning}");
         }
     }
     // `import { … } from cstd` still resolves, but `mika` is the name now.
     if let Ok(src) = std::fs::read_to_string(file) {
         if src.contains("from cstd") {
-            if let Some(warning) = copper_syntax::ext::stdlib_deprecation("cstd") {
+            if let Some(warning) = mikasa_syntax::ext::stdlib_deprecation("cstd") {
                 eprintln!("warning: {warning}");
             }
         }
@@ -233,7 +233,7 @@ fn warn_deprecated_extension(file: Option<&String>) {
 /// `mikasa vm run/build <file>` — drive the Astra interpreter. Returns the
 /// process exit code.
 fn run_vm(sub: &str, file: &str) -> i32 {
-    use alloy_vm::loader;
+    use astra_vm::loader;
     use std::path::Path;
     let p = Path::new(file);
 
@@ -248,8 +248,8 @@ fn run_vm(sub: &str, file: &str) -> i32 {
         // Compile each imported `.rs` to wasm and embed it in the `.loy`.
         let mut modules = resolved.wasm_modules.clone();
         for imp in &resolved.rs_imports {
-            match alloy_vm::wasm::compile_rs_to_wasm(&imp.rs_path) {
-                Ok(bytes) => modules.push(alloy_vm::bytecode::WasmModule {
+            match astra_vm::wasm::compile_rs_to_wasm(&imp.rs_path) {
+                Ok(bytes) => modules.push(astra_vm::bytecode::WasmModule {
                     names: imp.names.clone(),
                     bytes,
                 }),
@@ -262,8 +262,8 @@ fn run_vm(sub: &str, file: &str) -> i32 {
                 }
             }
         }
-        let out = p.with_extension(copper_syntax::ext::ARTIFACT);
-        let bytes = alloy_vm::bytecode::compile(&resolved.program.items, &modules);
+        let out = p.with_extension(mikasa_syntax::ext::ARTIFACT);
+        let bytes = astra_vm::bytecode::compile(&resolved.program.items, &modules);
         match std::fs::write(&out, bytes) {
             Ok(()) => {
                 if modules.is_empty() {
@@ -292,7 +292,7 @@ fn run_vm(sub: &str, file: &str) -> i32 {
             }
         };
 
-        let mut interp = alloy_vm::interp::Interpreter::new();
+        let mut interp = astra_vm::interp::Interpreter::new();
         // Wasm already embedded in a `.loy` — no rustc needed.
         for m in &resolved.wasm_modules {
             if let Err(e) = interp.register_wasm_bytes(&m.names, &m.bytes) {
@@ -301,7 +301,7 @@ fn run_vm(sub: &str, file: &str) -> i32 {
             }
         }
         for imp in &resolved.rs_imports {
-            let rt = match alloy_vm::wasm::WasmRuntime::from_rs(&imp.rs_path) {
+            let rt = match astra_vm::wasm::WasmRuntime::from_rs(&imp.rs_path) {
                 Ok(rt) => rt,
                 Err(e) => {
                     eprintln!(

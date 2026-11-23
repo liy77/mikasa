@@ -18,7 +18,7 @@
 //! `signal(...)` initial values. Handlers and live reactivity are emitted as
 //! TODOs for now (that's the M3/M4 evaluator work, ported into codegen later).
 
-use copper_syntax::expr::{BinOp, Expr, ExprKind, Literal, StrPart, StrTemplate};
+use mikasa_syntax::expr::{BinOp, Expr, ExprKind, Literal, StrPart, StrTemplate};
 use mui_syntax::ast::{Document, Element, HandlerAction, Node, PropValue, View};
 use mui_syntax::loader::Registry;
 use mui_syntax::style::{self, Anchor, HAnchor, Rgba, ShadowSpec, VAnchor};
@@ -591,7 +591,7 @@ fn emit_node(
             els,
             ..
         } => {
-            let parsed = copper_syntax::expr::parse_expr(cond_raw).0;
+            let parsed = mikasa_syntax::expr::parse_expr(cond_raw).0;
             let sig_lookup = |n: &str| sigs.kind(n);
             let env_lookup = |n: &str| env.get(n).map(|s| s.to_string());
             match parsed

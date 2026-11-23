@@ -2,13 +2,13 @@
 
 **Data:** 2026-06-22
 **Status:** Design aprovado (pré-implementação)
-**Depende de:** [Alloy VM MVP](2026-06-22-alloy-vm-design.md) (concluído)
+**Depende de:** [Alloy VM MVP](2026-06-22-astra-vm-design.md) (concluído)
 
 ## Resumo
 
 Transformar `alloy` num binário **dual-mode** distribuível, construído com
 **MUI** (a UI declarativa do mocida), sem quebrar a portabilidade do crate
-`alloy-vm`:
+`astra-vm`:
 
 - **CLI:** `alloy run arquivo.crs` (e `alloy <arquivo.crs>`) interpreta no
   terminal — comportamento atual, reaproveitado.
@@ -22,23 +22,23 @@ Transformar `alloy` num binário **dual-mode** distribuível, construído com
 O `CLAUDE.md` do copper-lang exige que o caminho portátil **nunca linke
 mocida** (senão quebra CI Linux/macOS). Portanto:
 
-- `crates/alloy-vm` **permanece portátil** (lib + lógica de interpretação, sem
+- `crates/astra-vm` **permanece portátil** (lib + lógica de interpretação, sem
   mocida). Já está pronto.
 - Crate novo **`alloy-gui`** (fora do workspace portátil, como o
   `installer-gui`) linka `mocida` + `mui-runtime` + `mui-syntax` e usa
-  `alloy-vm` como lib. **Este** é o binário `alloy` de release/distribuição.
+  `astra-vm` como lib. **Este** é o binário `alloy` de release/distribuição.
 - O binário `alloy` do `alloy-gui` é o dual-mode: parseia args; com `run`/arquivo
-  → chama a lib `alloy-vm`; sem args → sobe a GUI MUI.
+  → chama a lib `astra-vm`; sem args → sobe a GUI MUI.
 
 Assim entregamos "um binário usável como GUI e CLI" sem sujar o CI. O binário
-`alloy` do crate `alloy-vm` continua existindo para o CI portátil (testes), mas
+`alloy` do crate `astra-vm` continua existindo para o CI portátil (testes), mas
 a distribuição usa o de `alloy-gui`.
 
 ```
-crates/alloy-vm  (lib + CLI portátil, sem mocida)   ← CI
+crates/astra-vm  (lib + CLI portátil, sem mocida)   ← CI
         │ (path dep)
         ▼
-alloy-gui/  (host: mocida + mui-runtime + mui-syntax + alloy-vm)
+alloy-gui/  (host: mocida + mui-runtime + mui-syntax + astra-vm)
    ├── alloy.mui        view declarativa (playground/runner/updater)
    ├── backend.rs       lógica do host: rodar fonte, listar arquivos, update
    ├── app.bundle       nome/id + assets (ícone)
@@ -48,7 +48,7 @@ alloy-gui/  (host: mocida + mui-runtime + mui-syntax + alloy-vm)
    └── src/main.rs      dual-mode (CLI passthrough + host MUI)
 ```
 
-## Pré-requisito no `alloy-vm`: captura de saída
+## Pré-requisito no `astra-vm`: captura de saída
 
 Hoje `println`/`print` escrevem direto em `stdout` via `println!`. A GUI precisa
 **capturar** a saída para mostrar no painel. Refactor testável:
@@ -68,7 +68,7 @@ Esta é a **primeira tarefa** (no crate portátil, testável no CI).
 
 ### `src/main.rs` — dual-mode
 - `args`: se o primeiro arg for `run` ou um caminho `.crs` existente → modo CLI
-  (chama `alloy_vm::run_source(path)`); `--update` → roda updater headless;
+  (chama `astra_vm::run_source(path)`); `--update` → roda updater headless;
   nenhum arg / `gui` → sobe a GUI.
 - Modo GUI: padrão de host do `mui-dev` (parse `alloy.mui` → `entry_view` →
   `window_config` → `prefer_renderer`/`prefer_custom_titlebar` → `App::new` →
@@ -77,9 +77,9 @@ Esta é a **primeira tarefa** (no crate portátil, testável no CI).
 - Ícone da janela: `app.bundle` registra `mocida://alloy-icon.png` +
   `app.set_window_icon("mocida://alloy-icon.png")`.
 
-### `backend.rs` — lógica do host (std + alloy-vm)
+### `backend.rs` — lógica do host (std + astra-vm)
 - `run_source(src: &str) -> RunResult { output: String, error: Option<String> }`
-  — parseia via `copper_syntax::program::parse_program` e interpreta com
+  — parseia via `mikasa_syntax::program::parse_program` e interpreta com
   `Interpreter::with_output(buffer)`, devolvendo texto capturado + erros
   (sintaxe/runtime) formatados com span.
 - `read_file(path)` / `list_dirs(prefix)` — file runner + autocomplete.
@@ -114,7 +114,7 @@ Esta é a **primeira tarefa** (no crate portátil, testável no CI).
   ícone de janela. **Bloqueio atual:** arquivos PNG precisam ser salvos em disco.
 
 ## Testes / verificação
-- **`alloy-vm` (CI):** testes de captura de saída (buffer) + os existentes.
+- **`astra-vm` (CI):** testes de captura de saída (buffer) + os existentes.
 - **`alloy-gui`:** não linka no CI portátil (precisa de `MOCIDA_LIB_DIR`); a
   lógica de `backend.rs` que não depende de mocida (`run_source`, `read_file`,
   parsing de versão do updater) é testável isoladamente. A GUI em si **não é
@@ -125,7 +125,7 @@ Esta é a **primeira tarefa** (no crate portátil, testável no CI).
 - REPL com estado incremental (a VM executa um `Program` inteiro hoje).
 
 ## Fases internas
-1. **Captura de saída no `alloy-vm`** (testável, CI). ← primeiro
+1. **Captura de saída no `astra-vm`** (testável, CI). ← primeiro
 2. **Crate `alloy-gui`**: scaffold + `main.rs` dual-mode (CLI passthrough já
    funciona) + `backend::run_source` (testável sem mocida).
 3. **`alloy.mui`** + wiring de signals (playground + runner).

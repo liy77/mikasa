@@ -11,7 +11,7 @@ pub mod cargo {
     use super::crate_extractor;
 }
 
-// Re-export from copper-syntax so existing `crate::ConsumedTrait`,
+// Re-export from mikasa-syntax so existing `crate::ConsumedTrait`,
 // `crate::utils::Consumed`, etc. paths in the parser keep resolving.
-pub use copper_syntax::utils::*;
+pub use mikasa_syntax::utils::*;
 pub use null::*;

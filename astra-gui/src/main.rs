@@ -2,7 +2,7 @@
 //! binary is still `alloy`.)
 //!
 //! * `alloy run <file.crs>` / `alloy <file.crs>` → interpret in the terminal
-//!   (reuses the portable `alloy-vm` lib; output goes straight to stdout).
+//!   (reuses the portable `astra-vm` lib; output goes straight to stdout).
 //! * `alloy update` → run the self-updater headlessly.
 //! * `alloy` (no args) / `alloy gui` → open the MUI window (playground + file
 //!   runner + updater).
@@ -59,11 +59,11 @@ fn main() -> ExitCode {
     }
 }
 
-/// CLI interpretation — output to real stdout (not captured), like `alloy-vm`'s
+/// CLI interpretation — output to real stdout (not captured), like `astra-vm`'s
 /// own binary. Reuses the portable interpreter.
 fn cli_run(file: &Path) -> ExitCode {
-    use alloy_vm::interp::Interpreter;
-    use copper_syntax::program::parse_program;
+    use astra_vm::interp::Interpreter;
+    use mikasa_syntax::program::parse_program;
 
     let src = match std::fs::read_to_string(file) {
         Ok(s) => s,
@@ -211,8 +211,8 @@ mod backend_run {
     use std::cell::RefCell;
     use std::rc::Rc;
 
-    use alloy_vm::interp::Interpreter;
-    use copper_syntax::program::parse_program;
+    use astra_vm::interp::Interpreter;
+    use mikasa_syntax::program::parse_program;
 
     pub struct RunResult {
         pub output: String,

@@ -2,65 +2,65 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Criar o crate `alloy-vm` e o binário `alloy` capaz de interpretar um `.crs` (`alloy run file.crs`) cobrindo expressões, variáveis, controle de fluxo, funções definidas pelo usuário e `println`, executando direto sobre o `Program` AST de `copper-syntax`.
+**Goal:** Criar o crate `astra-vm` e o binário `alloy` capaz de interpretar um `.crs` (`alloy run file.crs`) cobrindo expressões, variáveis, controle de fluxo, funções definidas pelo usuário e `println`, executando direto sobre o `Program` AST de `mikasa-syntax`.
 
-**Architecture:** Interpretador tree-walking sobre `copper_syntax::program::parse_program`. Sem bytecode, sem JIT. O crate expõe uma lib (`Interpreter`) + um binário (`alloy`). Reaproveita 100% da AST existente (`expr.rs` + `program.rs`); nenhum re-parse.
+**Architecture:** Interpretador tree-walking sobre `mikasa_syntax::program::parse_program`. Sem bytecode, sem JIT. O crate expõe uma lib (`Interpreter`) + um binário (`alloy`). Reaproveita 100% da AST existente (`expr.rs` + `program.rs`); nenhum re-parse.
 
-**Tech Stack:** Rust (edition 2021), workspace Cargo já existente, dependência de path em `crates/copper-syntax`. `clap` para o CLI do binário (já usado pelo `cforge`).
+**Tech Stack:** Rust (edition 2021), workspace Cargo já existente, dependência de path em `crates/mikasa-syntax`. `clap` para o CLI do binário (já usado pelo `cforge`).
 
 ## Global Constraints
 
 - Edition: `2021` (igual aos outros crates do workspace).
-- O crate `alloy-vm` deve ser **isolado**: `cforge`, `mui-*` e `copper-parser` NÃO podem depender dele.
+- O crate `astra-vm` deve ser **isolado**: `cforge`, `mui-*` e `mikasa-parser` NÃO podem depender dele.
 - Toolchain pin: `stable` (`rust-toolchain.toml`). Código deve passar `cargo fmt --check` e `cargo clippy -- -D warnings`.
 - A AST é fonte de verdade e **não deve ser modificada** neste plano — apenas consumida. Gaps de cobertura (`ExprKind::Raw`) são fora de escopo do MVP: ao encontrar `Raw`, o interpretador retorna um erro de runtime claro ("construção ainda não suportada pela VM"), nunca panica.
-- Tipos consumidos de `copper_syntax`: `program::{parse_program, Program, Item, Param, Block}`, `expr::{Expr, ExprKind, Stmt, Literal, StrPart, StrTemplate, BinOp, UnOp, AssignOp, Pattern}`.
+- Tipos consumidos de `mikasa_syntax`: `program::{parse_program, Program, Item, Param, Block}`, `expr::{Expr, ExprKind, Stmt, Literal, StrPart, StrTemplate, BinOp, UnOp, AssignOp, Pattern}`.
 - A VM **nunca panica** em entrada malformada: erros viram `RuntimeError` com `Span`.
 
 ---
 
-### Task 1: Scaffold do crate `alloy-vm` + tipo `Value`
+### Task 1: Scaffold do crate `astra-vm` + tipo `Value`
 
 **Files:**
-- Create: `crates/alloy-vm/Cargo.toml`
-- Create: `crates/alloy-vm/src/lib.rs`
-- Create: `crates/alloy-vm/src/value.rs`
+- Create: `crates/astra-vm/Cargo.toml`
+- Create: `crates/astra-vm/src/lib.rs`
+- Create: `crates/astra-vm/src/value.rs`
 - Modify: `Cargo.toml:2` (raiz — adicionar membro ao workspace)
-- Test: `crates/alloy-vm/src/value.rs` (módulo `#[cfg(test)]`)
+- Test: `crates/astra-vm/src/value.rs` (módulo `#[cfg(test)]`)
 
 **Interfaces:**
-- Produces: `alloy_vm::value::Value` (enum `Int(i64)`, `Float(f64)`, `Bool(bool)`, `Str(String)`, `Unit`), `Value::type_name(&self) -> &'static str`, `impl std::fmt::Display for Value`.
+- Produces: `astra_vm::value::Value` (enum `Int(i64)`, `Float(f64)`, `Bool(bool)`, `Str(String)`, `Unit`), `Value::type_name(&self) -> &'static str`, `impl std::fmt::Display for Value`.
 
-- [ ] **Step 1: Criar `crates/alloy-vm/Cargo.toml`**
+- [ ] **Step 1: Criar `crates/astra-vm/Cargo.toml`**
 
 ```toml
 [package]
-name = "alloy-vm"
+name = "astra-vm"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "alloy"
+name = "astra"
 path = "src/bin/alloy.rs"
 
 [lib]
-name = "alloy_vm"
+name = "astra_vm"
 path = "src/lib.rs"
 
 [dependencies]
-copper-syntax = { path = "../copper-syntax" }
+mikasa-syntax = { path = "../mikasa-syntax" }
 clap = { version = "4", features = ["derive"] }
 ```
 
 - [ ] **Step 2: Adicionar o crate ao workspace**
 
-Em `Cargo.toml` da raiz, na linha `members = [...]`, acrescentar `"crates/alloy-vm"`:
+Em `Cargo.toml` da raiz, na linha `members = [...]`, acrescentar `"crates/astra-vm"`:
 
 ```toml
-members = [".", "crates/copper-syntax", "crates/copper-parser", "crates/copper-lsp", "crates/mui-syntax", "crates/mui-codegen", "crates/mui-lsp", "crates/alloy-vm"]
+members = [".", "crates/mikasa-syntax", "crates/mikasa-parser", "crates/mikasa-lsp", "crates/mui-syntax", "crates/mui-codegen", "crates/mui-lsp", "crates/astra-vm"]
 ```
 
-- [ ] **Step 3: Escrever `crates/alloy-vm/src/value.rs` com o teste falhando**
+- [ ] **Step 3: Escrever `crates/astra-vm/src/value.rs` com o teste falhando**
 
 ```rust
 //! Valores em runtime da VM Alloy.
@@ -125,7 +125,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 4: Escrever `crates/alloy-vm/src/lib.rs`**
+- [ ] **Step 4: Escrever `crates/astra-vm/src/lib.rs`**
 
 ```rust
 //! Alloy: interpretador tree-walking para Copper.
@@ -135,14 +135,14 @@ pub mod value;
 
 - [ ] **Step 5: Rodar o teste e verificar que passa**
 
-Run: `cargo test -p alloy-vm value::tests::display_and_type_name`
+Run: `cargo test -p astra-vm value::tests::display_and_type_name`
 Expected: PASS (1 test)
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add crates/alloy-vm/Cargo.toml crates/alloy-vm/src/lib.rs crates/alloy-vm/src/value.rs Cargo.toml Cargo.lock
-git commit -m "feat(alloy): scaffold alloy-vm crate with Value type"
+git add crates/astra-vm/Cargo.toml crates/astra-vm/src/lib.rs crates/astra-vm/src/value.rs Cargo.toml Cargo.lock
+git commit -m "feat(alloy): scaffold astra-vm crate with Value type"
 ```
 
 ---
@@ -150,25 +150,25 @@ git commit -m "feat(alloy): scaffold alloy-vm crate with Value type"
 ### Task 2: Ambiente de escopos (`Env`) + erro de runtime
 
 **Files:**
-- Create: `crates/alloy-vm/src/error.rs`
-- Create: `crates/alloy-vm/src/env.rs`
-- Modify: `crates/alloy-vm/src/lib.rs`
-- Test: `crates/alloy-vm/src/env.rs` (módulo `#[cfg(test)]`)
+- Create: `crates/astra-vm/src/error.rs`
+- Create: `crates/astra-vm/src/env.rs`
+- Modify: `crates/astra-vm/src/lib.rs`
+- Test: `crates/astra-vm/src/env.rs` (módulo `#[cfg(test)]`)
 
 **Interfaces:**
-- Consumes: `Value` (Task 1), `copper_syntax::ast::Span`.
+- Consumes: `Value` (Task 1), `mikasa_syntax::ast::Span`.
 - Produces:
-  - `alloy_vm::error::RuntimeError { message: String, span: Span }` + `RuntimeError::new(msg, span)`.
-  - `alloy_vm::error::Flow` (enum de controle: `Err(RuntimeError)`, `Return(Value)`, `Break`, `Continue`).
-  - `alloy_vm::env::Env` com `new()`, `child(&Rc<RefCell<Env>>) -> Rc<RefCell<Env>>`, `define(&mut self, name, value)`, `get(&self, name) -> Option<Value>`, `set(&mut self, name, value) -> bool` (atualiza no escopo onde o nome existe; `false` se não existe).
+  - `astra_vm::error::RuntimeError { message: String, span: Span }` + `RuntimeError::new(msg, span)`.
+  - `astra_vm::error::Flow` (enum de controle: `Err(RuntimeError)`, `Return(Value)`, `Break`, `Continue`).
+  - `astra_vm::env::Env` com `new()`, `child(&Rc<RefCell<Env>>) -> Rc<RefCell<Env>>`, `define(&mut self, name, value)`, `get(&self, name) -> Option<Value>`, `set(&mut self, name, value) -> bool` (atualiza no escopo onde o nome existe; `false` se não existe).
 
-- [ ] **Step 1: Escrever `crates/alloy-vm/src/error.rs`**
+- [ ] **Step 1: Escrever `crates/astra-vm/src/error.rs`**
 
 ```rust
 //! Erros e fluxo de controle não-local da VM.
 
 use crate::value::Value;
-use copper_syntax::ast::Span;
+use mikasa_syntax::ast::Span;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RuntimeError {
@@ -198,7 +198,7 @@ pub enum Flow {
 }
 ```
 
-- [ ] **Step 2: Escrever `crates/alloy-vm/src/env.rs` com o teste falhando**
+- [ ] **Step 2: Escrever `crates/astra-vm/src/env.rs` com o teste falhando**
 
 ```rust
 //! Ambiente de variáveis: cadeia de escopos com pai compartilhado.
@@ -288,13 +288,13 @@ pub mod value;
 
 - [ ] **Step 4: Rodar o teste e verificar que passa**
 
-Run: `cargo test -p alloy-vm env::tests::child_sees_parent_and_set_updates_origin`
+Run: `cargo test -p astra-vm env::tests::child_sees_parent_and_set_updates_origin`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/alloy-vm/src/env.rs crates/alloy-vm/src/error.rs crates/alloy-vm/src/lib.rs
+git add crates/astra-vm/src/env.rs crates/astra-vm/src/error.rs crates/astra-vm/src/lib.rs
 git commit -m "feat(alloy): scoped Env and RuntimeError/Flow"
 ```
 
@@ -303,15 +303,15 @@ git commit -m "feat(alloy): scoped Env and RuntimeError/Flow"
 ### Task 3: Avaliar expressões puras (literais, binário, unário, ternário)
 
 **Files:**
-- Create: `crates/alloy-vm/src/interp.rs`
-- Modify: `crates/alloy-vm/src/lib.rs`
-- Test: `crates/alloy-vm/src/interp.rs` (módulo `#[cfg(test)]`)
+- Create: `crates/astra-vm/src/interp.rs`
+- Modify: `crates/astra-vm/src/lib.rs`
+- Test: `crates/astra-vm/src/interp.rs` (módulo `#[cfg(test)]`)
 
 **Interfaces:**
-- Consumes: `Value`, `Env`, `RuntimeError` (Tasks 1-2); `copper_syntax::expr::{Expr, ExprKind, Literal, StrPart, BinOp, UnOp, parse_expr}`.
-- Produces: `alloy_vm::interp::Interpreter` com `Interpreter::new()` e `eval_expr(&mut self, expr: &Expr, env: &Rc<RefCell<Env>>) -> Result<Value, RuntimeError>`. (Neste passo cobre só literais escalares, `Ident`, `Binary`, `Unary` Neg/Not, `Ternary`. Demais variantes retornam `RuntimeError` "não suportado".)
+- Consumes: `Value`, `Env`, `RuntimeError` (Tasks 1-2); `mikasa_syntax::expr::{Expr, ExprKind, Literal, StrPart, BinOp, UnOp, parse_expr}`.
+- Produces: `astra_vm::interp::Interpreter` com `Interpreter::new()` e `eval_expr(&mut self, expr: &Expr, env: &Rc<RefCell<Env>>) -> Result<Value, RuntimeError>`. (Neste passo cobre só literais escalares, `Ident`, `Binary`, `Unary` Neg/Not, `Ternary`. Demais variantes retornam `RuntimeError` "não suportado".)
 
-- [ ] **Step 1: Escrever `crates/alloy-vm/src/interp.rs` com testes falhando**
+- [ ] **Step 1: Escrever `crates/astra-vm/src/interp.rs` com testes falhando**
 
 ```rust
 //! Interpretador tree-walking.
@@ -319,7 +319,7 @@ git commit -m "feat(alloy): scoped Env and RuntimeError/Flow"
 use crate::env::Env;
 use crate::error::RuntimeError;
 use crate::value::Value;
-use copper_syntax::expr::{BinOp, Expr, ExprKind, Literal, StrPart, UnOp};
+use mikasa_syntax::expr::{BinOp, Expr, ExprKind, Literal, StrPart, UnOp};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -387,7 +387,7 @@ impl Interpreter {
         })
     }
 
-    fn eval_unary(&mut self, op: UnOp, v: Value, span: copper_syntax::ast::Span) -> Result<Value, RuntimeError> {
+    fn eval_unary(&mut self, op: UnOp, v: Value, span: mikasa_syntax::ast::Span) -> Result<Value, RuntimeError> {
         match (op, v) {
             (UnOp::Neg, Value::Int(n)) => Ok(Value::Int(-n)),
             (UnOp::Neg, Value::Float(x)) => Ok(Value::Float(-x)),
@@ -399,7 +399,7 @@ impl Interpreter {
         }
     }
 
-    fn eval_binary(&mut self, op: BinOp, l: Value, r: Value, span: copper_syntax::ast::Span) -> Result<Value, RuntimeError> {
+    fn eval_binary(&mut self, op: BinOp, l: Value, r: Value, span: mikasa_syntax::ast::Span) -> Result<Value, RuntimeError> {
         use BinOp::*;
         use Value::*;
         match (op, l, r) {
@@ -433,7 +433,7 @@ impl Interpreter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use copper_syntax::expr::parse_expr;
+    use mikasa_syntax::expr::parse_expr;
 
     fn eval(src: &str) -> Value {
         let (expr, errs) = parse_expr(src);
@@ -479,13 +479,13 @@ pub mod value;
 
 - [ ] **Step 3: Rodar os testes e verificar que passam**
 
-Run: `cargo test -p alloy-vm interp::tests`
-Expected: PASS (3 tests). Se algum literal de interpolação falhar no parse, ajustar a string de teste mantendo a asserção de valor — a forma exata do template vem de `copper-syntax`.
+Run: `cargo test -p astra-vm interp::tests`
+Expected: PASS (3 tests). Se algum literal de interpolação falhar no parse, ajustar a string de teste mantendo a asserção de valor — a forma exata do template vem de `mikasa-syntax`.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add crates/alloy-vm/src/interp.rs crates/alloy-vm/src/lib.rs
+git add crates/astra-vm/src/interp.rs crates/astra-vm/src/lib.rs
 git commit -m "feat(alloy): eval scalar exprs (literals, binary, unary, ternary)"
 ```
 
@@ -494,11 +494,11 @@ git commit -m "feat(alloy): eval scalar exprs (literals, binary, unary, ternary)
 ### Task 4: Avaliar statements de variáveis (let/mut, assign, expr-stmt, ++/--)
 
 **Files:**
-- Modify: `crates/alloy-vm/src/interp.rs`
-- Test: `crates/alloy-vm/src/interp.rs` (novos testes)
+- Modify: `crates/astra-vm/src/interp.rs`
+- Test: `crates/astra-vm/src/interp.rs` (novos testes)
 
 **Interfaces:**
-- Consumes: `copper_syntax::expr::{Stmt, AssignOp, Block}`.
+- Consumes: `mikasa_syntax::expr::{Stmt, AssignOp, Block}`.
 - Produces:
   - `Interpreter::eval_block(&mut self, block: &Block, env: &Rc<RefCell<Env>>) -> Result<Value, RuntimeError>` — executa stmts num escopo filho; retorna o valor do `tail` (ou `Unit`). Propaga erro. (Controle de fluxo return/break/continue entra na Task 5.)
   - `Interpreter::eval_stmt(&mut self, stmt: &Stmt, env: &Rc<RefCell<Env>>) -> Result<Value, RuntimeError>` — cobre `Let`, `Expr`, `IncDec` e `Expr(ExprKind::Assign)`. Demais variantes retornam erro "não suportado" por enquanto.
@@ -552,7 +552,7 @@ Adicionar ao `match` de `eval_expr` (antes do braço `_`):
 Adicionar o import de `AssignOp` e `Stmt`/`Block` no topo:
 
 ```rust
-use copper_syntax::expr::{AssignOp, BinOp, Block, Expr, ExprKind, Literal, Stmt, StrPart, UnOp};
+use mikasa_syntax::expr::{AssignOp, BinOp, Block, Expr, ExprKind, Literal, Stmt, StrPart, UnOp};
 ```
 
 Adicionar os dois métodos ao `impl Interpreter`:
@@ -608,7 +608,7 @@ Adicionar os dois métodos ao `impl Interpreter`:
 Adicionar ao `mod tests`:
 
 ```rust
-    use copper_syntax::expr::parse_stmts;
+    use mikasa_syntax::expr::parse_stmts;
 
     fn run_block(src: &str) -> Value {
         let (block, errs) = parse_stmts(src);
@@ -627,13 +627,13 @@ Adicionar ao `mod tests`:
 
 - [ ] **Step 3: Rodar os testes**
 
-Run: `cargo test -p alloy-vm interp::tests::let_assign_incdec`
+Run: `cargo test -p astra-vm interp::tests::let_assign_incdec`
 Expected: PASS. Se o parser de `parse_stmts` exigir um `tail` separado, manter a última linha (`x`/`y`/`c`) como expressão final — é o valor retornado por `eval_block`.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add crates/alloy-vm/src/interp.rs
+git add crates/astra-vm/src/interp.rs
 git commit -m "feat(alloy): eval let/assign/incdec statements and blocks"
 ```
 
@@ -642,11 +642,11 @@ git commit -m "feat(alloy): eval let/assign/incdec statements and blocks"
 ### Task 5: Controle de fluxo (if / while / loop / for / break / continue)
 
 **Files:**
-- Modify: `crates/alloy-vm/src/interp.rs`
-- Test: `crates/alloy-vm/src/interp.rs` (novos testes)
+- Modify: `crates/astra-vm/src/interp.rs`
+- Test: `crates/astra-vm/src/interp.rs` (novos testes)
 
 **Interfaces:**
-- Consumes: `copper_syntax::expr::{Pattern}`, `ExprKind::{If, Range, Block}`.
+- Consumes: `mikasa_syntax::expr::{Pattern}`, `ExprKind::{If, Range, Block}`.
 - Produces: refatoração de `eval_block`/`eval_stmt` para propagar `Flow` (Break/Continue/Return) via um enum interno; `if`/`while`/`loop`/`for` implementados. `eval_block` passa a retornar `Result<BlockOutcome, RuntimeError>` onde `BlockOutcome` distingue valor normal de fluxo não-local. Manter a assinatura pública `eval_block -> Result<Value, RuntimeError>` como wrapper que converte `Return(v)`→`v` e `Break`/`Continue` no topo→erro "fora de loop".
 
 - [ ] **Step 1: Introduzir `BlockOutcome` e reescrever a execução de stmts**
@@ -819,7 +819,7 @@ Renomear o antigo `eval_stmt` para `exec_stmt` retornando `Outcome`, e adicionar
 Adicionar `Pattern` ao import:
 
 ```rust
-use copper_syntax::expr::{AssignOp, BinOp, Block, Expr, ExprKind, Literal, Pattern, Stmt, StrPart, UnOp};
+use mikasa_syntax::expr::{AssignOp, BinOp, Block, Expr, ExprKind, Literal, Pattern, Stmt, StrPart, UnOp};
 ```
 
 Atualizar o teste antigo `let_assign_incdec` se referenciava `eval_stmt` diretamente — ele usa `eval_block`, então segue válido.
@@ -847,13 +847,13 @@ Atualizar o teste antigo `let_assign_incdec` se referenciava `eval_stmt` diretam
 
 - [ ] **Step 3: Rodar os testes**
 
-Run: `cargo test -p alloy-vm interp::tests`
+Run: `cargo test -p astra-vm interp::tests`
 Expected: PASS (todos). Ajustar separadores (`;` vs newline) nas strings de teste se o `parse_stmts` exigir — a semântica do valor final é o que importa.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add crates/alloy-vm/src/interp.rs
+git add crates/astra-vm/src/interp.rs
 git commit -m "feat(alloy): control flow (if/while/loop/for, break/continue)"
 ```
 
@@ -862,11 +862,11 @@ git commit -m "feat(alloy): control flow (if/while/loop/for, break/continue)"
 ### Task 6: Funções do usuário + chamadas + `println`
 
 **Files:**
-- Modify: `crates/alloy-vm/src/interp.rs`
-- Test: `crates/alloy-vm/src/interp.rs` (novos testes)
+- Modify: `crates/astra-vm/src/interp.rs`
+- Test: `crates/astra-vm/src/interp.rs` (novos testes)
 
 **Interfaces:**
-- Consumes: `copper_syntax::program::{parse_program, Program, Item, Param}`.
+- Consumes: `mikasa_syntax::program::{parse_program, Program, Item, Param}`.
 - Produces:
   - `Interpreter` ganha campo `funcs: HashMap<String, FuncDef>` onde `FuncDef { params: Vec<String>, body: Block }`.
   - `Interpreter::load_program(&mut self, prog: &Program)` — registra todas as `Item::Function` na tabela.
@@ -878,7 +878,7 @@ git commit -m "feat(alloy): control flow (if/while/loop/for, break/continue)"
 No topo do arquivo, adicionar imports e o struct auxiliar:
 
 ```rust
-use copper_syntax::program::{Item, Program};
+use mikasa_syntax::program::{Item, Program};
 use std::collections::HashMap;
 
 #[derive(Clone)]
@@ -929,12 +929,12 @@ Adicionar métodos:
         }
         // se há `func main`, chama
         if self.funcs.contains_key("main") {
-            return self.call_user("main", vec![], copper_syntax::ast::Span::default());
+            return self.call_user("main", vec![], mikasa_syntax::ast::Span::default());
         }
         Ok(Value::Unit)
     }
 
-    fn call_user(&mut self, name: &str, args: Vec<Value>, span: copper_syntax::ast::Span) -> Result<Value, RuntimeError> {
+    fn call_user(&mut self, name: &str, args: Vec<Value>, span: mikasa_syntax::ast::Span) -> Result<Value, RuntimeError> {
         let def = self.funcs.get(name).cloned().ok_or_else(|| {
             RuntimeError::new(format!("função `{name}` não definida"), span)
         })?;
@@ -986,7 +986,7 @@ Adicionar o braço `Call` em `eval_expr` (antes do `_`):
 - [ ] **Step 2: Escrever os testes falhando**
 
 ```rust
-    use copper_syntax::program::parse_program;
+    use mikasa_syntax::program::parse_program;
 
     fn run_prog(src: &str) -> Value {
         let prog = parse_program(src);
@@ -1018,13 +1018,13 @@ impl Interpreter {
 
 - [ ] **Step 3: Rodar os testes**
 
-Run: `cargo test -p alloy-vm interp::tests`
+Run: `cargo test -p astra-vm interp::tests`
 Expected: PASS (todos, incluindo os anteriores). O teste `run_prog` que termina numa expressão de topo (`r`, `fac(5)`) depende de `parse_program` emitir um `Item::Stmt(Stmt::Expr(..))` final; se ele exigir a expressão dentro de função, adaptar para `func int main() { ... return ... }` e ajustar a asserção via valor de retorno de `main`.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add crates/alloy-vm/src/interp.rs
+git add crates/astra-vm/src/interp.rs
 git commit -m "feat(alloy): user functions, calls, recursion and println"
 ```
 
@@ -1033,14 +1033,14 @@ git commit -m "feat(alloy): user functions, calls, recursion and println"
 ### Task 7: Binário `alloy` com subcomando `run`
 
 **Files:**
-- Create: `crates/alloy-vm/src/bin/alloy.rs`
-- Test: `crates/alloy-vm/tests/cli_run.rs`
+- Create: `crates/astra-vm/src/bin/alloy.rs`
+- Test: `crates/astra-vm/tests/cli_run.rs`
 
 **Interfaces:**
-- Consumes: `alloy_vm::interp::Interpreter`, `copper_syntax::program::parse_program`.
+- Consumes: `astra_vm::interp::Interpreter`, `mikasa_syntax::program::parse_program`.
 - Produces: binário `alloy` com `alloy run <arquivo.crs>`. Em erro de parse ou runtime, imprime no stderr com o `Span` e sai com código 1.
 
-- [ ] **Step 1: Escrever `crates/alloy-vm/src/bin/alloy.rs`**
+- [ ] **Step 1: Escrever `crates/astra-vm/src/bin/alloy.rs`**
 
 ```rust
 //! CLI do Alloy: interpretador tree-walking de Copper.
@@ -1048,12 +1048,12 @@ git commit -m "feat(alloy): user functions, calls, recursion and println"
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use alloy_vm::interp::Interpreter;
+use astra_vm::interp::Interpreter;
 use clap::{Parser, Subcommand};
-use copper_syntax::program::parse_program;
+use mikasa_syntax::program::parse_program;
 
 #[derive(Parser)]
-#[command(name = "alloy", about = "Interpretador Alloy para Copper")]
+#[command(name = "astra", about = "Interpretador Alloy para Copper")]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
@@ -1105,7 +1105,7 @@ fn run(file: &PathBuf) -> ExitCode {
 
 - [ ] **Step 2: Escrever o teste de integração falhando**
 
-`crates/alloy-vm/tests/cli_run.rs`:
+`crates/astra-vm/tests/cli_run.rs`:
 
 ```rust
 use std::io::Write;
@@ -1146,18 +1146,18 @@ fn loop_and_function() {
 
 - [ ] **Step 3: Rodar o teste**
 
-Run: `cargo test -p alloy-vm --test cli_run`
+Run: `cargo test -p astra-vm --test cli_run`
 Expected: PASS (2 tests). Se `parse_program` reportar erros para essas fontes, ajustar a sintaxe do fonte de teste (não o interpretador) até a AST aceitar — a invariante é só "o que a AST aceita, a VM executa".
 
 - [ ] **Step 4: `cargo run` manual de fumaça**
 
-Run: `echo 'println("ok")' > /tmp/smoke.crs && cargo run -p alloy-vm --bin alloy -- run /tmp/smoke.crs`
+Run: `echo 'println("ok")' > /tmp/smoke.crs && cargo run -p astra-vm --bin alloy -- run /tmp/smoke.crs`
 Expected: imprime `ok`, exit 0.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/alloy-vm/src/bin/alloy.rs crates/alloy-vm/tests/cli_run.rs
+git add crates/astra-vm/src/bin/alloy.rs crates/astra-vm/tests/cli_run.rs
 git commit -m "feat(alloy): alloy run CLI subcommand"
 ```
 
@@ -1193,7 +1193,7 @@ func main() {
 
 - [ ] **Step 2: Rodar o exemplo**
 
-Run: `cargo run -p alloy-vm --bin alloy -- run examples/copper/alloy-hello.crs`
+Run: `cargo run -p astra-vm --bin alloy -- run examples/copper/alloy-hello.crs`
 Expected:
 ```
 Alloy VM
@@ -1203,13 +1203,13 @@ soma 1..5 = 10
 
 - [ ] **Step 3: fmt + clippy + test do crate**
 
-Run: `cargo fmt -p alloy-vm -- --check && cargo clippy -p alloy-vm -- -D warnings && cargo test -p alloy-vm`
+Run: `cargo fmt -p astra-vm -- --check && cargo clippy -p astra-vm -- -D warnings && cargo test -p astra-vm`
 Expected: tudo PASS, zero warnings. Corrigir qualquer lint inline.
 
 - [ ] **Step 4: Verificar que o workspace inteiro ainda compila**
 
 Run: `cargo check --workspace`
-Expected: PASS — confirma que adicionar `alloy-vm` não quebrou `cforge`/`mui-*`.
+Expected: PASS — confirma que adicionar `astra-vm` não quebrou `cforge`/`mui-*`.
 
 - [ ] **Step 5: Commit**
 
@@ -1222,6 +1222,6 @@ git commit -m "docs(alloy): runnable alloy-hello.crs example"
 
 ## Notas de execução
 
-- **Risco recorrente:** a forma exata que `parse_stmts`/`parse_program` produz para certas sintaxes (separadores `;` vs `\n`, se a última expressão vira `tail` ou `Item::Stmt`). Sempre que um teste falhar no *parse* (não na avaliação), ajuste o **fonte de teste** para algo que a AST aceita — nunca modifique `copper-syntax` neste plano. A invariante do MVP é "o que a AST aceita, a VM executa corretamente".
+- **Risco recorrente:** a forma exata que `parse_stmts`/`parse_program` produz para certas sintaxes (separadores `;` vs `\n`, se a última expressão vira `tail` ou `Item::Stmt`). Sempre que um teste falhar no *parse* (não na avaliação), ajuste o **fonte de teste** para algo que a AST aceita — nunca modifique `mikasa-syntax` neste plano. A invariante do MVP é "o que a AST aceita, a VM executa corretamente".
 - **`ExprKind::Raw`:** se aparecer em qualquer teste, significa que o subset do Pratt parser não formou aquela construção — está fora do escopo do MVP e o interpretador deve devolver `RuntimeError` "construção ainda não suportada pela VM" (o braço `_` já cobre isso).
 - **Próximos planos:** Fase 3 (struct/class/enum/impl/match/closures na VM), depois interop e `alloy build`. Cada um é um plano próprio.

@@ -30,7 +30,7 @@ the two share conventions (and the same `mut`/bare bindings — **no `let`**).
   keywords / types (`func`, `struct`, `impl`, `signal`, `int`, …).
   - **Mikasa words use the SAME descriptions as the Mikasa extension.** They
     come from the shared `editors/copper-lexicon.json` — a single JSON read by
-    both `copper-lsp` (embedded via `include_str!`) and this extension (at
+    both `mikasa-lsp` (embedded via `include_str!`) and this extension (at
     runtime), so the `.crs` and `.mui`/`.crm` hovers can never drift. Edit a
     description there once and both update. (Mocida-only words — `view`,
     `signal`, `computed`, `effect` — live in `src/catalog.ts`.)
@@ -84,7 +84,7 @@ npm run package    # builds a mui-<version>.vsix (via @vscode/vsce)
 **Extensions: Install from VSIX…** or `code --install-extension mui-*.vsix`.
 The `compile` step copies `editors/copper-lexicon.json` into `out/` so the
 packaged extension shows the exact same Mikasa keyword descriptions as
-`copper-lsp` (in the dev host it reads the repo copy directly).
+`mikasa-lsp` (in the dev host it reads the repo copy directly).
 
 ## Scope
 
@@ -92,4 +92,4 @@ Highlighting, colors, completion, hover, and diagnostics are **self-contained**
 (no language server) — driven by the `src/catalog.ts` table. Deeper analysis
 (go-to-definition, cross-file checks, full Mikasa type-checking) would come
 later via a MUI language server built on the `mui-syntax` crate, the same way
-`copper-lsp` backs the Mikasa extension.
+`mikasa-lsp` backs the Mikasa extension.

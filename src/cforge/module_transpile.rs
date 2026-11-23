@@ -39,7 +39,7 @@ pub fn transpile_crs_project(project_dir: &Path) -> Result<PathBuf, String> {
         crate::cforge::VERSION,
         hash_source(
             include_str!("module_transpile.rs"),
-            include_str!("../../crates/copper-parser/src/parser/mod.rs"),
+            include_str!("../../crates/mikasa-parser/src/parser/mod.rs"),
         )
     );
     let mut cache = TranspileCache::load(&dist_dir_str, &compiler_ver);
@@ -655,7 +655,7 @@ fn collect_crs(dir: &Path, out: &mut Vec<PathBuf>) {
         } else if p
             .extension()
             .and_then(|e| e.to_str())
-            .is_some_and(copper_syntax::ext::is_source)
+            .is_some_and(mikasa_syntax::ext::is_source)
         {
             out.push(p);
         }

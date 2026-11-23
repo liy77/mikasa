@@ -86,7 +86,7 @@ CalVer scheme (`0.YY.M`, stamped from the build date).
   get a spurious `;`. The tokenizer tracks struct-literal braces (separating
   fields with `,`) and suppresses the statement `;` after a line that ends in a
   binary/infix operator (`a &&` / `x +` / `obj.`). Regression tests:
-  `crates/copper-parser/tests/impl_methods.rs`.
+  `crates/mikasa-parser/tests/impl_methods.rs`.
 
 ## [v0.26.6] - 2026-06-03
 

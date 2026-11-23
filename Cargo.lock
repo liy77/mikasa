@@ -18,22 +18,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "alloy-vm"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "clap",
- "copper-syntax",
- "hmac",
- "serde",
- "serde_json",
- "sha2",
- "ureq",
- "wasmi",
- "wat",
-]
-
-[[package]]
 name = "anstream"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -81,6 +65,22 @@ dependencies = [
  "anstyle",
  "once_cell_polyfill",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "astra-vm"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "clap",
+ "hmac",
+ "mikasa-syntax",
+ "serde",
+ "serde_json",
+ "sha2",
+ "ureq",
+ "wasmi",
+ "wat",
 ]
 
 [[package]]
@@ -277,58 +277,6 @@ checksum = "ba5a308b75df32fe02788e748662718f03fde005016435c444eea572398219fd"
 dependencies = [
  "bytes",
  "memchr",
-]
-
-[[package]]
-name = "copper-cforge"
-version = "0.1.0-beta.0"
-dependencies = [
- "alloy-vm",
- "clap",
- "colored",
- "copper-parser",
- "copper-syntax",
- "mui-codegen",
- "mui-syntax",
- "once_cell",
- "quick-xml",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "sha2",
- "tokio",
- "toml",
- "walkdir",
-]
-
-[[package]]
-name = "copper-lsp"
-version = "0.0.1-pre-alpha"
-dependencies = [
- "copper-syntax",
- "dashmap",
- "once_cell",
- "ropey",
- "serde_json",
- "tokio",
- "tower-lsp",
-]
-
-[[package]]
-name = "copper-parser"
-version = "0.0.1-pre-alpha"
-dependencies = [
- "copper-syntax",
-]
-
-[[package]]
-name = "copper-syntax"
-version = "0.0.1-pre-alpha"
-dependencies = [
- "once_cell",
- "regex",
- "serde",
 ]
 
 [[package]]
@@ -1028,6 +976,58 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "88904434abc2901f197fe8cc55f0445e7ded921dba5911dad2e2b39b48e663c4"
 
 [[package]]
+name = "mikasa"
+version = "0.1.0-beta.0"
+dependencies = [
+ "astra-vm",
+ "clap",
+ "colored",
+ "mikasa-parser",
+ "mikasa-syntax",
+ "mui-codegen",
+ "mui-syntax",
+ "once_cell",
+ "quick-xml",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "toml",
+ "walkdir",
+]
+
+[[package]]
+name = "mikasa-lsp"
+version = "0.0.1-pre-alpha"
+dependencies = [
+ "dashmap",
+ "mikasa-syntax",
+ "once_cell",
+ "ropey",
+ "serde_json",
+ "tokio",
+ "tower-lsp",
+]
+
+[[package]]
+name = "mikasa-parser"
+version = "0.0.1-pre-alpha"
+dependencies = [
+ "mikasa-syntax",
+]
+
+[[package]]
+name = "mikasa-syntax"
+version = "0.0.1-pre-alpha"
+dependencies = [
+ "once_cell",
+ "regex",
+ "serde",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1058,7 +1058,7 @@ dependencies = [
 name = "mui-codegen"
 version = "0.0.1-pre-alpha"
 dependencies = [
- "copper-syntax",
+ "mikasa-syntax",
  "mui-syntax",
 ]
 
@@ -1066,8 +1066,8 @@ dependencies = [
 name = "mui-lsp"
 version = "0.0.1-pre-alpha"
 dependencies = [
- "copper-syntax",
  "dashmap",
+ "mikasa-syntax",
  "mui-syntax",
  "once_cell",
  "ropey",
@@ -1080,7 +1080,7 @@ dependencies = [
 name = "mui-syntax"
 version = "0.0.1-pre-alpha"
 dependencies = [
- "copper-syntax",
+ "mikasa-syntax",
 ]
 
 [[package]]

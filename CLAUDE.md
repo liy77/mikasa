@@ -5,10 +5,10 @@ Context for AI assistants on **copper-lang** — traps, invariants, conventions.
 > **Copper is now Mikasa, and Alloy is now Astra.** The rename is branding:
 > docs, window titles, and logos say Mikasa / Astra. The toolchain binary is
 > `mikasa` (formerly `cforge`). The interpreter binary (`alloy`), crate names
-> (`copper-*`, `alloy-vm`), and module paths stay as they are — do not rename
+> (`copper-*`, `astra-vm`), and module paths stay as they are — do not rename
 > them to match the brand.
 >
-> Extensions (`crates/copper-syntax/src/ext.rs`): `.mika` source, `.ast`
+> Extensions (`crates/mikasa-syntax/src/ext.rs`): `.mika` source, `.ast`
 > bytecode, `.mklib` library, `.mipkg` package. `.crs` and `.loy` still load
 > and must keep loading — they are legacy, not removed. New output uses the
 > new names.
@@ -22,26 +22,26 @@ Context for AI assistants on **copper-lang** — traps, invariants, conventions.
 Mikasa (formerly Copper) transpiles to Rust. Binary: `mikasa`. Pipeline:
 `.crs` → tokenizer → token rewrites → parser → Rust source → `cargo build`.
 
-**Second engine: Astra** (formerly Alloy; `crates/alloy-vm`, binary `alloy`) — tree-walking interpreter
-over the shared `copper-syntax` AST. Instant like `python`; no transpile, no cargo.
-Design specs: `docs/superpowers/specs/2026-06-22-alloy-vm-design.md`.
+**Second engine: Astra** (formerly Alloy; `crates/astra-vm`, binary `alloy`) — tree-walking interpreter
+over the shared `mikasa-syntax` AST. Instant like `python`; no transpile, no cargo.
+Design specs: `docs/superpowers/specs/2026-06-22-astra-vm-design.md`.
 
 ## Repository layout (canonical)
 
 ```
 crates/
-  copper-syntax/    tokenizer + AST (shared by cforge, alloy, LSPs)
-  copper-parser/    streaming transpiler parser
-  alloy-vm/         Astra interpreter lib + `alloy` CLI
+  mikasa-syntax/    tokenizer + AST (shared by cforge, alloy, LSPs)
+  mikasa-parser/    streaming transpiler parser
+  astra-vm/         Astra interpreter lib + `alloy` CLI
                     src/{value,env,error,interp,bytecode,loader,stdlib,stdlib_ext,wasm,intrinsics}.rs
-  copper-lsp/       Mikasa language server
+  mikasa-lsp/       Mikasa language server
   mui-syntax/       MocidaUI parser (.mui, and .mika files with a view)
   mui-codegen/      MUI → Rust codegen (M5)
   mui-lsp/          MUI language server
 src/                cforge entrypoint + re-exports from crates (historical; real code is in crates/)
 astra-gui/          Dual-mode alloy GUI host (MUI; own workspace; links mocida)
 std/cstd.mika        Mikasa stdlib — single source for both cforge and alloy
-docs/superpowers/specs/   Design specs (alloy-vm, bytecode, gui, check-miri, wasm-interop, mui-codegen)
+docs/superpowers/specs/   Design specs (astra-vm, bytecode, gui, check-miri, wasm-interop, mui-codegen)
 docs/TODO.md        Backlog with priorities
 ```
 
@@ -62,7 +62,7 @@ Handlers + live reactivity are emitted as comments/placeholders — M3/M4 evalua
 - `alloy check file.crs [--no-miri]` — verify via real rustc + Miri.
 - `cforge vm run/build` / `cforge check` — same VM via cforge.
 
-**`.loy` format** (`crates/alloy-vm/src/bytecode.rs`):
+**`.loy` format** (`crates/astra-vm/src/bytecode.rs`):
 `magic b"ALLOYBC\0"` + `fmt_ver: u16 LE` + bincode(alloy_ver) + bincode(payload).
 v1 = `Vec<Item>` (AST). v2 = `Vec<Item>` + `Vec<WasmModule { names, bytes }>` (wasm embedded). v1 still loadable.
 
@@ -107,7 +107,7 @@ v1 = `Vec<Item>` (AST). v2 = `Vec<Item>` + `Vec<WasmModule { names, bytes }>` (w
 - **`match` arms use `,` not `;`** — enforced via `brace_is_match.last()` in `line_break_token`. Don't disable.
 - **Don't stub the parser back to a minimal echo.** Happened once (cd22d82); restoration was non-trivial.
 
-### copper-syntax AST parser (Astra)
+### mikasa-syntax AST parser (Astra)
 
 - **Recoverable parser** — partial tree + `ParseError`s on bad input. `alloy run` rejects non-empty `prog.errors`. Earlier these were silently discarded (`_errs`).
 - **Inside `(...)` identifiers are `Param`/`ParamType`, not `Identifier`.** `expect_ident` and closure-param parsing must accept both.
@@ -202,7 +202,7 @@ cargo build                    # debug
 cargo build --release          # release (what install.py runs)
 cargo fmt -- --check
 cargo clippy -- -D warnings
-cargo test                     # tests in copper-syntax interpolation
+cargo test                     # tests in mikasa-syntax interpolation
 for f in examples/copper/*.crs; do ./target/debug/cforge run "$f"; done
 python scripts/install.py      # reinstall; open NEW terminal after
 ```

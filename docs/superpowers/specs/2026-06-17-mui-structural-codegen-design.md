@@ -134,7 +134,7 @@ runtime's ceiling:
 A small evaluator over Copper's `Expr`, run at build time inside the view fn:
 
 - Input: `cond_raw` / `iter` / `scrutinee`, parsed via
-  `copper_syntax::expr::parse_expr`.
+  `mikasa_syntax::expr::parse_expr`.
 - Resolves against the current env: live signal values (`.borrow().get()`),
   view params, literals.
 - Produces a `bool` (if), a `Vec<item>` (for), or a comparable value (match).

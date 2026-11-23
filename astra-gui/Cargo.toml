@@ -21,14 +21,14 @@ description = "Astra — GUI + dual-mode binary (playground, file runner, update
 
 # The shipped binary is named `alloy` (the dual-mode GUI/CLI executable).
 [[bin]]
-name = "alloy"
+name = "astra"
 path = "src/main.rs"
 
 [dependencies]
 # Portable Astra interpreter (lib) — reused for the CLI passthrough and the
 # playground/runner "Run".
-alloy-vm = { path = "../crates/alloy-vm" }
-copper-syntax = { path = "../crates/copper-syntax" }
+astra-vm = { path = "../crates/astra-vm" }
+mikasa-syntax = { path = "../crates/mikasa-syntax" }
 
 # MUI / mocida runtime (the part the portable crates can't link).
 mocida = { path = "../../mocida/mocida-rs/mocida" }

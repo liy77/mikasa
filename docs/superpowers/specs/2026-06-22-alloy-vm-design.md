@@ -24,11 +24,11 @@ a forma concreta de "Alloy continua compatível com Rust".
 ## Arquitetura
 
 ```
-                 crates/copper-syntax::program  (Program AST — JÁ EXISTE)
+                 crates/mikasa-syntax::program  (Program AST — JÁ EXISTE)
                                    │
                   ┌────────────────┴────────────────┐
                   ▼                                  ▼
-        crates/alloy-vm                       crates/copper-parser
+        crates/astra-vm                       crates/mikasa-parser
         (interpretador tree-walking)          (AST/tokens → Rust source)  ← já existe
                   │                                  │
                   ▼                                  ▼
@@ -38,40 +38,40 @@ a forma concreta de "Alloy continua compatível com Rust".
 
 **Princípios**
 
-- **AST única e compartilhada** (`copper-syntax`) é a fonte de verdade dos dois
+- **AST única e compartilhada** (`mikasa-syntax`) é a fonte de verdade dos dois
   alvos. Nenhum backend re-tokeniza.
 - **`alloy` é binário separado** do `cforge`. `cforge` continua dono do
   transpile/release; `alloy` é dono da VM.
-- **Crates novos isolados** (`alloy-compiler`, `alloy-vm`). `cforge` e `mui-*`
+- **Crates novos isolados** (`alloy-compiler`, `astra-vm`). `cforge` e `mui-*`
   não dependem deles, então o CI Linux/macOS/Windows não quebra por causa do
   Alloy.
 
 ## Componentes
 
-### 1. `copper-syntax` (JÁ EXISTE — fundação pronta)
+### 1. `mikasa-syntax` (JÁ EXISTE — fundação pronta)
 
 **Atualização (2026-06-22):** a AST completa **já está implementada** no repo,
 não precisa ser construída:
 
-- `crates/copper-syntax/src/expr.rs` — AST tipada completa (`Expr`/`ExprKind`,
+- `crates/mikasa-syntax/src/expr.rs` — AST tipada completa (`Expr`/`ExprKind`,
   `Stmt`, `Pattern`, `Block`, `Type`) + Pratt parser (`parse_expr`,
   `parse_stmts`, `parse_stmts_tokens`). Cobre literais, member, call (turbofish),
   path, index, cast, try, unary/binary, ternário, assign, range, array, closure,
   struct-lit, `if`/`match` como expressão, block. Fallback `ExprKind::Raw` para
   o que o subset ainda não forma.
-- `crates/copper-syntax/src/program.rs` — `parse_program(source) -> Program`,
+- `crates/mikasa-syntax/src/program.rs` — `parse_program(source) -> Program`,
   AST de programa inteiro: `Item` (func/struct/class/impl/trait/enum/import/stmt)
   com **corpos `Block` totalmente parseados** (reusa o Pratt parser de `expr`).
   Descrita no próprio arquivo como "the faithful program AST a backend
   (Cranelift, or a re-emitter) can walk".
-- `crates/copper-syntax/src/ast.rs` — árvore span-based nível-item (corpos =
+- `crates/mikasa-syntax/src/ast.rs` — árvore span-based nível-item (corpos =
   span), usada pelo LSP; permanece como está.
 
 Logo o primeiro trabalho de Alloy **não** é AST, é o backend. Gaps residuais
 (casos que ainda caem em `Raw`, genéricos em itens) são tratados sob demanda
 conforme a VM os exercita, não como uma fase prévia.
 
-### 2. `alloy-vm` (runtime — interpretador tree-walking primeiro)
+### 2. `astra-vm` (runtime — interpretador tree-walking primeiro)
 
 Decisão de implementação: começar como **interpretador tree-walking** que
 executa o `Program` de `program.rs` diretamente — caminho mais curto até
@@ -145,7 +145,7 @@ próprio.
 
 1. ~~**AST completa**~~ — **JÁ EXISTE** (`expr.rs` + `program.rs`). Pulada.
 2. **VM núcleo (tree-walking):** avaliação de expr, vars, funcs, controle de
-   fluxo, `println`. Crate `alloy-vm` + binário `alloy` com `run`. → primeiro
+   fluxo, `println`. Crate `astra-vm` + binário `alloy` com `run`. → primeiro
    `alloy run`. **(primeiro plano de implementação)**
 3. **Tipos compostos:** struct/class/enum/impl/match/closures na VM.
 4. **Genéricos + traits** na VM (e fechar gaps de `Raw` na AST sob demanda).

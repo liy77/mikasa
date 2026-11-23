@@ -5,7 +5,7 @@
 build` (v2 format, self-contained: runs with no rustc and no `.rs` on disk).
 Richer ABI (strings/structs) + auto-wrappers = next phases.
 **Date:** 2026-06-22
-**Crates:** `crates/alloy-vm` (`wasm.rs`, `loader.rs`, `interp.rs`, `bin/alloy.rs`)
+**Crates:** `crates/astra-vm` (`wasm.rs`, `loader.rs`, `interp.rs`, `bin/alloy.rs`)
 
 ## Problem
 

@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 
 use crate::ast::{Element, MuiValue, Node, Prop, PropValue};
-use copper_syntax::expr::{BinOp, Expr, ExprKind, Literal, StrPart, UnOp};
+use mikasa_syntax::expr::{BinOp, Expr, ExprKind, Literal, StrPart, UnOp};
 
 /// An RGBA color in 0-255 channels (alpha 0-255). The single representation
 /// both `#rrggbb[aa]` and `rgba(...)` resolve to.
@@ -695,7 +695,7 @@ fn parse_hex(hex: &str) -> Option<Rgba> {
 /// expression interpolation (e.g. `method: "${kind}"`) is rejected —
 /// material names must be a compile-time constant.
 pub fn enum_member(el: &Element, name: &str) -> Option<String> {
-    use copper_syntax::expr::{Literal, StrPart};
+    use mikasa_syntax::expr::{Literal, StrPart};
     match &find(el, name)?.value {
         PropValue::Mui(MuiValue::Enum { member, .. }) => Some(member.to_lowercase()),
         PropValue::Expr(e) => match &e.kind {

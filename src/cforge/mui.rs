@@ -34,12 +34,12 @@ pub fn is_mui_file(file: &str) -> bool {
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_ascii_lowercase();
-    if copper_syntax::ext::is_mui(&ext) || copper_syntax::ext::is_mui_legacy(&ext) {
+    if mikasa_syntax::ext::is_mui(&ext) || mikasa_syntax::ext::is_mui_legacy(&ext) {
         return true;
     }
-    if copper_syntax::ext::is_source(&ext) {
+    if mikasa_syntax::ext::is_source(&ext) {
         if let Ok(src) = std::fs::read_to_string(file) {
-            return copper_syntax::ext::source_is_mui(&src);
+            return mikasa_syntax::ext::source_is_mui(&src);
         }
     }
     false

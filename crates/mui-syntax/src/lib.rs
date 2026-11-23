@@ -4,8 +4,8 @@
 //! their parameters, and the nested element/children tree (plus `let` / `if` /
 //! `for` / `match` / `effect` node shapes). Element arguments and prop
 //! expressions are recognised structurally; lowering them into
-//! [`copper_syntax::expr`] trees is the next increment (the dependency is
-//! already wired — the AST carries `Expr`/`Block` from copper-syntax).
+//! [`mikasa_syntax::expr`] trees is the next increment (the dependency is
+//! already wired — the AST carries `Expr`/`Block` from mikasa-syntax).
 //!
 //! Lexing reuses Copper's own tokenizer so MUI and Copper stay in lockstep.
 
@@ -16,11 +16,11 @@ pub mod style;
 use ast::{
     Document, Element, Handler, MatchArm, MuiError, MuiValue, Node, Param, Prop, PropValue, View,
 };
-use copper_syntax::ast::Span;
-use copper_syntax::expr::Expr;
-use copper_syntax::tokenizer::kind::TokenKind;
-use copper_syntax::tokenizer::tokenizer::Tokenizer;
-use copper_syntax::tokenizer::tokens::Token;
+use mikasa_syntax::ast::Span;
+use mikasa_syntax::expr::Expr;
+use mikasa_syntax::tokenizer::kind::TokenKind;
+use mikasa_syntax::tokenizer::tokenizer::Tokenizer;
+use mikasa_syntax::tokenizer::tokens::Token;
 
 /// Parse a MUI document. Never panics; recoverable errors land in
 /// [`Document::errors`].
@@ -263,7 +263,7 @@ impl Parser {
         // The path: collect the remaining tokens on this entry and pull the
         // string out (Copper makes a `Literal::Str` / `format("...")`).
         let (raw, _) = self.collect_arg_tokens();
-        let path = match copper_syntax::expr::parse_expr(&raw).0 {
+        let path = match mikasa_syntax::expr::parse_expr(&raw).0 {
             Some(e) => prop_string(&PropValue::Expr(e)).unwrap_or(raw),
             None => raw,
         };
@@ -453,9 +453,9 @@ impl Parser {
             if self.eat("=") {
                 let (raw, span) = self.collect_arg_tokens();
                 if !raw.is_empty() {
-                    default = Some(copper_syntax::expr::parse_expr(&raw).0.unwrap_or_else(|| {
-                        copper_syntax::expr::Expr::new(
-                            copper_syntax::expr::ExprKind::Ident(raw),
+                    default = Some(mikasa_syntax::expr::parse_expr(&raw).0.unwrap_or_else(|| {
+                        mikasa_syntax::expr::Expr::new(
+                            mikasa_syntax::expr::ExprKind::Ident(raw),
                             span,
                         )
                     }));
@@ -668,15 +668,15 @@ impl Parser {
         // `eval_dim_reactive` can walk it); otherwise we fall through to the
         // generic fallback below.
         if let Some(inner) = strip_reactive_slot(&raw) {
-            if let Some(e) = copper_syntax::expr::parse_expr(&inner).0 {
+            if let Some(e) = mikasa_syntax::expr::parse_expr(&inner).0 {
                 return PropValue::Expr(e);
             }
         }
         // Fall back to a lowered Copper expression.
-        match copper_syntax::expr::parse_expr(&raw).0 {
+        match mikasa_syntax::expr::parse_expr(&raw).0 {
             Some(e) => PropValue::Expr(e),
-            None => PropValue::Expr(copper_syntax::expr::Expr::new(
-                copper_syntax::expr::ExprKind::Ident(raw),
+            None => PropValue::Expr(mikasa_syntax::expr::Expr::new(
+                mikasa_syntax::expr::ExprKind::Ident(raw),
                 exprs_span,
             )),
         }
@@ -793,7 +793,7 @@ impl Parser {
 
     /// Eat `=>` — the tokenizer may emit it as a single `=>` token or as two
     /// tokens `=` and `>` (since `=` is in `SYMBOL_OPERATORS` and `>` is in
-    /// `COMPARE_SIGNS`). Mirror the strategy used by copper-syntax's own parser.
+    /// `COMPARE_SIGNS`). Mirror the strategy used by mikasa-syntax's own parser.
     fn eat_fat_arrow(&mut self) -> bool {
         if self.peek_val() == Some("=>") {
             self.pos += 1;
@@ -855,9 +855,9 @@ impl Parser {
             }
             let raw = parts.join("");
             if !raw.is_empty() {
-                value = Some(copper_syntax::expr::parse_expr(&raw).0.unwrap_or_else(|| {
-                    copper_syntax::expr::Expr::new(
-                        copper_syntax::expr::ExprKind::Ident(raw),
+                value = Some(mikasa_syntax::expr::parse_expr(&raw).0.unwrap_or_else(|| {
+                    mikasa_syntax::expr::Expr::new(
+                        mikasa_syntax::expr::ExprKind::Ident(raw),
                         val_start,
                     )
                 }));
@@ -973,7 +973,7 @@ impl Parser {
             }
         }
         let iter_raw = iter_parts.join(" ");
-        let iter = copper_syntax::expr::parse_expr(&iter_raw)
+        let iter = mikasa_syntax::expr::parse_expr(&iter_raw)
             .0
             .unwrap_or_else(raw_expr);
         let body = self.parse_block();
@@ -1005,7 +1005,7 @@ impl Parser {
             }
         }
         let scrut_raw = scrut_parts.join(" ");
-        let scrutinee = copper_syntax::expr::parse_expr(&scrut_raw)
+        let scrutinee = mikasa_syntax::expr::parse_expr(&scrut_raw)
             .0
             .unwrap_or_else(raw_expr);
         let mut arms: Vec<MatchArm> = Vec::new();
@@ -1092,8 +1092,8 @@ fn span_of(t: &Token) -> Span {
     Span::new(s, e)
 }
 
-fn empty_block() -> copper_syntax::expr::Block {
-    copper_syntax::expr::Block {
+fn empty_block() -> mikasa_syntax::expr::Block {
+    mikasa_syntax::expr::Block {
         stmts: Vec::new(),
         tail: None,
         span: Span::new(0, 0),
@@ -1102,8 +1102,8 @@ fn empty_block() -> copper_syntax::expr::Block {
 
 /// Placeholder expression used where the structural pass records a node but
 /// the embedded Copper expression isn't lowered yet (next increment).
-fn raw_expr() -> copper_syntax::expr::Expr {
-    copper_syntax::expr::parse_expr("0")
+fn raw_expr() -> mikasa_syntax::expr::Expr {
+    mikasa_syntax::expr::parse_expr("0")
         .0
         .expect("placeholder literal parses")
 }
@@ -1111,7 +1111,7 @@ fn raw_expr() -> copper_syntax::expr::Expr {
 /// Extract a string from a prop value (a string literal, lowered by Copper
 /// into a `format("...")` call or a `Literal::Str`).
 fn prop_string(value: &PropValue) -> Option<String> {
-    use copper_syntax::expr::{ExprKind, Literal, StrPart};
+    use mikasa_syntax::expr::{ExprKind, Literal, StrPart};
     let PropValue::Expr(e) = value else {
         return None;
     };
@@ -1150,7 +1150,7 @@ fn prop_string(value: &PropValue) -> Option<String> {
 
 /// Extract an integer from a numeric-literal prop value.
 fn prop_int(value: &PropValue) -> Option<i32> {
-    use copper_syntax::expr::{ExprKind, Literal};
+    use mikasa_syntax::expr::{ExprKind, Literal};
     let PropValue::Expr(e) = value else {
         return None;
     };
@@ -1162,7 +1162,7 @@ fn prop_int(value: &PropValue) -> Option<i32> {
 }
 
 fn prop_float(value: &PropValue) -> Option<f32> {
-    use copper_syntax::expr::{ExprKind, Literal};
+    use mikasa_syntax::expr::{ExprKind, Literal};
     let PropValue::Expr(e) = value else {
         return None;
     };
@@ -1175,7 +1175,7 @@ fn prop_float(value: &PropValue) -> Option<f32> {
 
 /// Extract an identifier name (`entry: Counter`) or a string (`entry: "Counter"`).
 fn prop_ident_or_string(value: &PropValue) -> Option<String> {
-    use copper_syntax::expr::ExprKind;
+    use mikasa_syntax::expr::ExprKind;
     if let PropValue::Expr(e) = value {
         if let ExprKind::Ident(n) = &e.kind {
             return Some(n.clone());
@@ -1185,9 +1185,9 @@ fn prop_ident_or_string(value: &PropValue) -> Option<String> {
 }
 
 /// Pull a string out of a Copper [`Expr`] (literal / `format("…")` / ident).
-fn expr_string(e: &copper_syntax::expr::Expr) -> Option<String> {
+fn expr_string(e: &mikasa_syntax::expr::Expr) -> Option<String> {
     prop_string(&PropValue::Expr(e.clone())).or_else(|| {
-        if let copper_syntax::expr::ExprKind::Ident(n) = &e.kind {
+        if let mikasa_syntax::expr::ExprKind::Ident(n) = &e.kind {
             Some(n.clone())
         } else {
             None
@@ -1196,9 +1196,9 @@ fn expr_string(e: &copper_syntax::expr::Expr) -> Option<String> {
 }
 
 fn expr_field<'a>(
-    fields: &'a [(String, copper_syntax::expr::Expr)],
+    fields: &'a [(String, mikasa_syntax::expr::Expr)],
     names: &[&str],
-) -> Option<&'a copper_syntax::expr::Expr> {
+) -> Option<&'a mikasa_syntax::expr::Expr> {
     fields
         .iter()
         .find(|(k, _)| names.iter().any(|n| k.eq_ignore_ascii_case(n)))
@@ -1207,8 +1207,8 @@ fn expr_field<'a>(
 
 /// Parse one `FontFace("Inter", "/fonts/Inter.ttf")` call, `FontFace { … }`
 /// struct, `"Inter=/path"`, or `"Inter"` + separate path pair.
-fn font_face_from_expr(e: &copper_syntax::expr::Expr) -> Option<ast::FontFace> {
-    use copper_syntax::expr::ExprKind;
+fn font_face_from_expr(e: &mikasa_syntax::expr::Expr) -> Option<ast::FontFace> {
+    use mikasa_syntax::expr::ExprKind;
     match &e.kind {
         ExprKind::Call { callee, args, .. }
             if matches!(&callee.kind, ExprKind::Ident(n) if n == "FontFace" || n == "fontFace") =>
@@ -1260,7 +1260,7 @@ fn font_face_from_expr(e: &copper_syntax::expr::Expr) -> Option<ast::FontFace> {
 
 /// `fonts:` value → zero or more [`ast::FontFace`] entries.
 fn parse_font_faces(value: &PropValue) -> Vec<ast::FontFace> {
-    use copper_syntax::expr::ExprKind;
+    use mikasa_syntax::expr::ExprKind;
     let PropValue::Expr(e) = value else {
         return Vec::new();
     };
@@ -1434,7 +1434,7 @@ view Hello(name: string = "world") {
         assert!(
             matches!(
                 &orientation.value,
-                PropValue::Expr(e) if matches!(&e.kind, copper_syntax::expr::ExprKind::Ident(n) if n == "vertical")
+                PropValue::Expr(e) if matches!(&e.kind, mikasa_syntax::expr::ExprKind::Ident(n) if n == "vertical")
             ),
             "orientation `vertical` should be a Copper ident expr, got {:?}",
             orientation.value

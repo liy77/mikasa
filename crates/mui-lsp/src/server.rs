@@ -19,7 +19,7 @@ use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer};
 
-use copper_syntax::expr::ExprKind;
+use mikasa_syntax::expr::ExprKind;
 use mui_syntax::ast::{ImportKind, Node, PropValue};
 
 use crate::catalog;
@@ -861,7 +861,7 @@ fn scan_colors(doc: &Document) -> Vec<ColorInformation> {
 }
 
 fn color_info(doc: &Document, start: usize, end: usize, color: Color) -> ColorInformation {
-    use copper_syntax::ast::Span;
+    use mikasa_syntax::ast::Span;
     ColorInformation {
         range: doc.span_to_range(Span::new(start as u32, end as u32)),
         color,

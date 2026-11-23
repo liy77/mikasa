@@ -3,7 +3,7 @@
 //! live signal values each rebuild. Reactivity is whole-view rebuild, not
 //! const-folding — nothing here is evaluated at codegen time.
 
-use copper_syntax::expr::{BinOp, Expr, ExprKind, Literal, UnOp};
+use mikasa_syntax::expr::{BinOp, Expr, ExprKind, Literal, UnOp};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SigKind {
@@ -145,7 +145,7 @@ pub fn collect_reads(expr: &Expr, out: &mut Vec<String>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use copper_syntax::expr::parse_expr;
+    use mikasa_syntax::expr::parse_expr;
 
     fn sig(name: &str) -> Option<SigKind> {
         match name {

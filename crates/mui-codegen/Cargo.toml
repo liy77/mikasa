@@ -6,4 +6,4 @@ description = "Release codegen for MUI (.mui / .crm): lowers the component AST t
 
 [dependencies]
 mui-syntax = { path = "../mui-syntax" }
-copper-syntax = { path = "../copper-syntax" }
+mikasa-syntax = { path = "../mikasa-syntax" }

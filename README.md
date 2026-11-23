@@ -43,7 +43,7 @@ println!("Your name is $name")
 
 `alloy run file.mika` is instant — like `python` or `node`. `mikasa run file.mika`
 gives you native speed after the first compile. Both share the same
-`copper-syntax` AST so behaviour is identical.
+`mikasa-syntax` AST so behaviour is identical.
 
 ## Install
 
@@ -235,10 +235,10 @@ shared between the transpiler and Astra (single source of truth).
 copper-lang/
 ├── src/                # cforge compiler entrypoint + legacy re-exports
 ├── crates/
-│   ├── copper-syntax/  # Tokenizer + AST (shared by cforge, alloy, LSPs)
-│   ├── copper-parser/  # Streaming transpiler parser
-│   ├── alloy-vm/       # Astra interpreter + `alloy` CLI
-│   ├── copper-lsp/     # Mikasa language server (hover, completion, goto-def)
+│   ├── mikasa-syntax/  # Tokenizer + AST (shared by cforge, alloy, LSPs)
+│   ├── mikasa-parser/  # Streaming transpiler parser
+│   ├── astra-vm/       # Astra interpreter + `alloy` CLI
+│   ├── mikasa-lsp/     # Mikasa language server (hover, completion, goto-def)
 │   ├── mui-syntax/     # MocidaUI parser (.mui, and .mika files with a view)
 │   ├── mui-codegen/    # MUI → Rust codegen (M5 native path)
 │   └── mui-lsp/        # MUI language server
@@ -302,7 +302,7 @@ Full backlog with details: [`docs/TODO.md`](./docs/TODO.md).
 - [ ] Type aliases (`type Foo = Bar<T>`) inside `static`/`as` casts
 
 **Astra interpreter**
-- [x] Tree-walking interpreter for the full `copper-syntax` AST
+- [x] Tree-walking interpreter for the full `mikasa-syntax` AST
 - [x] `cstd` interpreted from `std/cstd.mika` (single source, no Rust reimplementation)
 - [x] Portable `.loy` artifacts (`alloy build` / `alloy run`)
 - [x] Imported `.rs` files run via embedded WebAssembly (wasm cache, embedded in `.loy`)

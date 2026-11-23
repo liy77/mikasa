@@ -9,7 +9,7 @@ use mui_syntax::ast::Document as MuiDocument;
 use ropey::Rope;
 use tower_lsp::lsp_types::{Position, Range, Url};
 
-use copper_syntax::ast::Span;
+use mikasa_syntax::ast::Span;
 
 #[derive(Default)]
 pub struct DocumentMap {

@@ -6,7 +6,7 @@
 Turns `.mui` / `.crm` source into a component AST: `view` declarations, their
 params, and the nested element/children tree (`let` / `if` / `for` / `match` /
 `effect` nodes), with element args and prop expressions lowered into
-[`copper-syntax`](../copper-syntax) `Expr` trees.
+[`mikasa-syntax`](../mikasa-syntax) `Expr` trees.
 
 Lexing **reuses Copper's own tokenizer**, so MUI and Copper stay in lockstep:
 embedded Copper expressions (`${...}`, handlers, signal initializers) parse with
@@ -32,7 +32,7 @@ src/
 
 ## Notes
 
-- **Recoverable** like `copper-syntax`: malformed input yields a partial
+- **Recoverable** like `mikasa-syntax`: malformed input yields a partial
   `Document` with errors collected in `Document::errors`.
 - Pure parser — no dependency on `mocida` or the runtime, so it builds anywhere.
 - See `mocida/mui/ARCHITECTURE.md` for where this sits in the MUI pipeline.

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** executado via subagent-driven-development. Os EXEMPLOS são o critério de aceitação: cada cluster termina com `alloy run` executando os exemplos-alvo sem gaps de linguagem.
 
-**Goal:** Estender `crates/alloy-vm` para que todo `examples/copper/*.crs` rode pelo `alloy run` como o `cforge` rodaria.
+**Goal:** Estender `crates/astra-vm` para que todo `examples/copper/*.crs` rode pelo `alloy run` como o `cforge` rodaria.
 
 **Acceptance:** `alloy run <ex>` executa cada exemplo. Para exemplos puramente locais (ternary, tuples, optional, methods, matching, collections, unsafe, url, cstd, fs, time, json, crypto): exit 0 + saída coerente. Para os que dependem de rede/servidor (http, net, ws): o interpretador executa as chamadas nativas (sem "construção não suportada"/"função não definida"); falha de rede/servidor é ambiental e aceitável.
 
@@ -10,7 +10,7 @@
 
 Dois eixos:
 - **Linguagem** (`interp.rs` + `value.rs`): expandir o modelo de valores e o `eval_expr`/`exec_stmt` para cobrir os construtos compostos.
-- **Stdlib nativa** (`crates/alloy-vm/src/std_native/`): funções Rust registradas, chamadas por nome quando o exemplo importa de `cstd`/`fs`/`time`/`net`/`url`/`ws`/`json`/`crypto`/`http`. O host de import resolve `import { f } from mod` → registra `mod::f` na tabela de builtins.
+- **Stdlib nativa** (`crates/astra-vm/src/std_native/`): funções Rust registradas, chamadas por nome quando o exemplo importa de `cstd`/`fs`/`time`/`net`/`url`/`ws`/`json`/`crypto`/`http`. O host de import resolve `import { f } from mod` → registra `mod::f` na tabela de builtins.
 
 ## Modelo de valores (value.rs) — expansão cross-cutting (FAÇA PRIMEIRO)
 
@@ -72,7 +72,7 @@ Adicionar a `enum Value`:
 - Acceptance: cstd/fs/time/url/net → executam (net pode falhar por ambiente). `input()` lê stdin; em ambiente sem tty, retornar string vazia em vez de travar.
 
 ### Cluster 8 — stdlib com crates (desbloqueia: json, crypto, http)
-- Adicionar deps ao `alloy-vm`: `serde_json@1`, `sha2@0.10`, `hmac@0.12`, `ureq@2`.
+- Adicionar deps ao `astra-vm`: `serde_json@1`, `sha2@0.10`, `hmac@0.12`, `ureq@2`.
 - `json`: get/get_int/get_bool/has/len/pretty (serde_json) — e suportar indexação `Value` de json (`body["a"]["b"]`) integrando com `Value::Map`.
 - `crypto`: base64/hex/crc32 (puro) + sha256/sha512/hmac_sha256 (sha2/hmac).
 - `http`: get/post_json/download (ureq) retornando um `Value::Struct` "Response" com `.status`/`.body`/`.is_ok()`/`.json()`.
@@ -80,6 +80,6 @@ Adicionar a `enum Value`:
 
 ## Notas
 - **Sem panics:** todo gap remanescente continua sendo `RuntimeError` com span, nunca panic.
-- **Portabilidade:** as deps adicionadas (serde_json/sha2/hmac/ureq) são puro-Rust; não quebram CI. alloy-vm continua sem mocida.
+- **Portabilidade:** as deps adicionadas (serde_json/sha2/hmac/ureq) são puro-Rust; não quebram CI. astra-vm continua sem mocida.
 - **ws/http/net:** "rodar" = executar as chamadas; conectividade é ambiental.
-- Cada cluster: implementar → `cargo test -p alloy-vm` + `alloy run` nos exemplos-alvo → fmt/clippy → commit.
+- Cada cluster: implementar → `cargo test -p astra-vm` + `alloy run` nos exemplos-alvo → fmt/clippy → commit.

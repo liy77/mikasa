@@ -698,11 +698,11 @@ pub fn compile(
         // Skip anything that's neither Mikasa nor Rust — a project directory
         // may hold assets, kson, markdown, … which must not be tokenized.
         // `.mika` is the recommended source extension; `.crs` still compiles.
-        if !copper_syntax::ext::is_source(&ext) {
+        if !mikasa_syntax::ext::is_source(&ext) {
             vprint!("  {} {}", "skipping non-source".dimmed(), file);
             continue;
         }
-        if let Some(note) = copper_syntax::ext::legacy_note(&ext) {
+        if let Some(note) = mikasa_syntax::ext::legacy_note(&ext) {
             vprint!("  {} {}", "note".yellow(), note);
         }
 

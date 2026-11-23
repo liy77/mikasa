@@ -14,7 +14,7 @@
   - Fase 3: structs, `Option`/`Result`, traits via WebAssembly Component Model + `wit-bindgen`.
   - **Ergonomia:** auto-gerar wrapper de export para `pub fn` idiomático (sem `extern "C"`),
     para que o usuário não precise anotar manualmente.
-- **Arquivo:** `crates/alloy-vm/src/wasm.rs`, `loader.rs`
+- **Arquivo:** `crates/astra-vm/src/wasm.rs`, `loader.rs`
 
 ### MUI codegen — controle de fluxo estrutural reativo (`if`/`for`/`match`)
 - **Estado:** design aprovado, pré-implementação (`docs/superpowers/specs/2026-06-17-mui-structural-codegen-design.md`).
@@ -30,7 +30,7 @@
 - **Estado:** não suportado. Apenas genéricos em tipo de retorno e em `struct` funcionam.
 - **O que falta:** capturar `<T, U, ...>` após o nome da função em `parse_function` e emitir
   `fn name<T, U>(...) -> Ret` corretamente.
-- **Arquivo:** `crates/copper-parser/src/parser/mod.rs` (`parse_function`)
+- **Arquivo:** `crates/mikasa-parser/src/parser/mod.rs` (`parse_function`)
 
 ---
 
@@ -41,7 +41,7 @@
   (documentado em `CLAUDE.md` como limitação conhecida).
 - **O que falta:** na avaliação de `BinOp::And`/`BinOp::Or` em `interp.rs`,
   usar avaliação preguiçosa do lado direito.
-- **Arquivo:** `crates/alloy-vm/src/interp.rs` (`eval`)
+- **Arquivo:** `crates/astra-vm/src/interp.rs` (`eval`)
 
 ### Alloy GUI — features pendentes do alloy-gui
 - **Estado:** playground responsivo funcional, hot-reload, file dialog.
@@ -51,7 +51,7 @@
   - Painel de erros estruturado (vs. texto puro no output).
   - Packaging: `.app` bundle (macOS), `.exe` com ícone (Windows) via `make-app.sh`.
 
-### copper-lsp — features LSP faltantes
+### mikasa-lsp — features LSP faltantes
 - **Estado:** hover, completion, goto-definition funcionam.
 - **O que falta:**
   - `inlayHints` — tipos inferidos de variáveis `let x = expr`.
@@ -116,5 +116,5 @@
 | alloy: `alloy check` / Miri auto-provisionado | `551f298` |
 | alloy: imports locais `.crs` (merge + bundle no .loy) | `2f14a38` |
 | alloy: artefato portável `.loy` + `alloy build` | `a726046` |
-| copper-syntax: `mut (a,b) = ...` tuple destructuring | `0c96577` |
+| mikasa-syntax: `mut (a,b) = ...` tuple destructuring | `0c96577` |
 | i18n: comentários e mensagens em inglês | `0926b65` |

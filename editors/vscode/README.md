@@ -15,11 +15,11 @@ legacy `.crs`). Mikasa was formerly called Copper.
 
 ## Requirements
 
-You need the `copper-lsp` binary on `PATH` (or set `copper.serverPath`). Build it from the copper-lang repo:
+You need the `mikasa-lsp` binary on `PATH` (or set `copper.serverPath`). Build it from the copper-lang repo:
 
 ```sh
-cargo build --release -p copper-lsp
-# Copy target/release/copper-lsp to a PATH directory, or:
+cargo build --release -p mikasa-lsp
+# Copy target/release/mikasa-lsp to a PATH directory, or:
 # set copper.serverPath in VSCode settings to its absolute path.
 ```
 
@@ -27,7 +27,7 @@ cargo build --release -p copper-lsp
 
 | Setting | Default | What it does |
 |---------|---------|--------------|
-| `copper.serverPath` | `copper-lsp` | Executable to launch as the LSP server. |
+| `copper.serverPath` | `mikasa-lsp` | Executable to launch as the LSP server. |
 | `copper.trace.server` | `off` | LSP message tracing — `off` / `messages` / `verbose`. |
 | `mikasa.runtime` | `astra` | `astra` interprets, `mikasa` transpiles to Rust. |
 | `mikasa.astraPath` | `alloy` | Path to the Astra interpreter. |
