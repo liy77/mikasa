@@ -327,37 +327,18 @@
     return fetch(assetUrl(path), opts).catch(function () { return null; });
   }
 
-  /* Warm the HTTP cache for screenshots. Prefer warmFetch over stuffing every
-     PNG into MEMFS — decoded full-res textures already stress wasm memory;
-     emscripten_fetch + LoadTextureSized(downscale) is the light path. */
+  /* 100% lazy media by default: warm only the above-the-fold hero + Bold font.
+     Everything else is fetched on demand when Image enters the Scroll clip
+     (mocida viewport gate). Prefetching the whole man.media gallery contended
+     with first interaction and queued decode hitches on scroll. */
   function prefetchLazyImages() {
-    var rest = [];
-    try {
-      if (typeof FS !== "undefined" && vfsExists("/manifest.json")) {
-        var man = JSON.parse(FS.readFile("/manifest.json", { encoding: "utf8" }));
-        if (man && man.media && man.media.length) {
-          for (var mi = 0; mi < man.media.length; mi++) rest.push(man.media[mi]);
-        }
-      }
-    } catch (eMan) { /* ignore */ }
-    if (!rest.length) {
-      rest = [
-        "/media/editor.png",
-        "/media/packages.png",
-        "/media/asset-store.png",
-        "/media/command-palette.png",
-        "/media/play-mode.png"
-      ];
-    }
-    rest.push("/fonts/Inter-Bold.ttf");
+    var rest = ["/fonts/Inter-Bold.ttf"];
     function stageRest() {
       var i = 0;
       (function next() {
         if (i >= rest.length) return;
         var batch = [rest[i++]];
-        if (i < rest.length) batch.push(rest[i++]);
         Promise.all(batch.map(function (p) {
-          /* Warm Cache Storage / HTTP — Image falls back to emscripten_fetch. */
           return warmFetch(p, "low");
         })).then(function () {
           if (window.requestIdleCallback) {
@@ -368,15 +349,12 @@
         });
       })();
     }
-    /* Above-the-fold: warm HTTP only. Staging full 2560x1440 PNGs into MEMFS
-       raced first paint into full-res IMG_Load and OOB'd the wasm heap. */
-    ["/media/editor.png"].forEach(function (p) {
-      warmFetch(p, "high");
-    });
+    /* Hero only — high priority HTTP warm, no MEMFS dump. */
+    warmFetch("/media/editor.png", "high");
     if (window.requestIdleCallback) {
-      window.requestIdleCallback(stageRest, { timeout: 400 });
+      window.requestIdleCallback(stageRest, { timeout: 800 });
     } else {
-      setTimeout(stageRest, 120);
+      setTimeout(stageRest, 200);
     }
   }
 
