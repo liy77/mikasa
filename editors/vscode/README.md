@@ -1,4 +1,4 @@
-# Mikasa for VSCode
+# mikasa-lsp
 
 Language support for [Mikasa](https://github.com/liy77/mikasa) (`.mika`, and the
 legacy `.crs`). Mikasa was formerly called Copper.

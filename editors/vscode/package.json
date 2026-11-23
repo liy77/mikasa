@@ -1,5 +1,5 @@
 {
-  "name": "copper-lang",
+  "name": "mikasa-lsp",
   "displayName": "Mikasa",
   "description": "Language support for Mikasa (.mika, .crs) — syntax highlight, diagnostics, completion, document symbols, hover. Mikasa was formerly Copper.",
   "version": "0.0.1",
@@ -12,7 +12,7 @@
     "vscode": "^1.85.0"
   },
   "categories": ["Programming Languages"],
-  "icon": "icons/extension-icon.png",
+  "icon": "icons/mikasa-lsp.png",
   "main": "./out/extension.js",
   "activationEvents": [
     "onLanguage:copper",
