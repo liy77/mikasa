@@ -1,16 +1,13 @@
-// Astra — GUI written entirely in Mikasa (MocidaUI document).
-//
-// Logic lives in backend.mika. The thin Rust host only links mocida,
-// runs the interpreter, and forwards signals. Edit this file and save —
-// the host hot-reloads it in dev.
+// Astra — GUI in Mikasa (MocidaUI). Visual language: Apple HIG (macOS dark).
+// Logic: backend.mika. Host hot-reloads this file in dev.
 
 App() {
   name: "Astra"
-  width: 1120
-  height: 740
-  minWidth: 800
-  minHeight: 560
-  background: #0a0a0c
+  width: 1180
+  height: 760
+  minWidth: 880
+  minHeight: 580
+  background: #1C1C1E
   mainContent: AstraApp
   host: "."
 }
@@ -32,54 +29,58 @@ view AstraApp() {
   Stack(
     orientation: horizontal,
     align: stretch,
-    background: #0a0a0c,
+    background: #1C1C1E,
     width: Window.width,
     height: Window.height
   ) {
-    // ── Sidebar ──────────────────────────────────────────────────────────
+    // ── Sidebar (HIG: secondary grouped) ─────────────────────────────────
     Rectangle(
-      width: 200,
+      width: 220,
       height: Window.height,
-      background: #101014,
-      borderColor: #1c1c24,
-      borderWidth: 1
+      background: #2C2C2E
     ) {
       Stack(
         orientation: vertical,
         align: stretch,
         justify: spaceBetween,
-        width: 200,
+        width: 220,
         height: Window.height,
-        paddingTop: 20,
-        paddingBottom: 18,
-        paddingLeft: 14,
-        paddingRight: 14
+        paddingTop: 18,
+        paddingBottom: 16,
+        paddingLeft: 12,
+        paddingRight: 12
       ) {
-        Stack(orientation: vertical, align: stretch, gap: 22, width: 172) {
-          Stack(orientation: horizontal, align: center, gap: 10, width: 172) {
-            Image("mocida://icon", width: 36, height: 36, fillMode: fit, antialiasing: true)
-            Stack(orientation: vertical, gap: 2, align: left) {
-              Text("Astra", size: 17, color: #f4f4f7, weight: bold)
-              Text("Mikasa VM", size: 10, color: #6e6e7a)
+        Stack(orientation: vertical, align: stretch, gap: 20, width: 196) {
+          Stack(orientation: horizontal, align: center, gap: 10, width: 196) {
+            Image(
+              "mocida://icon",
+              width: 36,
+              height: 36,
+              fillMode: fit,
+              antialiasing: true,
+              radius: 8
+            )
+            Stack(orientation: vertical, gap: 1, align: left) {
+              Text("Astra", size: 15, color: #F5F5F7, weight: bold, fontFamily: "SF Pro Text")
+              Text("Mikasa VM", size: 11, color: #98989D, fontFamily: "SF Pro Text")
             }
           }
 
-          Stack(orientation: vertical, align: stretch, gap: 4, width: 172) {
-            SideNav("Playground", nav == 0, 0, nav, "mocida://icons/code.png")
-            SideNav("Runner", nav == 1, 1, nav, "mocida://icons/terminal.png")
-            SideNav("Updates", nav == 2, 2, nav, "mocida://icons/update.png")
+          Stack(orientation: vertical, align: stretch, gap: 2, width: 196) {
+            SideNav("Playground", nav == 0, 0, nav, "chevron.left.forwardslash.chevron.right", "mocida://icons/code.png")
+            SideNav("Runner", nav == 1, 1, nav, "terminal", "mocida://icons/terminal.png")
+            SideNav("Updates", nav == 2, 2, nav, "arrow.triangle.2.circlepath", "mocida://icons/update.png")
           }
         }
 
-        Stack(orientation: vertical, align: stretch, gap: 6, width: 172) {
-          Rectangle(width: 172, height: 1, background: #1c1c24) {}
-          Text("v${version}", size: 11, color: #5c5c68)
-          Text("F1  F2  F3", size: 10, color: #3e3e48)
+        Stack(orientation: vertical, align: stretch, gap: 6, width: 196) {
+          Rectangle(width: 196, height: 1, background: #38383A) {}
+          Text(format("v{}", version), size: 11, color: #98989D, fontFamily: "SF Pro Text")
+          Text("F1 · F2 · F3", size: 10, color: #636366, fontFamily: "SF Pro Text")
         }
       }
     }
 
-    // ── Main pane ────────────────────────────────────────────────────────
     if nav == 0 {
       Playground(mode, source, output, run_trigger, wrap_output, status)
     } else if nav == 1 {
@@ -90,80 +91,76 @@ view AstraApp() {
   }
 }
 
-view SideNav(label, on, index, target, icon) {
+view SideNav(label, on, index, target, icon, fallback) {
   if on {
     Stack(
       orientation: horizontal,
       align: center,
-      gap: 8,
-      height: 36,
-      width: 172,
-      background: #e23b3b,
-      radius: 9,
-      paddingLeft: 12,
-      paddingRight: 12,
+      gap: 10,
+      height: 34,
+      width: 196,
+      background: #0A84FF,
+      radius: 8,
+      paddingLeft: 10,
+      paddingRight: 10,
       cursor: pointer,
       onClick: { target = index }
     ) {
-      Image(icon, width: 15, height: 15, fillMode: fit)
-      Text(label, size: 13, color: #ffffff, weight: bold)
+      Icon(icon, fallback: fallback, size: 18, tint: #FFFFFF)
+      Text(label, size: 13, color: #FFFFFF, weight: bold, fontFamily: "SF Pro Text")
     }
   } else {
     Stack(
       orientation: horizontal,
       align: center,
-      gap: 8,
-      height: 36,
-      width: 172,
-      background: #101014,
-      radius: 9,
-      paddingLeft: 12,
-      paddingRight: 12,
+      gap: 10,
+      height: 34,
+      width: 196,
+      background: #2C2C2E,
+      radius: 8,
+      paddingLeft: 10,
+      paddingRight: 10,
       cursor: pointer,
       onClick: { target = index }
     ) {
-      Image(icon, width: 15, height: 15, fillMode: fit)
-      Text(label, size: 13, color: #8a8a96)
+      Icon(icon, fallback: fallback, size: 18, tint: #98989D)
+      Text(label, size: 13, color: #F5F5F7, fontFamily: "SF Pro Text")
     }
   }
 }
 
-view ModeChip(label, on, index, target, icon) {
+view ModeChip(label, on, index, target, icon, fallback) {
   if on {
     Stack(
       orientation: horizontal,
       align: center,
-      gap: 5,
-      height: 30,
-      background: #1e1e28,
-      radius: 8,
+      gap: 6,
+      height: 26,
+      background: #48484A,
+      radius: 6,
       paddingLeft: 10,
       paddingRight: 10,
-      borderColor: #e23b3b,
-      borderWidth: 1,
       cursor: pointer,
       onClick: { target = index }
     ) {
-      Image(icon, width: 13, height: 13, fillMode: fit)
-      Text(label, size: 12, color: #f0f0f4)
+      Icon(icon, fallback: fallback, size: 12, tint: #FFFFFF)
+      Text(label, size: 12, color: #FFFFFF, weight: bold, fontFamily: "SF Pro Text")
     }
   } else {
     Stack(
       orientation: horizontal,
       align: center,
-      gap: 5,
-      height: 30,
-      background: #141418,
-      radius: 8,
+      gap: 6,
+      height: 26,
+      background: #2C2C2E,
+      radius: 6,
       paddingLeft: 10,
       paddingRight: 10,
-      borderColor: #24242e,
-      borderWidth: 1,
       cursor: pointer,
       onClick: { target = index }
     ) {
-      Image(icon, width: 13, height: 13, fillMode: fit)
-      Text(label, size: 12, color: #7a7a88)
+      Icon(icon, fallback: fallback, size: 12, tint: #98989D)
+      Text(label, size: 12, color: #98989D, fontFamily: "SF Pro Text")
     }
   }
 }
@@ -172,68 +169,76 @@ view Playground(mode, source, output, run_trigger, wrap_output, status) {
   Stack(
     orientation: vertical,
     align: stretch,
-    gap: 14,
+    gap: 12,
     padding: 20,
-    width: Window.width - 200,
-    height: Window.height
+    width: Window.width - 220,
+    height: Window.height,
+    background: #1C1C1E
   ) {
     Stack(
       orientation: horizontal,
       align: center,
       justify: spaceBetween,
-      width: Window.width - 240,
-      height: 40
+      width: Window.width - 260,
+      height: 36
     ) {
-      Stack(orientation: horizontal, align: center, gap: 10) {
-        Text("PLAYGROUND", size: 11, color: #e23b3b, weight: bold)
-        Text("edit · run · inspect", size: 12, color: #6e6e7a)
+      Stack(orientation: horizontal, align: center, gap: 8) {
+        Text("Playground", size: 20, color: #F5F5F7, weight: bold, fontFamily: "SF Pro Display")
         if status != "" {
-          Text("·  ${status}", size: 12, color: #8a8a96)
+          Text(status, size: 12, color: #98989D, fontFamily: "SF Pro Text")
         }
       }
       Stack(orientation: horizontal, align: center, gap: 10) {
-        Stack(orientation: horizontal, align: center, gap: 4) {
-          ModeChip("Split", mode == 0, 0, mode, "mocida://icons/split.png")
-          ModeChip("Editor", mode == 1, 1, mode, "mocida://icons/code.png")
-          ModeChip("Output", mode == 2, 2, mode, "mocida://icons/terminal.png")
+        Rectangle(
+          height: 28,
+          background: #2C2C2E,
+          radius: 8,
+          paddingLeft: 3,
+          paddingRight: 3
+        ) {
+          Stack(orientation: horizontal, align: center, gap: 2, height: 28) {
+            ModeChip("Split", mode == 0, 0, mode, "rectangle.split.2x1", "mocida://icons/split.png")
+            ModeChip("Editor", mode == 1, 1, mode, "chevron.left.forwardslash.chevron.right", "mocida://icons/code.png")
+            ModeChip("Output", mode == 2, 2, mode, "terminal", "mocida://icons/terminal.png")
+          }
         }
         Stack(
           orientation: horizontal,
           align: center,
-          gap: 7,
-          height: 34,
-          background: #e23b3b,
-          radius: 9,
-          paddingLeft: 14,
-          paddingRight: 16,
+          gap: 6,
+          height: 32,
+          background: #0A84FF,
+          radius: 8,
+          paddingLeft: 12,
+          paddingRight: 14,
           cursor: pointer,
-          onClick: { status = "running…" ; run_trigger = run_trigger + 1 }
+          onClick: { status = "Running…" ; run_trigger = run_trigger + 1 }
         ) {
-          Image("mocida://icons/play.png", width: 14, height: 14, fillMode: fit)
-          Text("Run", size: 13, color: #ffffff, weight: bold)
+          Icon("play.fill", fallback: "mocida://icons/play.png", size: 13, tint: #FFFFFF)
+          Text("Run", size: 13, color: #FFFFFF, weight: bold, fontFamily: "SF Pro Text")
         }
       }
     }
 
     if mode == 1 {
-      EditorPane(source, Window.width - 240, Window.height - 90)
+      EditorPane(source, Window.width - 260, Window.height - 80)
     } else if mode == 2 {
-      OutputPane(output, wrap_output, Window.width - 240, Window.height - 90)
-    } else if Window.width == 0 or Window.width >= 1000 {
+      OutputPane(output, wrap_output, Window.width - 260, Window.height - 80)
+    } else if Window.width == 0 or Window.width >= 1040 {
       Stack(
         orientation: horizontal,
         align: stretch,
-        gap: 14,
-        width: Window.width - 240,
-        height: Window.height - 90
+        gap: 12,
+        width: Window.width - 260,
+        height: Window.height - 80
       ) {
-        EditorPane(source, (Window.width - 268) / 2, Window.height - 90)
-        OutputPane(output, wrap_output, (Window.width - 268) / 2, Window.height - 90)
+        EditorPane(source, (Window.width - 284) / 2, Window.height - 80)
+        OutputPane(output, wrap_output, (Window.width - 284) / 2, Window.height - 80)
       }
     } else {
-      Stack(orientation: vertical, align: stretch, gap: 14, width: Window.width - 240) {
-        EditorPane(source, Window.width - 240, (Window.height - 120) / 2)
-        OutputPane(output, wrap_output, Window.width - 240, (Window.height - 120) / 2)
+      Stack(orientation: vertical, align: stretch, gap: 12, width: Window.width - 260) {
+        EditorPane(source, Window.width - 260, (Window.height - 104) / 2)
+        OutputPane(output, wrap_output, Window.width - 260, (Window.height - 104) / 2)
       }
     }
   }
@@ -241,22 +246,20 @@ view Playground(mode, source, output, run_trigger, wrap_output, status) {
 
 view EditorPane(source, w, h) {
   Stack(orientation: vertical, align: stretch, gap: 8, width: w, height: h) {
-    Stack(orientation: horizontal, align: center, gap: 8, width: w, height: 18) {
-      Text("SOURCE", size: 10, color: #7a7a88, weight: bold)
-      Text(".mika", size: 10, color: #4a4a56)
-    }
+    Text("Source", size: 11, color: #98989D, weight: bold, fontFamily: "SF Pro Text")
     TextArea(
       value: source,
       placeholder: "func main() {\n    println(\"hello from Astra\")\n}",
       width: w,
-      height: h - 26,
-      background: #0d1117,
-      textColor: #d6e2f0,
-      borderColor: #22222c,
+      height: h - 24,
+      background: #2C2C2E,
+      textColor: #F5F5F7,
+      borderColor: #38383A,
       borderWidth: 1,
-      radius: 12,
-      padding: 16,
-      fontSize: 14,
+      radius: 10,
+      padding: 14,
+      fontSize: 13,
+      fontFamily: "SF Mono",
       cursor: text,
       onChange: { |v| source = v },
     )
@@ -265,35 +268,36 @@ view EditorPane(source, w, h) {
 
 view OutputPane(output, wrap_output, w, h) {
   Stack(orientation: vertical, align: stretch, gap: 8, width: w, height: h) {
-    Stack(orientation: horizontal, align: center, justify: spaceBetween, width: w, height: 24) {
-      Text("OUTPUT", size: 10, color: #7a7a88, weight: bold)
+    Stack(orientation: horizontal, align: center, justify: spaceBetween, width: w, height: 22) {
+      Text("Output", size: 11, color: #98989D, weight: bold, fontFamily: "SF Pro Text")
       Switch(
-        "wrap",
+        "Wrap",
         value: wrap_output,
-        onColor: #e23b3b,
-        offColor: #2a2a32,
-        knobColor: #ffffff,
-        labelColor: #7a7a88,
+        onColor: #0A84FF,
+        offColor: #48484A,
+        knobColor: #FFFFFF,
+        labelColor: #98989D,
         labelSize: 11,
         onChange: { |v| wrap_output = v }
       )
     }
     Rectangle(
       width: w,
-      height: h - 32,
-      background: #0b1210,
-      radius: 12,
-      borderColor: #1a3228,
+      height: h - 30,
+      background: #2C2C2E,
+      radius: 10,
+      borderColor: #38383A,
       borderWidth: 1
     ) {
       Text(
         output,
-        size: 13,
-        color: #b6e3c4,
+        size: 12,
+        color: #E5E5EA,
         align: left,
         vAlign: top,
-        padding: 16,
-        wrap: wrap_output
+        padding: 14,
+        wrap: wrap_output,
+        fontFamily: "SF Mono"
       )
     }
   }
@@ -304,82 +308,85 @@ view Runner(path_field, output, run_trigger, open_trigger, wrap_output, status) 
     orientation: vertical,
     align: stretch,
     gap: 16,
-    padding: 22,
-    width: Window.width - 200,
-    height: Window.height
+    padding: 20,
+    width: Window.width - 220,
+    height: Window.height,
+    background: #1C1C1E
   ) {
+    Text("Runner", size: 20, color: #F5F5F7, weight: bold, fontFamily: "SF Pro Display")
+
     Rectangle(
-      width: Window.width - 244,
-      background: #121218,
-      radius: 14,
-      borderColor: #22222c,
+      width: Window.width - 260,
+      background: #2C2C2E,
+      radius: 12,
+      borderColor: #38383A,
       borderWidth: 1,
-      padding: 18
+      padding: 16
     ) {
-      Stack(orientation: vertical, align: stretch, gap: 12, width: Window.width - 280) {
-        Text("OPEN A FILE", size: 11, color: #e23b3b, weight: bold)
+      Stack(orientation: vertical, align: stretch, gap: 12, width: Window.width - 292) {
+        Text("Open a file", size: 13, color: #F5F5F7, weight: bold, fontFamily: "SF Pro Text")
         Text(
-          "Pick a .mika on disk. Run uses that file instead of the editor.",
-          size: 13,
-          color: #7a7a88,
+          "Choose a .mika on disk. Run uses that file instead of the editor buffer.",
+          size: 12,
+          color: #98989D,
           wrap: true,
-          width: Window.width - 280
+          width: Window.width - 292,
+          fontFamily: "SF Pro Text"
         )
         Input(
           value: path_field,
           placeholder: "path/to/file.mika",
-          width: Window.width - 280,
-          height: 40,
-          background: #0a0a0c,
-          textColor: #f0f0f4,
-          placeholderColor: #4a4a56,
-          borderColor: #22222c,
-          borderColorFocused: #e23b3b,
+          width: Window.width - 292,
+          height: 36,
+          background: #1C1C1E,
+          textColor: #F5F5F7,
+          placeholderColor: #636366,
+          borderColor: #38383A,
+          borderColorFocused: #0A84FF,
           borderWidth: 1,
-          radius: 10,
-          padding: 12,
-          fontSize: 14,
+          radius: 8,
+          padding: 10,
+          fontSize: 13,
+          fontFamily: "SF Pro Text",
           cursor: text,
           onChange: { |v| path_field = v },
         )
-        Stack(orientation: horizontal, gap: 10, align: center) {
+        Stack(orientation: horizontal, gap: 8, align: center) {
           Stack(
             orientation: horizontal,
             align: center,
-            gap: 7,
-            height: 36,
-            background: #1a1a22,
-            radius: 9,
+            gap: 6,
+            height: 32,
+            background: #3A3A3C,
+            radius: 8,
             paddingLeft: 12,
             paddingRight: 14,
-            borderColor: #2a2a34,
-            borderWidth: 1,
             cursor: pointer,
             onClick: { open_trigger = open_trigger + 1 }
           ) {
-            Image("mocida://icons/folder.png", width: 14, height: 14, fillMode: fit)
-            Text("Choose file", size: 13, color: #d0d0d8)
+            Icon("folder.fill", fallback: "mocida://icons/folder.png", size: 14, tint: #F5F5F7)
+            Text("Choose…", size: 13, color: #F5F5F7, fontFamily: "SF Pro Text")
           }
           Stack(
             orientation: horizontal,
             align: center,
-            gap: 7,
-            height: 36,
-            background: #e23b3b,
-            radius: 9,
+            gap: 6,
+            height: 32,
+            background: #0A84FF,
+            radius: 8,
             paddingLeft: 12,
             paddingRight: 14,
             cursor: pointer,
-            onClick: { status = "running…" ; run_trigger = run_trigger + 1 }
+            onClick: { status = "Running…" ; run_trigger = run_trigger + 1 }
           ) {
-            Image("mocida://icons/play.png", width: 14, height: 14, fillMode: fit)
-            Text("Run file", size: 13, color: #ffffff, weight: bold)
+            Icon("play.fill", fallback: "mocida://icons/play.png", size: 13, tint: #FFFFFF)
+            Text("Run file", size: 13, color: #FFFFFF, weight: bold, fontFamily: "SF Pro Text")
           }
         }
       }
     }
 
-    OutputPane(output, wrap_output, Window.width - 244, Window.height - 280)
+    OutputPane(output, wrap_output, Window.width - 260, Window.height - 260)
   }
 }
 
@@ -388,26 +395,34 @@ view Updates(version, update_status, update_trigger) {
     orientation: vertical,
     align: center,
     justify: center,
-    gap: 18,
-    width: Window.width - 200,
-    height: Window.height
+    gap: 16,
+    width: Window.width - 220,
+    height: Window.height,
+    background: #1C1C1E
   ) {
     Rectangle(
-      width: 420,
-      background: #121218,
-      radius: 18,
-      borderColor: #22222c,
+      width: 400,
+      background: #2C2C2E,
+      radius: 14,
+      borderColor: #38383A,
       borderWidth: 1,
       padding: 28
     ) {
-      Stack(orientation: vertical, align: center, gap: 14, width: 364) {
-        Image("mocida://icon", width: 96, height: 96, fillMode: fit, antialiasing: true)
-        Text("Astra", size: 24, color: #f4f4f7, weight: bold)
-        Text("Mikasa interpreter", size: 13, color: #7a7a88)
+      Stack(orientation: vertical, align: center, gap: 12, width: 344) {
+        Image(
+          "mocida://icon",
+          width: 72,
+          height: 72,
+          fillMode: fit,
+          antialiasing: true,
+          radius: 16
+        )
+        Text("Astra", size: 22, color: #F5F5F7, weight: bold, fontFamily: "SF Pro Display")
+        Text("Mikasa interpreter", size: 13, color: #98989D, fontFamily: "SF Pro Text")
 
-        Rectangle(width: 364, height: 1, background: #22222c) {}
+        Rectangle(width: 344, height: 1, background: #38383A) {}
 
-        Text("installed  v${version}", size: 13, color: #c4c4cc)
+        Text(format("Installed  v{}", version), size: 13, color: #E5E5EA, fontFamily: "SF Pro Text")
 
         Stack(
           orientation: horizontal,
@@ -415,29 +430,38 @@ view Updates(version, update_status, update_trigger) {
           justify: center,
           gap: 8,
           width: 220,
-          height: 40,
-          background: #e23b3b,
-          radius: 10,
+          height: 36,
+          background: #0A84FF,
+          radius: 9,
           cursor: pointer,
           onClick: {
             update_status = "Checking GitHub for a newer build…"
             update_trigger = update_trigger + 1
           }
         ) {
-          Image("mocida://icons/update.png", width: 15, height: 15, fillMode: fit)
-          Text("Check for updates", size: 13, color: #ffffff, weight: bold)
+          Icon("arrow.triangle.2.circlepath", fallback: "mocida://icons/update.png", size: 14, tint: #FFFFFF)
+          Text("Check for Updates", size: 13, color: #FFFFFF, weight: bold, fontFamily: "SF Pro Text")
         }
 
         if update_status == "" {
           Text(
-            "Astra checks GitHub releases for a newer nightly.",
+            "Astra checks GitHub Releases for a newer nightly.",
             size: 12,
-            color: #5c5c68,
+            color: #636366,
             align: center,
-            width: 364
+            width: 344,
+            fontFamily: "SF Pro Text"
           )
         } else {
-          Text(update_status, size: 13, color: #d0d0d8, align: center, width: 364, wrap: true)
+          Text(
+            update_status,
+            size: 13,
+            color: #E5E5EA,
+            align: center,
+            width: 344,
+            wrap: true,
+            fontFamily: "SF Pro Text"
+          )
         }
       }
     }

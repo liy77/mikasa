@@ -1,4 +1,4 @@
-//! Alloy's native stdlib: Rust implementations of the functions that
+//! Astra's native stdlib: Rust implementations of the functions that
 //! `std/*.crs` modules expose. When a program does `import { f } from mod`,
 //! the interpreter registers `f` and resolves calls here.
 //!

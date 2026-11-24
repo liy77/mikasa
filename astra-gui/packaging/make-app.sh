@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Packages the `alloy` binary into an Astra.app bundle for macOS, with an icon
-# (.icns) generated from assets/alloy-icon.png. The app works in Finder/Dock
-# AND on the command line (Astra.app/Contents/MacOS/alloy run x.mika).
+# Packages the `astra` binary into an Astra.app bundle for macOS, with an icon
+# (.icns) generated from assets/astra-icon.png. The app works in Finder/Dock
+# AND on the command line (Astra.app/Contents/MacOS/astra run x.mika).
 #
 # Prerequisites: cargo build --release (produces the binary + libmocida.dylib),
 # `sips` and `iconutil` (both ship with macOS).
 #
-# Usage:  alloy-gui/packaging/make-app.sh
+# Usage:  astra-gui/packaging/make-app.sh
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,7 +15,7 @@ target_dir="${CARGO_TARGET_DIR:-$gui_dir/target}/release"
 out="$gui_dir/dist/Astra.app"
 icon_png="$gui_dir/assets/astra-icon-mac.png"
 
-bin="$target_dir/alloy"
+bin="$target_dir/astra"
 if [[ ! -x "$bin" ]]; then
   echo "binary not found at $bin — build it first:" >&2
   echo "  cargo build --release --manifest-path $gui_dir/Cargo.toml" >&2
@@ -31,7 +31,7 @@ rm -rf "$out"
 mkdir -p "$out/Contents/MacOS" "$out/Contents/Resources"
 
 # 1. Binary + mocida dylib beside it.
-cp "$bin" "$out/Contents/MacOS/alloy"
+cp "$bin" "$out/Contents/MacOS/astra"
 for dylib in "$target_dir"/*.dylib; do
   [[ -f "$dylib" ]] && cp "$dylib" "$out/Contents/MacOS/"
 done
@@ -53,8 +53,8 @@ cat > "$out/Contents/Info.plist" <<PLIST
 <dict>
   <key>CFBundleName</key><string>Astra</string>
   <key>CFBundleDisplayName</key><string>Astra</string>
-  <key>CFBundleIdentifier</key><string>net.liy77.alloy</string>
-  <key>CFBundleExecutable</key><string>alloy</string>
+  <key>CFBundleIdentifier</key><string>net.liy77.astra</string>
+  <key>CFBundleExecutable</key><string>astra</string>
   <key>CFBundleIconFile</key><string>Astra</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>0.1.0</string>
@@ -65,4 +65,4 @@ PLIST
 
 echo "==> done: $out"
 echo "    GUI:  open $out"
-echo "    CLI:  $out/Contents/MacOS/alloy run file.crs"
+echo "    CLI:  $out/Contents/MacOS/astra run file.crs"

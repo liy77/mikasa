@@ -156,8 +156,8 @@
         },
         "mikasa.astraPath": {
           "type": "string",
-          "default": "alloy",
-          "description": "Path to the Astra interpreter (binary name alloy)."
+          "default": "astra",
+          "description": "Path to the Astra interpreter (binary name astra)."
         }
       }
     }

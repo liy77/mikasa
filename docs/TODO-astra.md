@@ -37,10 +37,8 @@
 
 - [ ] **Bytecode / Cranelift JIT** — backend além do tree-walk (opcional, pós-MVP).
 - [ ] **Docs de usuário** — quick start Astra (`astra run|build|check`, `mikasa vm`).
-- [ ] **Release** — `scripts/release-alloy.py`: notarização macOS / assets de update
+- [ ] **Release** — `scripts/release-astra.py`: notarização macOS / assets de update
   alinhados ao updater da GUI.
-- [ ] **Paths absolutos mocida** — já aceitos no mocida; manter nota no host GUI
-  (`register_assets` absoluto).
 
 ---
 
@@ -54,5 +52,9 @@
 | `import("file.mika")` no interpreter | merge AST |
 | Artefato `.ast` / `.loy` + wasm embutido | `astra build` |
 | GUI 100% Mikasa (`astra.mika` + `backend.mika`) | host Rust fino |
-| Binário CLI `astra` | alias histórico `alloy` onde ainda existir |
+| Binário CLI `astra` | alias histórico `astra` onde ainda existir |
 | Suite `tests/mikasa/` + `astra-vm` `mikasa_suite` | linguagem + stdlib + file import + rust wasm |
+| Docs MUI + HIG | `docs/mui.md` |
+| GUI headless + `--shot` | `MOCIDA_WINDOW_HIDDEN` / `MOCIDA_SHOT_*` |
+| GUI HIG dark + ícones template | `astra.mika`, `assets/icons/` |
+| Paths absolutos mocida no host | `register_assets` |

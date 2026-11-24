@@ -12,7 +12,7 @@
 //! | Package | `.mipkg` | — |
 //!
 //! Detection never keys off the extension alone where the bytes already say
-//! what a file is: an Astra artifact is recognised by its `ALLOYBC` magic, so
+//! what a file is: an Astra artifact is recognised by its `ASTRABC` magic, so
 //! `.ast` and `.loy` load through the same path.
 
 /// Recommended extension for Mikasa source, without the dot.
@@ -22,7 +22,7 @@ pub const SOURCE_LEGACY: &str = "crs";
 
 /// Recommended extension for an Astra bytecode artifact.
 pub const ARTIFACT: &str = "ast";
-/// Original artifact extension (`alloy build` used to write this).
+/// Original artifact extension (`astra build` used to write this).
 pub const ARTIFACT_LEGACY: &str = "loy";
 
 /// A Mikasa library.

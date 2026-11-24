@@ -9,7 +9,7 @@ understand Copper source starts here:
 | --- | --- |
 | `cforge` (via `mikasa-parser`) | the **token stream** — walked directly to emit Rust |
 | `mikasa-lsp` | the **AST** — for diagnostics, hover, completion |
-| `alloy` (`astra-vm`) | the **AST with parsed bodies** — walked by the interpreter |
+| `astra` (`astra-vm`) | the **AST with parsed bodies** — walked by the interpreter |
 | `mui-syntax` | the **tokenizer** — embedded Copper expressions in `.mui` |
 
 Because all paths share this crate, the language never drifts between the
@@ -38,6 +38,6 @@ src/
 
 ## Notes
 
-- Serde derives live on the AST types so Alloy can serialize a `Program` into its
+- Serde derives live on the AST types so Astra can serialize a `Program` into its
   portable `.loy` artifact.
 - No dependency on `cforge`, `mocida`, or any runtime — pure, portable, CI-safe.

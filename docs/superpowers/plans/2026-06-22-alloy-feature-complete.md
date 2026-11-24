@@ -1,10 +1,10 @@
 # Alloy feature-complete — rodar TODOS os examples/copper/*.crs
 
-> **For agentic workers:** executado via subagent-driven-development. Os EXEMPLOS são o critério de aceitação: cada cluster termina com `alloy run` executando os exemplos-alvo sem gaps de linguagem.
+> **For agentic workers:** executado via subagent-driven-development. Os EXEMPLOS são o critério de aceitação: cada cluster termina com `astra run` executando os exemplos-alvo sem gaps de linguagem.
 
-**Goal:** Estender `crates/astra-vm` para que todo `examples/copper/*.crs` rode pelo `alloy run` como o `cforge` rodaria.
+**Goal:** Estender `crates/astra-vm` para que todo `examples/copper/*.crs` rode pelo `astra run` como o `cforge` rodaria.
 
-**Acceptance:** `alloy run <ex>` executa cada exemplo. Para exemplos puramente locais (ternary, tuples, optional, methods, matching, collections, unsafe, url, cstd, fs, time, json, crypto): exit 0 + saída coerente. Para os que dependem de rede/servidor (http, net, ws): o interpretador executa as chamadas nativas (sem "construção não suportada"/"função não definida"); falha de rede/servidor é ambiental e aceitável.
+**Acceptance:** `astra run <ex>` executa cada exemplo. Para exemplos puramente locais (ternary, tuples, optional, methods, matching, collections, unsafe, url, cstd, fs, time, json, crypto): exit 0 + saída coerente. Para os que dependem de rede/servidor (http, net, ws): o interpretador executa as chamadas nativas (sem "construção não suportada"/"função não definida"); falha de rede/servidor é ambiental e aceitável.
 
 ## Estratégia
 
@@ -36,7 +36,7 @@ Adicionar a `enum Value`:
 
 ### Cluster 2 — Tuplas (desbloqueia: tuples)
 - Tuple literal `(a,b)`, indexação `.0`/`.1`, destructuring em `let`/`mut` (`(a,b) = ...`), tuplas aninhadas, função retornando tupla.
-- Acceptance: `alloy run examples/copper/tuples.crs` → exit 0.
+- Acceptance: `astra run examples/copper/tuples.crs` → exit 0.
 
 ### Cluster 3 — Structs, classes, impl, métodos (desbloqueia: methods, optional, unsafe)
 - `Item::Struct`/`Item::Class`/`Item::Impl` registrados; `Class` lowered p/ struct+métodos.
@@ -82,4 +82,4 @@ Adicionar a `enum Value`:
 - **Sem panics:** todo gap remanescente continua sendo `RuntimeError` com span, nunca panic.
 - **Portabilidade:** as deps adicionadas (serde_json/sha2/hmac/ureq) são puro-Rust; não quebram CI. astra-vm continua sem mocida.
 - **ws/http/net:** "rodar" = executar as chamadas; conectividade é ambiental.
-- Cada cluster: implementar → `cargo test -p astra-vm` + `alloy run` nos exemplos-alvo → fmt/clippy → commit.
+- Cada cluster: implementar → `cargo test -p astra-vm` + `astra run` nos exemplos-alvo → fmt/clippy → commit.

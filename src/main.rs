@@ -167,9 +167,10 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
             .arg(Arg::new("verbose").short('V').long("verbose")
                 .action(clap::ArgAction::SetTrue).help("Enable verbose output"))
         )
-        // `cforge format <paths…>` — pretty-print MUI (.mui/.crm) files.
+        // `mikasa format` (alias `fmt`) — pretty-print Mikasa + MocidaUI.
         .subcommand(ClapCommand::new("format")
-            .about("Pretty-print MocidaUI files (.mui, or a .mika with a view): clean indentation, spacing and blank lines (comments preserved).")
+            .visible_alias("fmt")
+            .about("Pretty-print Mikasa (.mika/.crs) and MocidaUI (.mui / .mika with a view): indentation, spacing, blank lines (comments preserved).")
             .arg(Arg::new("input")
                 .help("Files or directories to format (recurses into directories)")
                 .value_name("PATH")
@@ -197,18 +198,28 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
                 .about("Parse + validate a .mika through Astra without running it")
                 .arg(Arg::new("input").value_name("FILE").required(true).index(1)))
         )
-        // `cforge check <file.crs>` — real Rust verification (borrow + Miri),
-        // with auto-provisioned toolchain (~/.alloy/rustup).
         .subcommand(ClapCommand::new("update")
             .visible_alias("upgrade")
             .about("Download the latest Mikasa nightly from GitHub and replace this install (no cargo needed)")
         )
+        // Fast static check by default (no cargo). Heavy Rust/Miri via --miri.
         .subcommand(ClapCommand::new("check")
-            .about("Check a .mika with real Rust (borrow checker + Miri), provisioning the toolchain automatically")
-            .arg(Arg::new("input").value_name("FILE").required(true).index(1))
+            .about("Static check: parse errors + lints (unused fns, bad imports, deprecations) without compiling. Pass --miri for real Rust borrow/UB checks.")
+            .arg(Arg::new("input")
+                .help("Files or directories to check (default: .)")
+                .value_name("PATH")
+                .required(false)
+                .num_args(1..)
+                .index(1))
+            .arg(Arg::new("deny-warnings").long("deny-warnings")
+                .action(clap::ArgAction::SetTrue)
+                .help("Treat warnings as errors (exit 1)"))
+            .arg(Arg::new("miri").long("miri")
+                .action(clap::ArgAction::SetTrue)
+                .help("Transpile + run the Rust verifier (Miri). Needs cargo/rustup; pass a single .mika file."))
             .arg(Arg::new("no-miri").long("no-miri")
                 .action(clap::ArgAction::SetTrue)
-                .help("Type + borrow check only (cargo check), without running Miri"))
+                .help("Heavy path without Miri: transpile + cargo check (type/borrow only)"))
         )
 });
 
@@ -654,13 +665,22 @@ async fn main() {
             return;
         }
         Some(("format", fmt_matches)) => {
+            // clap maps alias `fmt` → primary name `format` here.
             let paths: Vec<String> = fmt_matches
                 .get_many::<String>("input")
                 .map(|vals| vals.cloned().collect())
                 .unwrap_or_else(|| vec![".".to_string()]);
             let check = fmt_matches.get_flag("check");
             let to_stdout = fmt_matches.get_flag("stdout");
-            std::process::exit(cforge::mui_fmt::format_command(&paths, check, to_stdout));
+            std::process::exit(cforge::fmt::format_command(&paths, check, to_stdout));
+        }
+        Some(("check", cm)) if !cm.get_flag("miri") && !cm.get_flag("no-miri") => {
+            let paths: Vec<String> = cm
+                .get_many::<String>("input")
+                .map(|vals| vals.cloned().collect())
+                .unwrap_or_else(|| vec![".".to_string()]);
+            let deny = cm.get_flag("deny-warnings");
+            std::process::exit(cforge::check::run_fast_check(&paths, deny));
         }
         Some(("vm", vm_matches)) => {
             let (sub, sm) = match vm_matches.subcommand() {
@@ -693,7 +713,7 @@ async fn main() {
 
     if !is_command_available("cargo") {
         println!("🦀 Cargo is not installed — needed for transpile/build/check.");
-        println!("   Cargo-free commands: mikasa init | install | upgrade | vm run | format");
+        println!("   Cargo-free commands: mikasa init | install | upgrade | vm run | format | check");
         println!("   Install Rust from https://rustup.rs/ when you want native builds.");
         return;
     }
@@ -718,19 +738,24 @@ async fn main() {
         );
     }
 
-    // `cforge check <file.crs>` — transpiles and runs the Rust verifier
-    // (borrow + Miri), with auto-provisioned toolchain. Requires cargo (already
-    // checked above), so it comes after the toolchain checks.
-    if let Some(("check", cm)) = BASE_CMD.clone().get_matches().subcommand() {
-        let file = cm.get_one::<String>("input").cloned().unwrap_or_default();
-        let no_miri = cm.get_flag("no-miri");
-        if !path::Path::new(&file).is_file() {
-            eprintln!("cforge check: file not found: {file}");
-            std::process::exit(1);
+    // `mikasa check --miri|--no-miri <file.mika>` — transpile + Rust verifier.
+    if let Some(("check", cm)) = matches.subcommand() {
+        if cm.get_flag("miri") || cm.get_flag("no-miri") {
+            let file = cm
+                .get_many::<String>("input")
+                .and_then(|mut v| v.next().cloned())
+                .unwrap_or_default();
+            // `--no-miri` → cargo check only; `--miri` (without --no-miri) → Miri.
+            let borrow_only = cm.get_flag("no-miri");
+            if !path::Path::new(&file).is_file() {
+                eprintln!("mikasa check --miri: file not found: {file}");
+                eprintln!("usage: mikasa check --miri <file.mika> [--no-miri]");
+                std::process::exit(1);
+            }
+            let deps = cforge::compile(vec![file], None, Some("./dist".to_string()));
+            cforge::generate_toml(deps).await;
+            std::process::exit(cforge::check::run_miri_check(borrow_only));
         }
-        let deps = cforge::compile(vec![file], None, Some("./dist".to_string()));
-        cforge::generate_toml(deps).await;
-        std::process::exit(cforge::check::run_check(no_miri));
     }
 
     let commands = parse_commands();

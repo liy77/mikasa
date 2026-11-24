@@ -1,13 +1,13 @@
 use std::io::Write;
 use std::process::Command;
 
-/// Roda o binário `alloy run` sobre um fonte temporário e captura stdout.
-fn alloy_run(src: &str) -> (String, bool) {
+/// Roda o binário `astra run` sobre um fonte temporário e captura stdout.
+fn astra_run(src: &str) -> (String, bool) {
     use std::sync::atomic::{AtomicU64, Ordering};
     static CTR: AtomicU64 = AtomicU64::new(0);
     let dir = std::env::temp_dir();
     let path = dir.join(format!(
-        "alloy_test_{}_{}.crs",
+        "astra_test_{}_{}.crs",
         std::process::id(),
         CTR.fetch_add(1, Ordering::Relaxed)
     ));
@@ -26,15 +26,15 @@ fn alloy_run(src: &str) -> (String, bool) {
 
 #[test]
 fn hello_world_prints() {
-    let (stdout, ok) = alloy_run("println(\"olá, alloy\")");
-    assert!(ok, "alloy run falhou");
-    assert_eq!(stdout.trim_end(), "olá, alloy");
+    let (stdout, ok) = astra_run("println(\"olá, astra\")");
+    assert!(ok, "astra run falhou");
+    assert_eq!(stdout.trim_end(), "olá, astra");
 }
 
 #[test]
 fn loop_and_function() {
     let src = "func int dobro(n: int) { return n * 2 }\nfor i in 1..4 { println(dobro(i)) }";
-    let (stdout, ok) = alloy_run(src);
+    let (stdout, ok) = astra_run(src);
     assert!(ok);
     assert_eq!(stdout, "2\n4\n6\n");
 }

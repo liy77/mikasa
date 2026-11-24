@@ -1,11 +1,11 @@
 # Alloy ⇄ Rust via embedded WebAssembly
 
-**Status:** prototype landed — scalar `i64`/`bool` run via wasm in `alloy run` /
-`cforge vm run`, **and embedded into `.loy`** by `alloy build` / `cforge vm
+**Status:** prototype landed — scalar `i64`/`bool` run via wasm in `astra run` /
+`cforge vm run`, **and embedded into `.loy`** by `astra build` / `cforge vm
 build` (v2 format, self-contained: runs with no rustc and no `.rs` on disk).
 Richer ABI (strings/structs) + auto-wrappers = next phases.
 **Date:** 2026-06-22
-**Crates:** `crates/astra-vm` (`wasm.rs`, `loader.rs`, `interp.rs`, `bin/alloy.rs`)
+**Crates:** `crates/astra-vm` (`wasm.rs`, `loader.rs`, `interp.rs`, `bin/astra.rs`)
 
 ## Problem
 
@@ -44,13 +44,13 @@ bincoded AST). So:
   calls it. The Copper code stays interpreted; only the Rust leaves cross into
   wasm.
 
-### `alloy run` flow
+### `astra run` flow
 
 ```
-alloy run file.crs
+astra run file.crs
   ├─ no .rs imports        → pure interpretation (unchanged, instant)
   ├─ .rs imports
-  │    ├─ compile each .rs → wasm  (cached by content hash under ~/.alloy/cache)
+  │    ├─ compile each .rs → wasm  (cached by content hash under ~/.astra/cache)
   │    │     1st run: pays rustc;  later runs / unchanged .rs: cache hit → instant
   │    ├─ instantiate via wasmi; register exports as interpreter functions
   │    └─ interpret Copper; at an imported-name call, marshal args → wasm → result
@@ -61,11 +61,11 @@ The instant-iteration loop (edit **Copper**, rerun) stays instant because the
 `.rs` is unchanged → its wasm is cached. You only pay rustc when the `.rs`
 changes — inherent to running real Rust.
 
-### `alloy build` (distribution) — **done**
+### `astra build` (distribution) — **done**
 
 The compiled wasm is embedded into the `.loy` so it's self-contained:
 `bytecode.rs` v2 payload = `Vec<Item>` + `Vec<WasmModule { names, bytes }>`
-(`FMT_VERSION` 1→2, v1 still loadable). `alloy run app.loy` /
+(`FMT_VERSION` 1→2, v1 still loadable). `astra run app.loy` /
 `cforge vm run app.loy` then need **no rustc** — verified by clearing the cache
 and deleting the `.rs`: the `.loy` still runs the Rust.
 
@@ -83,14 +83,14 @@ and deleting the `.rs`: the `.loy` still runs the Rust.
 - **`wasm.rs`** — `WasmRuntime` (wasmi `Store`+`Instance`), `from_rs` (compile +
   instantiate), `call_i64` (dynamic-arity `Val::I64` call), `compile_rs_to_wasm`
   (rustc → `wasm32-unknown-unknown` cdylib, FNV-1a content-hash cache under
-  `~/.alloy/cache`, overridable via `ALLOY_CACHE_DIR`).
+  `~/.astra/cache`, overridable via `ASTRA_CACHE_DIR`).
 - **`loader.rs`** — `RsImport { names, rs_path }` + `resolve_runnable_wasm`
   collects `.rs` imports (instead of bailing to `NeedsCforge`). `collect` takes
   an optional accumulator so the old cforge path is preserved for `build`.
 - **`interp.rs`** — `Interpreter.wasm: HashMap<name, Rc<RefCell<WasmRuntime>>>`,
   `register_wasm`, and a `call_user` fallback that marshals scalars and calls
   `call_wasm`.
-- **`bin/alloy.rs`** — `run` compiles+instantiates each `.rs`, verifies every
+- **`bin/astra.rs`** — `run` compiles+instantiates each `.rs`, verifies every
   imported name is a wasm export (else falls back to cforge), then interprets.
 - **Example** — `examples/copper/rust-interop-wasm/` (`mathwasm.rs` exporting
   `add`/`fib`, `main.crs` importing them). 1st run ≈ rustc cost; cached run

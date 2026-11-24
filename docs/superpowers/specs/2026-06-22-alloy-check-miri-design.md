@@ -1,4 +1,4 @@
-# `alloy check` / `cforge check` — verificação Rust (borrow + Miri) auto-provisionada
+# `astra check` / `cforge check` — verificação Rust (borrow + Miri) auto-provisionada
 
 **Data:** 2026-06-22
 **Status:** Design aprovado (pré-implementação)
@@ -8,7 +8,7 @@
 
 Dar ao usuário a **verificação real do Rust** (type check + borrow checker + UB
 via Miri) para um `.crs`, **sem ele instalar nada manualmente** e sem carregar
-o rustc dentro do binário do Alloy. O `alloy run` continua dinâmico/instantâneo;
+o rustc dentro do binário do Alloy. O `astra run` continua dinâmico/instantâneo;
 `check` é o passo opcional que confirma que o programa respeita as regras do
 Rust (borrows, lifetimes, etc.) — fechando a lacuna do interpretador.
 
@@ -25,12 +25,12 @@ usamos como verificador — o usuário não digita comando de instalação.
 - **`cforge check <file.crs>`** faz o trabalho: transpila (reusa o pipeline de
   `cforge::compile` + `generate_toml` que já gera `dist/rust/`) e roda o Miri
   sobre o crate gerado.
-- **`alloy check <file.crs>`** **delega** ao `cforge check` (mesmo mecanismo de
+- **`astra check <file.crs>`** **delega** ao `cforge check` (mesmo mecanismo de
   `delegate_to_cforge` já usado para imports `.rs`). Localiza o `cforge` ao lado
-  do `alloy` ou no PATH.
+  do `astra` ou no PATH.
 
 ### 2. Auto-provisionamento do toolchain (`src/cforge/toolchain.rs`)
-- Usa um **rustup isolado**: `RUSTUP_HOME = ~/.alloy/rustup` (não mexe no rustup
+- Usa um **rustup isolado**: `RUSTUP_HOME = ~/.astra/rustup` (não mexe no rustup
   do usuário). `CARGO_HOME` pode ficar o padrão.
 - `ensure_miri() -> Result<String, String>`:
   1. Se `rustup` não está no PATH → erro claro ("instale o rustup uma vez:
@@ -40,13 +40,13 @@ usamos como verificador — o usuário não digita comando de instalação.
      --profile minimal` (idempotente; só baixa na 1ª vez).
   3. Garante o componente: `rustup component add miri --toolchain nightly`.
   4. Retorna o nome do toolchain (`nightly`).
-- Tudo com `RUSTUP_HOME` apontando para `~/.alloy/rustup`, então o download
+- Tudo com `RUSTUP_HOME` apontando para `~/.astra/rustup`, então o download
   (~centenas de MB) fica cacheado lá e some o "instale o miri" manual.
 - Mensagens de progresso (`baixando toolchain de verificação…`) na 1ª vez.
 
 ### 3. Execução da verificação
 - Após transpilar para `dist/rust/`, roda no diretório do crate:
-  `cargo +nightly miri run` com `RUSTUP_HOME=~/.alloy/rustup`.
+  `cargo +nightly miri run` com `RUSTUP_HOME=~/.astra/rustup`.
   - Miri faz type check + **borrow check** (frontend do rustc) e interpreta a
     MIR detectando UB.
   - Saída/erros do Miri são repassados; exit code propagado.
@@ -55,7 +55,7 @@ usamos como verificador — o usuário não digita comando de instalação.
 
 ### 4. Fluxo do usuário
 ```
-alloy check app.crs      # delega → cforge check
+astra check app.crs      # delega → cforge check
 cforge check app.crs     # transpila + provisiona (1ª vez) + roda miri
 cforge check app.crs --no-miri   # só borrow/type check (cargo check)
 ```
@@ -82,4 +82,4 @@ cforge check app.crs --no-miri   # só borrow/type check (cargo check)
 
 ## Fora de escopo
 - Embutir o rustc/Miri no binário (fork) — evolução futura se desejado.
-- Cross-check automático em todo `alloy run` (check é explícito/opcional).
+- Cross-check automático em todo `astra run` (check é explícito/opcional).

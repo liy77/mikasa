@@ -11,7 +11,7 @@ What it does:
         normal user   -> local   (%USERPROFILE%\\.copper      |  $HOME/.copper)
   4. Build cforge in release mode (fresh link — deletes the old binary first).
   5. Build lson from lson-src/ (git submodule).
-  6. Copy cforge + alloy + copper-lsp + mui-lsp + Cargo.toml + std/ + built lson
+  6. Copy mikasa + astra + copper-lsp + mui-lsp + Cargo.toml + std/ + built lson
      binary into the install dir (binaries land in bin/, so on PATH).
   7. Register COPPER_PATH and add %COPPER_PATH%/bin to PATH:
       Windows -> HKCU/HKLM registry (REG_EXPAND_SZ) + a settings broadcast
@@ -94,7 +94,7 @@ def build_release():
         step("Removing stale release binary to force a fresh link…")
         exe.unlink()
     head("Building Mikasa in release mode (cargo build --release --workspace)")
-    # --workspace so all members build (alloy, copper-lsp, mui-lsp), not just the
+    # --workspace so all members build (astra, copper-lsp, mui-lsp), not just the
     # root package. Without it cargo builds only the current package.
     if subprocess.run(["cargo", "build", "--release", "--workspace"], cwd=str(ROOT)).returncode != 0:
         fail("cargo build --release failed.")
@@ -177,19 +177,19 @@ def copy_payload(exe, install_dir, lson_bin=None):
         os.symlink(exe.name, dst_cforge)
     ok(f"Installed {cforge_name} → {exe.name}")
 
-    # Astra — the Mikasa interpreter (binary `alloy`, crate alloy-vm). It is a
+    # Astra — the Mikasa interpreter (binary `astra`, crate astra-vm). It is a
     # workspace member, so the release build above produced it for free. Ship it
     # in bin/ next to mikasa so it lands on PATH via %COPPER_PATH%\bin.
-    alloy_name = "alloy.exe" if SYS == "Windows" else "alloy"
-    src_alloy = exe.parent / alloy_name
-    if src_alloy.exists():
-        dst_alloy = bin_dir / alloy_name
-        shutil.copy2(src_alloy, dst_alloy)
+    astra_name = "astra.exe" if SYS == "Windows" else "astra"
+    src_astra = exe.parent / astra_name
+    if src_astra.exists():
+        dst_astra = bin_dir / astra_name
+        shutil.copy2(src_astra, dst_astra)
         if SYS != "Windows":
-            os.chmod(dst_alloy, 0o755)
-        ok(f"Installed {alloy_name}")
+            os.chmod(dst_astra, 0o755)
+        ok(f"Installed {astra_name}")
     else:
-        warn(f"alloy not found at {src_alloy} — skipping (rebuild the workspace).")
+        warn(f"astra not found at {src_astra} — skipping (rebuild the workspace).")
 
     # Language servers (copper-lsp / mui-lsp) live in bin/ next to cforge, so
     # they land on PATH via %COPPER_PATH%\bin. Mocidad resolves them through
@@ -389,7 +389,7 @@ def main():
     print(c("      mikasa run main.mika", DIM))
     print(c("      mikasa build main.mika", DIM))
     print(c("      mikasa --version", DIM))
-    print(c("      alloy run main.mika", DIM))
+    print(c("      astra run main.mika", DIM))
     uninst = install_dir / ("uninstall.bat" if SYS == "Windows" else "uninstall.py")
     info(f"Uninstall   : {uninst}" + ("  (run as Administrator)" if scope == "global" else ""))
     print()

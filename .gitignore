@@ -43,5 +43,7 @@ example.html
 alloy-gui/target/
 
 astra-gui/target/
+astra-gui/.shot*.png
+astra-gui/mocida_crash_*.log
 
 .DS_Store

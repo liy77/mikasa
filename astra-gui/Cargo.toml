@@ -1,8 +1,8 @@
-# alloy-gui — native host crate for the Astra GUI.
+# astra-gui — native host crate for the Astra GUI.
 #
 # NOT a member of the copper-lang workspace (it links mocida, which the portable
 # crates must not). Build it explicitly:
-#   cargo build --release --manifest-path alloy-gui/Cargo.toml
+#   cargo build --release --manifest-path astra-gui/Cargo.toml
 # Requires MOCIDA_INCLUDE_DIR / MOCIDA_LIB_DIR (see mocida-sys build.rs).
 #
 # Paths assume the mocida-rs workspace sits as a sibling:
@@ -14,14 +14,14 @@
 [workspace]
 
 [package]
-name = "alloy-gui"
+name = "astra-gui"
 version = "0.1.0"
 edition = "2021"
 description = "Astra — GUI + dual-mode binary (playground, file runner, updater)"
 
-# The shipped binary is named `alloy` (the dual-mode GUI/CLI executable).
+# The shipped binary is named `astra` (the dual-mode GUI/CLI executable).
 [[bin]]
-name = "alloy"
+name = "astra"
 path = "src/main.rs"
 
 [dependencies]
@@ -40,5 +40,5 @@ mui-syntax = { path = "../crates/mui-syntax" }
 rfd = "0.14"
 
 [target.'cfg(windows)'.build-dependencies]
-# Embeds assets/alloy-icon.ico into the .exe PE header (taskbar/Explorer icon).
+# Embeds assets/astra-icon.ico into the .exe PE header (taskbar/Explorer icon).
 winresource = "0.1"

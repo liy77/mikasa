@@ -165,7 +165,7 @@ fn crc32(data: &[u8]) -> u32 {
 // json
 // ===========================================================================
 
-/// Converts a `serde_json::Value` into an Alloy [`Value`] (object→Struct,
+/// Converts a `serde_json::Value` into an Astra [`Value`] (object→Struct,
 /// array→Vec, etc.). Objects become `Struct{name:"object"}` indexable by key.
 pub fn json_to_value(j: &serde_json::Value) -> Value {
     match j {

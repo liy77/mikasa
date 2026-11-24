@@ -1,12 +1,12 @@
-//! Alloy CLI: tree-walking interpreter for Copper.
+//! Astra CLI: tree-walking interpreter for Copper.
 //!
-//! * `alloy run <file>` — runs instantly (node/python style): interprets a
+//! * `astra run <file>` — runs instantly (node/python style): interprets a
 //!   `.crs` directly (no compilation step), merges local `.crs` imports,
 //!   or executes a `.loy`. Imported Rust (`.rs`) runs via embedded wasm
 //!   (compiled once + cached); non-exported `.rs` falls back to `cforge`.
-//! * `alloy build <file.crs>` — compiles to a portable `.loy` artifact
+//! * `astra build <file.crs>` — compiles to a portable `.loy` artifact
 //!   (serialized AST + any imported `.rs` compiled to embedded wasm, so the
-//!   artifact runs on any `alloy` without rustc).
+//!   artifact runs on any `astra` without rustc).
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -18,7 +18,7 @@ use astra_vm::loader;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "astra", about = "Alloy interpreter for Copper")]
+#[command(name = "astra", about = "Astra interpreter for Copper")]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
@@ -53,7 +53,7 @@ fn main() -> ExitCode {
     }
 }
 
-/// `alloy check` delegates to `cforge check` (which transpiles + runs the Rust
+/// `astra check` delegates to `cforge check` (which transpiles + runs the Rust
 /// checker with an automatically provisioned toolchain).
 fn check(file: &Path, no_miri: bool) -> ExitCode {
     for cf in cforge_candidates() {
@@ -67,7 +67,7 @@ fn check(file: &Path, no_miri: bool) -> ExitCode {
         }
     }
     eprintln!(
-        "alloy: could not find `mikasa` to check. Install mikasa and run: mikasa check {}",
+        "astra: could not find `mikasa` to check. Install mikasa and run: mikasa check {}",
         file.display()
     );
     ExitCode::FAILURE
@@ -92,7 +92,7 @@ fn run(file: &Path) -> ExitCode {
     let resolved = match loader::resolve_runnable_wasm(file) {
         Ok(x) => x,
         Err(e) => {
-            eprintln!("alloy: {e}");
+            eprintln!("astra: {e}");
             return ExitCode::FAILURE;
         }
     };
@@ -120,7 +120,7 @@ fn run(file: &Path) -> ExitCode {
     // Wasm already embedded in a `.loy` — no rustc needed.
     for m in &resolved.wasm_modules {
         if let Err(e) = interp.register_wasm_bytes(&m.names, &m.bytes) {
-            eprintln!("alloy: embedded wasm failed to load: {e}");
+            eprintln!("astra: embedded wasm failed to load: {e}");
             return ExitCode::FAILURE;
         }
     }
@@ -153,7 +153,7 @@ fn run(file: &Path) -> ExitCode {
         Ok(_) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!(
-                "alloy: runtime error @ {}..{}: {}",
+                "astra: runtime error @ {}..{}: {}",
                 e.span.start, e.span.end, e.message
             );
             ExitCode::FAILURE
@@ -165,13 +165,13 @@ fn build(file: &Path, output: Option<&Path>) -> ExitCode {
     let resolved = match loader::resolve_runnable_wasm(file) {
         Ok(x) => x,
         Err(e) => {
-            eprintln!("alloy: {e}");
+            eprintln!("astra: {e}");
             return ExitCode::FAILURE;
         }
     };
 
     // Compile each imported `.rs` to wasm and embed it in the `.loy` so the
-    // artifact is self-contained (runs on any `alloy` without rustc).
+    // artifact is self-contained (runs on any `astra` without rustc).
     let mut modules = resolved.wasm_modules.clone();
     for imp in &resolved.rs_imports {
         match astra_vm::wasm::compile_rs_to_wasm_named(&imp.rs_path, &imp.names) {
@@ -207,14 +207,14 @@ fn build(file: &Path, output: Option<&Path>) -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(e) => {
-            eprintln!("alloy: could not write {}: {e}", out.display());
+            eprintln!("astra: could not write {}: {e}", out.display());
             ExitCode::FAILURE
         }
     }
 }
 
 /// Locates the `cforge` binary and runs `cforge run <file>`, propagating the
-/// exit code. Looks beside the `alloy` binary itself, then in PATH.
+/// exit code. Looks beside the `astra` binary itself, then in PATH.
 fn delegate_to_cforge(file: &Path) -> ExitCode {
     let candidates = cforge_candidates();
     for cf in &candidates {
@@ -226,7 +226,7 @@ fn delegate_to_cforge(file: &Path) -> ExitCode {
         }
     }
     eprintln!(
-        "alloy: could not find `mikasa` to compile the Rust. \
+        "astra: could not find `mikasa` to compile the Rust. \
          Install mikasa and run: mikasa run {}",
         file.display()
     );

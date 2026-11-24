@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Criar o crate `astra-vm` e o binário `alloy` capaz de interpretar um `.crs` (`alloy run file.crs`) cobrindo expressões, variáveis, controle de fluxo, funções definidas pelo usuário e `println`, executando direto sobre o `Program` AST de `mikasa-syntax`.
+**Goal:** Criar o crate `astra-vm` e o binário `astra` capaz de interpretar um `.crs` (`astra run file.crs`) cobrindo expressões, variáveis, controle de fluxo, funções definidas pelo usuário e `println`, executando direto sobre o `Program` AST de `mikasa-syntax`.
 
-**Architecture:** Interpretador tree-walking sobre `mikasa_syntax::program::parse_program`. Sem bytecode, sem JIT. O crate expõe uma lib (`Interpreter`) + um binário (`alloy`). Reaproveita 100% da AST existente (`expr.rs` + `program.rs`); nenhum re-parse.
+**Architecture:** Interpretador tree-walking sobre `mikasa_syntax::program::parse_program`. Sem bytecode, sem JIT. O crate expõe uma lib (`Interpreter`) + um binário (`astra`). Reaproveita 100% da AST existente (`expr.rs` + `program.rs`); nenhum re-parse.
 
 **Tech Stack:** Rust (edition 2021), workspace Cargo já existente, dependência de path em `crates/mikasa-syntax`. `clap` para o CLI do binário (já usado pelo `cforge`).
 
@@ -41,7 +41,7 @@ edition = "2021"
 
 [[bin]]
 name = "astra"
-path = "src/bin/alloy.rs"
+path = "src/bin/astra.rs"
 
 [lib]
 name = "astra_vm"
@@ -1030,17 +1030,17 @@ git commit -m "feat(alloy): user functions, calls, recursion and println"
 
 ---
 
-### Task 7: Binário `alloy` com subcomando `run`
+### Task 7: Binário `astra` com subcomando `run`
 
 **Files:**
-- Create: `crates/astra-vm/src/bin/alloy.rs`
+- Create: `crates/astra-vm/src/bin/astra.rs`
 - Test: `crates/astra-vm/tests/cli_run.rs`
 
 **Interfaces:**
 - Consumes: `astra_vm::interp::Interpreter`, `mikasa_syntax::program::parse_program`.
-- Produces: binário `alloy` com `alloy run <arquivo.crs>`. Em erro de parse ou runtime, imprime no stderr com o `Span` e sai com código 1.
+- Produces: binário `astra` com `astra run <arquivo.crs>`. Em erro de parse ou runtime, imprime no stderr com o `Span` e sai com código 1.
 
-- [ ] **Step 1: Escrever `crates/astra-vm/src/bin/alloy.rs`**
+- [ ] **Step 1: Escrever `crates/astra-vm/src/bin/astra.rs`**
 
 ```rust
 //! CLI do Alloy: interpretador tree-walking de Copper.
@@ -1076,7 +1076,7 @@ fn run(file: &PathBuf) -> ExitCode {
     let src = match std::fs::read_to_string(file) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("alloy: não consegui ler {}: {e}", file.display());
+            eprintln!("astra: não consegui ler {}: {e}", file.display());
             return ExitCode::FAILURE;
         }
     };
@@ -1084,7 +1084,7 @@ fn run(file: &PathBuf) -> ExitCode {
     if !prog.errors.is_empty() {
         for err in &prog.errors {
             eprintln!(
-                "alloy: erro de sintaxe @ {}..{}: {}",
+                "astra: erro de sintaxe @ {}..{}: {}",
                 err.span.start, err.span.end, err.message
             );
         }
@@ -1094,7 +1094,7 @@ fn run(file: &PathBuf) -> ExitCode {
         Ok(_) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!(
-                "alloy: erro de runtime @ {}..{}: {}",
+                "astra: erro de runtime @ {}..{}: {}",
                 e.span.start, e.span.end, e.message
             );
             ExitCode::FAILURE
@@ -1111,7 +1111,7 @@ fn run(file: &PathBuf) -> ExitCode {
 use std::io::Write;
 use std::process::Command;
 
-/// Roda o binário `alloy run` sobre um fonte temporário e captura stdout.
+/// Roda o binário `astra run` sobre um fonte temporário e captura stdout.
 fn alloy_run(src: &str) -> (String, bool) {
     let dir = std::env::temp_dir();
     let path = dir.join(format!("alloy_test_{}.crs", std::process::id()));
@@ -1131,7 +1131,7 @@ fn alloy_run(src: &str) -> (String, bool) {
 #[test]
 fn hello_world_prints() {
     let (stdout, ok) = alloy_run("println(\"olá, alloy\")");
-    assert!(ok, "alloy run falhou");
+    assert!(ok, "astra run falhou");
     assert_eq!(stdout.trim_end(), "olá, alloy");
 }
 
@@ -1151,14 +1151,14 @@ Expected: PASS (2 tests). Se `parse_program` reportar erros para essas fontes, a
 
 - [ ] **Step 4: `cargo run` manual de fumaça**
 
-Run: `echo 'println("ok")' > /tmp/smoke.crs && cargo run -p astra-vm --bin alloy -- run /tmp/smoke.crs`
+Run: `echo 'println("ok")' > /tmp/smoke.crs && cargo run -p astra-vm --bin astra -- run /tmp/smoke.crs`
 Expected: imprime `ok`, exit 0.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/astra-vm/src/bin/alloy.rs crates/astra-vm/tests/cli_run.rs
-git commit -m "feat(alloy): alloy run CLI subcommand"
+git add crates/astra-vm/src/bin/astra.rs crates/astra-vm/tests/cli_run.rs
+git commit -m "feat(alloy): astra run CLI subcommand"
 ```
 
 ---
@@ -1171,7 +1171,7 @@ git commit -m "feat(alloy): alloy run CLI subcommand"
 
 **Interfaces:**
 - Consumes: tudo das tasks anteriores.
-- Produces: um exemplo `.crs` que roda em `alloy run` e o crate passa fmt/clippy/test.
+- Produces: um exemplo `.crs` que roda em `astra run` e o crate passa fmt/clippy/test.
 
 - [ ] **Step 1: Criar `examples/copper/alloy-hello.crs`**
 
@@ -1193,7 +1193,7 @@ func main() {
 
 - [ ] **Step 2: Rodar o exemplo**
 
-Run: `cargo run -p astra-vm --bin alloy -- run examples/copper/alloy-hello.crs`
+Run: `cargo run -p astra-vm --bin astra -- run examples/copper/alloy-hello.crs`
 Expected:
 ```
 Alloy VM
@@ -1224,4 +1224,4 @@ git commit -m "docs(alloy): runnable alloy-hello.crs example"
 
 - **Risco recorrente:** a forma exata que `parse_stmts`/`parse_program` produz para certas sintaxes (separadores `;` vs `\n`, se a última expressão vira `tail` ou `Item::Stmt`). Sempre que um teste falhar no *parse* (não na avaliação), ajuste o **fonte de teste** para algo que a AST aceita — nunca modifique `mikasa-syntax` neste plano. A invariante do MVP é "o que a AST aceita, a VM executa corretamente".
 - **`ExprKind::Raw`:** se aparecer em qualquer teste, significa que o subset do Pratt parser não formou aquela construção — está fora do escopo do MVP e o interpretador deve devolver `RuntimeError` "construção ainda não suportada pela VM" (o braço `_` já cobre isso).
-- **Próximos planos:** Fase 3 (struct/class/enum/impl/match/closures na VM), depois interop e `alloy build`. Cada um é um plano próprio.
+- **Próximos planos:** Fase 3 (struct/class/enum/impl/match/closures na VM), depois interop e `astra build`. Cada um é um plano próprio.

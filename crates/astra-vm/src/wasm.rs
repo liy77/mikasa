@@ -3,7 +3,7 @@
 //! The interpreter can't execute Rust directly. Instead of delegating the whole
 //! program to `cforge` (the old `NeedsCforge` path), Astra compiles each
 //! imported `.rs` to a **`wasm32-unknown-unknown`** module once (cached by
-//! content hash under `~/.alloy/cache`), then runs it with an embedded
+//! content hash under `~/.astra/cache`), then runs it with an embedded
 //! [`wasmi`] interpreter. Mikasa stays tree-walked (instant); only the Rust
 //! leaves cross into wasm. This keeps `.ast` / `.loy` portable — wasm is itself
 //! a platform-independent bytecode.
@@ -677,15 +677,15 @@ fn read_balanced(bytes: &[u8], start: usize, open: u8, close: u8) -> Option<(Str
     None
 }
 
-/// `~/.alloy/cache` (created lazily), overridable via `ALLOY_CACHE_DIR`.
+/// `~/.astra/cache` (created lazily), overridable via `ASTRA_CACHE_DIR`.
 fn cache_dir() -> Result<PathBuf, String> {
-    if let Ok(dir) = std::env::var("ALLOY_CACHE_DIR") {
+    if let Ok(dir) = std::env::var("ASTRA_CACHE_DIR").or_else(|_| std::env::var("ALLOY_CACHE_DIR")) {
         return Ok(PathBuf::from(dir));
     }
     let home = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
-        .map_err(|_| "no HOME/USERPROFILE to locate the Alloy cache".to_string())?;
-    Ok(PathBuf::from(home).join(".alloy").join("cache"))
+        .map_err(|_| "no HOME/USERPROFILE to locate the Astra cache".to_string())?;
+    Ok(PathBuf::from(home).join(".astra").join("cache"))
 }
 
 /// FNV-1a 64-bit — a tiny, dependency-free content hash for cache keys.

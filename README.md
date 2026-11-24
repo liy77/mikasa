@@ -2,7 +2,7 @@
 
 > **Copper is now Mikasa.** The language was renamed: Copper → **Mikasa**, and
 > its interpreter Alloy → **Astra**. The toolchain binary is `mikasa` (formerly
-> `cforge`); the interpreter binary is `astra` (the `alloy` name still works
+> `cforge`); the interpreter binary is `astra` (the `astra` name still works
 > where installed as an alias).
 >
 > File extensions were renamed too. The old ones still open, they are just no
@@ -122,7 +122,7 @@ mikasa vm run file.mika        # same engine via the mikasa CLI
 An `.ast` is a self-contained binary (magic header + bincoded AST). The older
 `.loy` spelling still loads. If the
 program imports sibling `.rs` files Astra compiles them to WebAssembly once
-(cached by content hash in `~/.alloy/cache`) and embeds the wasm into the
+(cached by content hash in `~/.astra/cache`) and embeds the wasm into the
 artifact — so the final `.ast` runs on any platform with no rustc and no
 `.rs` files on disk.
 
@@ -249,9 +249,9 @@ shared between the transpiler and Astra (single source of truth).
 copper-lang/
 ├── src/                # cforge compiler entrypoint + legacy re-exports
 ├── crates/
-│   ├── mikasa-syntax/  # Tokenizer + AST (shared by cforge, alloy, LSPs)
+│   ├── mikasa-syntax/  # Tokenizer + AST (shared by mikasa, astra, LSPs)
 │   ├── mikasa-parser/  # Streaming transpiler parser
-│   ├── astra-vm/       # Astra interpreter + `alloy` CLI
+│   ├── astra-vm/       # Astra interpreter + `astra` CLI
 │   ├── mikasa-lsp/     # Mikasa language server (hover, completion, goto-def)
 │   ├── mui-syntax/     # MocidaUI parser (.mui, and .mika files with a view)
 │   ├── mui-codegen/    # MUI → Rust codegen (M5 native path)
@@ -286,10 +286,10 @@ mikasa run examples/mikasa/cstd.mika            # built-in stdlib (input, sleep,
 mikasa run examples/mikasa/unsafe.mika          # `unsafe func` and `unsafe { ... }` blocks
 
 # Astra (interpreter — instant)
-alloy run examples/mikasa/loops.mika
-alloy run examples/mikasa/cstd.mika
-alloy build examples/mikasa/collections.mika -o collections.loy
-alloy run collections.loy
+astra run examples/mikasa/loops.mika
+astra run examples/mikasa/cstd.mika
+astra build examples/mikasa/collections.mika -o collections.loy
+astra run collections.loy
 
 # MUI examples (need mui-dev on PATH):
 cforge run examples/mui/hello/hello.mui
@@ -318,9 +318,9 @@ Full backlog with details: [`docs/TODO.md`](./docs/TODO.md).
 **Astra interpreter**
 - [x] Tree-walking interpreter for the full `mikasa-syntax` AST
 - [x] `cstd` interpreted from `std/cstd.mika` (single source, no Rust reimplementation)
-- [x] Portable `.loy` artifacts (`alloy build` / `alloy run`)
+- [x] Portable `.loy` artifacts (`astra build` / `astra run`)
 - [x] Imported `.rs` files run via embedded WebAssembly (wasm cache, embedded in `.loy`)
-- [x] `alloy check` — auto-provisioned Miri/rustc verification
+- [x] `astra check` — auto-provisioned Miri/rustc verification
 - [x] Return-type checking at runtime
 - [x] Astra GUI playground (MUI, hot-reload, native file dialog)
 - [ ] Wasm ABI: strings, `Vec`, structs (currently `i64`/`bool` scalars only)
@@ -338,7 +338,7 @@ Full backlog with details: [`docs/TODO.md`](./docs/TODO.md).
 
 **Installer**
 - [x] MUI-based native installer (no Tauri/web)
-- [x] `--workspace` flag builds and installs alloy + LSPs in one shot
+- [x] `--workspace` flag builds and installs astra + LSPs in one shot
 - [ ] Signed installer artifact + CI release packaging
 
 ## Contributing

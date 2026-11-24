@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Cross-compiles and packages the `alloy` runtime for multiple platforms.
+"""Cross-compiles and packages the `astra` runtime for multiple platforms.
 
-`alloy` lives in the portable `alloy-vm` crate (no mocida; pure-Rust deps), so
+`astra` lives in the portable `astra-vm` crate (no mocida; pure-Rust deps), so
 it cross-compiles cleanly. For each target whose toolchain is installed, builds
 in release mode and packages the binary into
-`dist/alloy/alloy-<version>-<target>.{tar.gz|zip}`.
+`dist/astra/astra-<version>-<target>.{tar.gz|zip}`.
 Targets without a toolchain are skipped with a warning (rather than failing) —
 useful for local runs.
 
 Usage:
-    python scripts/release-alloy.py            # all available targets
-    python scripts/release-alloy.py --host     # host target only
+    python scripts/release-astra.py            # all available targets
+    python scripts/release-astra.py --host     # host target only
 """
 
 import argparse
@@ -23,7 +23,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DIST = ROOT / "dist" / "alloy"
+DIST = ROOT / "dist" / "astra"
 
 TARGETS = [
     "x86_64-unknown-linux-gnu",
@@ -35,8 +35,8 @@ TARGETS = [
 ]
 
 
-def alloy_version() -> str:
-    cargo = (ROOT / "crates" / "alloy-vm" / "Cargo.toml").read_text(encoding="utf-8")
+def astra_version() -> str:
+    cargo = (ROOT / "crates" / "astra-vm" / "Cargo.toml").read_text(encoding="utf-8")
     for line in cargo.splitlines():
         if line.strip().startswith("version"):
             return line.split("=", 1)[1].strip().strip('"')
@@ -66,35 +66,35 @@ def host_target() -> str | None:
 
 
 def build_target(target: str) -> Path | None:
-    print(f"==> building alloy for {target}")
+    print(f"==> building astra for {target}")
     r = subprocess.run(
-        ["cargo", "build", "--release", "--target", target, "-p", "alloy-vm", "--bin", "alloy"],
+        ["cargo", "build", "--release", "--target", target, "-p", "astra-vm", "--bin", "astra"],
         cwd=ROOT,
     )
     if r.returncode != 0:
         print(f"    !! build failed for {target} (skipping)")
         return None
-    exe = "alloy.exe" if "windows" in target else "alloy"
+    exe = "astra.exe" if "windows" in target else "astra"
     bin_path = ROOT / "target" / target / "release" / exe
     return bin_path if bin_path.is_file() else None
 
 
 def package(target: str, bin_path: Path, version: str):
     DIST.mkdir(parents=True, exist_ok=True)
-    stem = f"alloy-{version}-{target}"
+    stem = f"astra-{version}-{target}"
     exe_name = bin_path.name
     if "windows" in target:
         out = DIST / f"{stem}.zip"
         with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
             z.write(bin_path, exe_name)
-            readme = ROOT / "crates" / "alloy-vm" / "README.md"
+            readme = ROOT / "crates" / "astra-vm" / "README.md"
             if readme.is_file():
                 z.write(readme, "README.md")
     else:
         out = DIST / f"{stem}.tar.gz"
         with tarfile.open(out, "w:gz") as t:
             t.add(bin_path, arcname=exe_name)
-            readme = ROOT / "crates" / "alloy-vm" / "README.md"
+            readme = ROOT / "crates" / "astra-vm" / "README.md"
             if readme.is_file():
                 t.add(readme, arcname="README.md")
     print(f"    -> {out.relative_to(ROOT)}")
@@ -105,7 +105,7 @@ def main():
     ap.add_argument("--host", action="store_true", help="package the host target only")
     args = ap.parse_args()
 
-    version = alloy_version()
+    version = astra_version()
     print(f"Astra runtime release v{version}")
 
     if args.host:

@@ -10,7 +10,7 @@ pipeline:
 .crs ─► mikasa-syntax (tokenize) ─► mikasa-parser (emit) ─► Rust source ─► cargo build
 ```
 
-The [`mikasa-lsp`](../mikasa-lsp) language server and the [`alloy`](../astra-vm)
+The [`mikasa-lsp`](../mikasa-lsp) language server and the [`astra`](../astra-vm)
 interpreter take the **AST** branch of `mikasa-syntax` instead and never touch
 this crate.
 

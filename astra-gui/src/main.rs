@@ -1,4 +1,4 @@
-//! Astra — dual-mode binary (`alloy`).
+//! Astra — dual-mode binary (`astra`).
 //!
 //! Authored app code is Mikasa: `astra.mika` (UI) + `backend.mika` (logic).
 //! This file is the unavoidable mocida host + CLI glue — no app decisions here.
@@ -9,11 +9,105 @@ mod backend;
 use std::path::Path;
 use std::process::ExitCode;
 
+struct GuiOpts {
+    /// Keep the SDL window hidden (`MOCIDA_WINDOW_HIDDEN`). Interactive
+    /// users get a normal window; agents pass `--headless` / `--shot`.
+    headless: bool,
+    /// Capture frame N to this PNG, then quit. Implies headless.
+    shot: Option<String>,
+    /// Frame index for `MOCIDA_SHOT_FRAME` (past first layout pass).
+    shot_frame: u32,
+}
+
+impl Default for GuiOpts {
+    fn default() -> Self {
+        Self {
+            headless: false,
+            shot: None,
+            shot_frame: 8,
+        }
+    }
+}
+
+fn parse_gui_opts(args: &[String]) -> Result<GuiOpts, String> {
+    let mut opts = GuiOpts::default();
+    if std::env::var_os("ASTRA_GUI_HEADLESS").is_some_and(|v| v == "1")
+        || std::env::var_os("MOCIDA_WINDOW_HIDDEN").is_some_and(|v| v == "1")
+    {
+        opts.headless = true;
+    }
+    if let Ok(path) = std::env::var("ASTRA_GUI_SHOT") {
+        if !path.is_empty() {
+            opts.shot = Some(path);
+            opts.headless = true;
+        }
+    }
+    if let Ok(n) = std::env::var("ASTRA_GUI_SHOT_FRAME") {
+        if let Ok(v) = n.parse::<u32>() {
+            opts.shot_frame = v;
+        }
+    }
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--headless" | "-H" => opts.headless = true,
+            "--foreground" | "-F" => opts.headless = false,
+            "--shot" => {
+                let path = args
+                    .get(i + 1)
+                    .ok_or_else(|| "usage: --shot <path.png>".to_string())?;
+                opts.shot = Some(path.clone());
+                opts.headless = true;
+                i += 1;
+            }
+            "--shot-frame" => {
+                let n = args
+                    .get(i + 1)
+                    .ok_or_else(|| "usage: --shot-frame <N>".to_string())?;
+                opts.shot_frame = n
+                    .parse()
+                    .map_err(|_| format!("invalid --shot-frame `{n}`"))?;
+                i += 1;
+            }
+            other if other.starts_with('-') => {
+                return Err(format!(
+                    "unknown gui flag `{other}` (use: --headless | --foreground | --shot PATH | --shot-frame N)"
+                ));
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    Ok(opts)
+}
+
+fn apply_gui_env(opts: &GuiOpts) {
+    if opts.headless {
+        // Single-threaded startup, before SDL init.
+        unsafe {
+            std::env::set_var("MOCIDA_WINDOW_HIDDEN", "1");
+        }
+    }
+    if let Some(path) = &opts.shot {
+        unsafe {
+            std::env::set_var("MOCIDA_SHOT_PATH", path);
+            std::env::set_var("MOCIDA_SHOT_FRAME", opts.shot_frame.to_string());
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
 
     match args.first().map(String::as_str) {
-        None | Some("gui") => run_gui(),
+        None => run_gui(GuiOpts::default()),
+        Some("gui") => match parse_gui_opts(&args[1..]) {
+            Ok(opts) => run_gui(opts),
+            Err(e) => {
+                eprintln!("astra: {e}");
+                ExitCode::FAILURE
+            }
+        },
         Some("update") => match check_for_update() {
             info if info.available => match apply_release(&info.asset_url) {
                 Ok(()) => {
@@ -21,7 +115,7 @@ fn main() -> ExitCode {
                     ExitCode::SUCCESS
                 }
                 Err(e) => {
-                    eprintln!("alloy: update failed: {e}");
+                    eprintln!("astra: update failed: {e}");
                     ExitCode::FAILURE
                 }
             },
@@ -33,13 +127,15 @@ fn main() -> ExitCode {
         Some("run") => match args.get(1) {
             Some(file) => cli_run(Path::new(file)),
             None => {
-                eprintln!("usage: alloy run <file.mika>");
+                eprintln!("usage: astra run <file.mika>");
                 ExitCode::FAILURE
             }
         },
         Some(path) if Path::new(path).exists() => cli_run(Path::new(path)),
         Some(other) => {
-            eprintln!("alloy: unknown command `{other}` (use: run <file> | update | gui)");
+            eprintln!(
+                "astra: unknown command `{other}` (use: run <file> | update | gui [--headless] [--shot PATH])"
+            );
             ExitCode::FAILURE
         }
     }
@@ -52,7 +148,7 @@ fn cli_run(file: &Path) -> ExitCode {
     let src = match std::fs::read_to_string(file) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("alloy: could not read {}: {e}", file.display());
+            eprintln!("astra: could not read {}: {e}", file.display());
             return ExitCode::FAILURE;
         }
     };
@@ -60,7 +156,7 @@ fn cli_run(file: &Path) -> ExitCode {
     if !prog.errors.is_empty() {
         for err in &prog.errors {
             eprintln!(
-                "alloy: syntax error @ {}..{}: {}",
+                "astra: syntax error @ {}..{}: {}",
                 err.span.start, err.span.end, err.message
             );
         }
@@ -70,7 +166,7 @@ fn cli_run(file: &Path) -> ExitCode {
         Ok(_) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!(
-                "alloy: runtime error @ {}..{}: {}",
+                "astra: runtime error @ {}..{}: {}",
                 e.span.start, e.span.end, e.message
             );
             ExitCode::FAILURE
@@ -208,17 +304,18 @@ fn read_mui_source() -> String {
     std::fs::read_to_string(mui_path()).unwrap_or_else(|_| MUI_BAKED.to_string())
 }
 
-fn run_gui() -> ExitCode {
-    match try_run_gui() {
+fn run_gui(opts: GuiOpts) -> ExitCode {
+    apply_gui_env(&opts);
+    match try_run_gui(opts) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
-            eprintln!("alloy: failed to open the GUI: {e}");
+            eprintln!("astra: failed to open the GUI: {e}");
             ExitCode::FAILURE
         }
     }
 }
 
-fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
+fn try_run_gui(opts: GuiOpts) -> Result<(), Box<dyn std::error::Error>> {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     register_assets(manifest_dir);
 
@@ -271,13 +368,19 @@ fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     mocida::text::search_fonts();
-    let _ = mocida::text::get_font("Arial");
+    for fam in ["SF Pro Text", "SF Pro Display", "SF Mono", "Helvetica Neue", "Arial"] {
+        let _ = mocida::text::get_font(fam);
+    }
 
     let source_cell = Rc::new(RefCell::new(mui_src.clone()));
     let loaded = mui_syntax::loader::load_from(&mui_src, Path::new("astra.mika"));
     let components = loaded.registry();
+    let mut initial = HashMap::new();
+    initial.insert("version".into(), backend::current_version());
+    initial.insert("output".into(), backend::ready_message());
+    initial.insert("source".into(), backend::default_source());
     let (children, reactive) =
-        mui_runtime::build_view_seeded(view, &components, &HashMap::new())?;
+        mui_runtime::build_view_seeded(view, &components, &initial)?;
     reactive.set_str("version", &backend::current_version());
     reactive.set_str("output", &backend::ready_message());
     reactive.set_str("source", &backend::default_source());
@@ -294,16 +397,20 @@ fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
     let last_size = std::rc::Rc::new(std::cell::Cell::new((0i32, 0i32, 0i32, 0i32)));
     let watch_source = Rc::clone(&source_cell);
     let last_mtime: Rc<RefCell<Option<std::time::SystemTime>>> = Rc::new(RefCell::new(None));
+    let shot_quit_after = opts.shot.as_ref().map(|_| opts.shot_frame.saturating_add(2));
+    let tick_n = Rc::new(std::cell::Cell::new(0u32));
 
     let rebuild = {
         let tick_slot = Rc::clone(&tick_slot);
         let source_cell = Rc::clone(&source_cell);
         move || {
-            let seed = tick_slot
+            let mut seed = tick_slot
                 .borrow()
                 .as_ref()
                 .map(|r| r.values())
                 .unwrap_or_default();
+            // Keep host-owned strings across rebuilds.
+            seed.insert("version".into(), backend::current_version());
             let src = source_cell.borrow().clone();
             let loaded = mui_syntax::loader::load_from(&src, Path::new("astra.mika"));
             let comps = loaded.registry();
@@ -325,6 +432,15 @@ fn try_run_gui() -> Result<(), Box<dyn std::error::Error>> {
             assets_flag.set(true);
             register_assets(Path::new(env!("CARGO_MANIFEST_DIR")));
             rebuild();
+        }
+
+        let n = tick_n.get().saturating_add(1);
+        tick_n.set(n);
+        if let Some(after) = shot_quit_after {
+            if n >= after {
+                // Avoid UIApp_CloseG + App::Drop double-free in mocida teardown.
+                std::process::exit(0);
+            }
         }
 
         let cur_m = std::fs::metadata(mui_path())

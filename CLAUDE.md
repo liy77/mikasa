@@ -4,9 +4,9 @@ Context for AI assistants on **copper-lang** — traps, invariants, conventions.
 
 > **Copper is now Mikasa, and Alloy is now Astra.** The rename is branding:
 > docs, window titles, and logos say Mikasa / Astra. The toolchain binary is
-> `mikasa` (formerly `cforge`). The interpreter binary (`alloy`), crate names
-> (`copper-*`, `astra-vm`), and module paths stay as they are — do not rename
-> them to match the brand.
+> `mikasa` (formerly `cforge`). The interpreter binary is `astra` (formerly
+> `alloy`); crate names (`copper-*`, `astra-vm`) and module paths stay as they
+> are — do not rename them further to match the brand.
 >
 > Extensions (`crates/mikasa-syntax/src/ext.rs`): `.mika` source, `.ast`
 > bytecode, `.mklib` library, `.mipkg` package. `.crs` and `.loy` still load
@@ -22,7 +22,7 @@ Context for AI assistants on **copper-lang** — traps, invariants, conventions.
 Mikasa (formerly Copper) transpiles to Rust. Binary: `mikasa`. Pipeline:
 `.crs` → tokenizer → token rewrites → parser → Rust source → `cargo build`.
 
-**Second engine: Astra** (formerly Alloy; `crates/astra-vm`, binary `alloy`) — tree-walking interpreter
+**Second engine: Astra** (formerly Alloy; `crates/astra-vm`, binary `astra`) — tree-walking interpreter
 over the shared `mikasa-syntax` AST. Instant like `python`; no transpile, no cargo.
 Design specs: `docs/superpowers/specs/2026-06-22-astra-vm-design.md`.
 
@@ -30,17 +30,17 @@ Design specs: `docs/superpowers/specs/2026-06-22-astra-vm-design.md`.
 
 ```
 crates/
-  mikasa-syntax/    tokenizer + AST (shared by cforge, alloy, LSPs)
+  mikasa-syntax/    tokenizer + AST (shared by cforge, astra, LSPs)
   mikasa-parser/    streaming transpiler parser
-  astra-vm/         Astra interpreter lib + `alloy` CLI
+  astra-vm/         Astra interpreter lib + `astra` CLI
                     src/{value,env,error,interp,bytecode,loader,stdlib,stdlib_ext,wasm,intrinsics}.rs
   mikasa-lsp/       Mikasa language server
   mui-syntax/       MocidaUI parser (.mui, and .mika files with a view)
   mui-codegen/      MUI → Rust codegen (M5)
   mui-lsp/          MUI language server
 src/                cforge entrypoint + re-exports from crates (historical; real code is in crates/)
-astra-gui/          Dual-mode alloy GUI host (MUI; own workspace; links mocida)
-std/cstd.mika        Mikasa stdlib — single source for both cforge and alloy
+astra-gui/          Dual-mode astra GUI host (MUI; own workspace; links mocida)
+std/cstd.mika        Mikasa stdlib — single source for both cforge and astra
 docs/superpowers/specs/   Design specs (astra-vm, bytecode, gui, check-miri, wasm-interop, mui-codegen)
 docs/TODO.md        Backlog index → TODO-mikasa.md / TODO-astra.md
 ```
@@ -56,14 +56,14 @@ Handlers + live reactivity are emitted as comments/placeholders — M3/M4 evalua
 ## Astra — commands, .ast, imports
 
 **Commands:**
-- `alloy run file.crs` — instant interpret.
-- `alloy build file.crs [-o out.loy]` — portable artifact.
-- `alloy run app.loy` — run artifact (auto-detected by magic `ALLOYBC\0`).
-- `alloy check file.crs [--no-miri]` — verify via real rustc + Miri.
+- `astra run file.crs` — instant interpret.
+- `astra build file.crs [-o out.loy]` — portable artifact.
+- `astra run app.loy` — run artifact (auto-detected by magic `ASTRABC\0`).
+- `astra check file.crs [--no-miri]` — verify via real rustc + Miri.
 - `cforge vm run/build` / `cforge check` — same VM via cforge.
 
 **`.loy` format** (`crates/astra-vm/src/bytecode.rs`):
-`magic b"ALLOYBC\0"` + `fmt_ver: u16 LE` + bincode(alloy_ver) + bincode(payload).
+`magic b"ASTRABC\0"` + `fmt_ver: u16 LE` + bincode(astra_ver) + bincode(payload).
 v1 = `Vec<Item>` (AST). v2 = `Vec<Item>` + `Vec<WasmModule { names, bytes }>` (wasm embedded). v1 still loadable.
 
 **Imports** (`loader.rs`):
@@ -73,9 +73,9 @@ v1 = `Vec<Item>` (AST). v2 = `Vec<Item>` + `Vec<WasmModule { names, bytes }>` (w
 | `fs`, `time`, `url`, `net`, `ws`, `json`, `crypto`, `http` | Native Rust in `stdlib.rs` / `stdlib_ext.rs` |
 | `cstd` | Interpreted from `std/cstd.mika` (merged); 4 native exceptions: `run`, `list_dir`, `append_file`, `rand_int` (`CSTD_NATIVE`) |
 | `math` (sibling `.crs`) | Parsed + merged recursively; bundled into `.loy` |
-| `foo` (sibling `.rs`) | Compiled to wasm32 once (cached in `~/.alloy/cache` by hash), run via `wasmi`. Prototype ABI: `i64`/`bool`, requires `#[no_mangle] pub extern "C"`. Plain `pub fn` → `LoadOutcome::NeedsCforge`. |
+| `foo` (sibling `.rs`) | Compiled to wasm32 once (cached in `~/.astra/cache` by hash), run via `wasmi`. Prototype ABI: `i64`/`bool`, requires `#[no_mangle] pub extern "C"`. Plain `pub fn` → `LoadOutcome::NeedsCforge`. |
 
-**Key decision — don't fork rustc:** embedding Miri = shipping a nightly compiler (100s MB). Rejected. See `2026-06-22-alloy-check-miri-design.md`.
+**Key decision — don't fork rustc:** embedding Miri = shipping a nightly compiler (100s MB). Rejected. See `2026-06-22-astra-check-miri-design.md`.
 
 **Values** (`value.rs`): `Int/Float/Bool/Str/Unit/Vec/Tuple/Struct/Enum/Closure`.
 `Option`/`Result` = `Enum{ty:"Option"|"Result", variant, payload}`. Manual `PartialEq` (closures never equal). Arithmetic is **checked** — must never panic; return `RuntimeError` with `Span`.
@@ -109,7 +109,7 @@ v1 = `Vec<Item>` (AST). v2 = `Vec<Item>` + `Vec<WasmModule { names, bytes }>` (w
 
 ### mikasa-syntax AST parser (Astra)
 
-- **Recoverable parser** — partial tree + `ParseError`s on bad input. `alloy run` rejects non-empty `prog.errors`. Earlier these were silently discarded (`_errs`).
+- **Recoverable parser** — partial tree + `ParseError`s on bad input. `astra run` rejects non-empty `prog.errors`. Earlier these were silently discarded (`_errs`).
 - **Inside `(...)` identifiers are `Param`/`ParamType`, not `Identifier`.** `expect_ident` and closure-param parsing must accept both.
 - **`?` vs ternary** disambiguated by `ternary_colon_ahead`: ternary iff `:` follows at the same paren depth before statement end.
 - **`mut (a, b) = …`** = mutable tuple destructuring, not a `mut name =` binding.
@@ -190,7 +190,7 @@ Required env vars: `MOCIDA_INCLUDE_DIR`, `MOCIDA_LIB_DIR`, `MOCIDA_LIB_NAME=moci
 - **Type aliases** (`type Foo = Bar<T>`) don't lower inside `static`/`as` casts.
 
 **Astra:**
-- **No static borrow/ownership checking** — dynamic `Rc<RefCell>`; pointer aliasing doesn't propagate. Use `cforge` or `alloy check` for real borrow-checking.
+- **No static borrow/ownership checking** — dynamic `Rc<RefCell>`; pointer aliasing doesn't propagate. Use `cforge` or `astra check` for real borrow-checking.
 - **`&&`/`||` are not short-circuit** — both operands pre-evaluated before `eval_binary`.
 - **Wasm ABI is prototype-only** — `i64`/`bool` + `extern "C"` only. Strings/structs = next phase.
 - **`.loy` v2** bundles wasm from imported `.rs`; self-contained, no rustc needed at run time.

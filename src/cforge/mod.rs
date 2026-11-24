@@ -2,6 +2,7 @@ pub mod cache;
 pub mod check;
 pub mod commands;
 pub mod fetch;
+pub mod fmt;
 pub mod kson;
 pub mod module_transpile;
 pub mod mui;

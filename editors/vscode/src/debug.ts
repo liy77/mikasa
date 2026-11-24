@@ -99,7 +99,7 @@ class MikasaDebugSession implements vscode.DebugAdapter {
     const command =
       runtime === 'mikasa'
         ? config.get('mikasaPath', 'mikasa')
-        : config.get('astraPath', 'alloy');
+        : config.get('astraPath', 'astra');
     const runArgs = runtime === 'mikasa' ? ['run', program] : ['run', program];
 
     this.event('output', {

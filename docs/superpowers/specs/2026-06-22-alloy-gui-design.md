@@ -1,4 +1,4 @@
-# Alloy GUI + dual-mode binary
+# Astra GUI + dual-mode binary
 
 **Data:** 2026-06-22
 **Status:** Design aprovado (pré-implementação)
@@ -6,16 +6,16 @@
 
 ## Resumo
 
-Transformar `alloy` num binário **dual-mode** distribuível, construído com
+Transformar `astra` num binário **dual-mode** distribuível, construído com
 **MUI** (a UI declarativa do mocida), sem quebrar a portabilidade do crate
 `astra-vm`:
 
-- **CLI:** `alloy run arquivo.crs` (e `alloy <arquivo.crs>`) interpreta no
+- **CLI:** `astra run arquivo.crs` (e `astra <arquivo.crs>`) interpreta no
   terminal — comportamento atual, reaproveitado.
-- **GUI (sem args, ou `alloy gui`):** abre uma janela MUI com:
+- **GUI (sem args, ou `astra gui`):** abre uma janela MUI com:
   - **Playground:** editor de `.crs` + botão Run + painel de saída.
   - **File runner:** abrir um `.crs` do disco e rodar.
-  - **Atualizador:** checar/baixar/instalar nova versão do próprio `alloy`.
+  - **Atualizador:** checar/baixar/instalar nova versão do próprio `astra`.
 
 ## Decisão de arquitetura: crate host separado
 
@@ -24,25 +24,25 @@ mocida** (senão quebra CI Linux/macOS). Portanto:
 
 - `crates/astra-vm` **permanece portátil** (lib + lógica de interpretação, sem
   mocida). Já está pronto.
-- Crate novo **`alloy-gui`** (fora do workspace portátil, como o
+- Crate novo **`astra-gui`** (fora do workspace portátil, como o
   `installer-gui`) linka `mocida` + `mui-runtime` + `mui-syntax` e usa
-  `astra-vm` como lib. **Este** é o binário `alloy` de release/distribuição.
-- O binário `alloy` do `alloy-gui` é o dual-mode: parseia args; com `run`/arquivo
+  `astra-vm` como lib. **Este** é o binário `astra` de release/distribuição.
+- O binário `astra` do `astra-gui` é o dual-mode: parseia args; com `run`/arquivo
   → chama a lib `astra-vm`; sem args → sobe a GUI MUI.
 
 Assim entregamos "um binário usável como GUI e CLI" sem sujar o CI. O binário
-`alloy` do crate `astra-vm` continua existindo para o CI portátil (testes), mas
-a distribuição usa o de `alloy-gui`.
+`astra` do crate `astra-vm` continua existindo para o CI portátil (testes), mas
+a distribuição usa o de `astra-gui`.
 
 ```
 crates/astra-vm  (lib + CLI portátil, sem mocida)   ← CI
         │ (path dep)
         ▼
-alloy-gui/  (host: mocida + mui-runtime + mui-syntax + astra-vm)
+astra-gui/  (host: mocida + mui-runtime + mui-syntax + astra-vm)
    ├── alloy.mui        view declarativa (playground/runner/updater)
    ├── backend.rs       lógica do host: rodar fonte, listar arquivos, update
    ├── app.bundle       nome/id + assets (ícone)
-   ├── assets/          alloy-icon.png / alloy-icon.ico / alloy-logo.png
+   ├── assets/          astra-icon.png / astra-icon.ico / astra-logo.png
    ├── build.rs         embute .ico no .exe (winresource, só Windows)
    ├── packaging/        script .app/.icns para macOS
    └── src/main.rs      dual-mode (CLI passthrough + host MUI)
@@ -64,7 +64,7 @@ Hoje `println`/`print` escrevem direto em `stdout` via `println!`. A GUI precisa
 
 Esta é a **primeira tarefa** (no crate portátil, testável no CI).
 
-## Componentes do `alloy-gui`
+## Componentes do `astra-gui`
 
 ### `src/main.rs` — dual-mode
 - `args`: se o primeiro arg for `run` ou um caminho `.crs` existente → modo CLI
@@ -74,8 +74,8 @@ Esta é a **primeira tarefa** (no crate portátil, testável no CI).
   `window_config` → `prefer_renderer`/`prefer_custom_titlebar` → `App::new` →
   `build_view_seeded` → seed de signals → `app.set_children` → `on_tick`
   (rebuild em `take_dirty`, polling de resultados do backend) → `show().run()`).
-- Ícone da janela: `app.bundle` registra `mocida://alloy-icon.png` +
-  `app.set_window_icon("mocida://alloy-icon.png")`.
+- Ícone da janela: `app.bundle` registra `mocida://astra-icon.png` +
+  `app.set_window_icon("mocida://astra-icon.png")`.
 
 ### `backend.rs` — lógica do host (std + astra-vm)
 - `run_source(src: &str) -> RunResult { output: String, error: Option<String> }`
@@ -100,22 +100,22 @@ Esta é a **primeira tarefa** (no crate portátil, testável no CI).
 
 ### Ícones (ambas plataformas)
 - **Janela (runtime):** `app.bundle` + `set_window_icon` — ambas plataformas.
-- **`.exe` (Windows):** `build.rs` com `winresource` embute `assets/alloy-icon.ico`
+- **`.exe` (Windows):** `build.rs` com `winresource` embute `assets/astra-icon.ico`
   no PE (padrão novo no repo; sob `#[cfg(windows)]`). Requer gerar o `.ico` do
   PNG (script de packaging).
 - **`.app` (macOS):** script `packaging/make-app.sh` que gera `Alloy.icns` do PNG
-  (via `iconutil`/`sips`) e monta `Alloy.app` (Info.plist + binário + `.icns` +
+  (via `iconutil`/`sips`) e monta `Astra.app` (Info.plist + binário + `.icns` +
   `libmocida.dylib`). Usável no Finder e ainda invocável por linha de comando
-  (`Alloy.app/Contents/MacOS/alloy run x.crs`).
+  (`Astra.app/Contents/MacOS/astra run x.crs`).
 
 ## Assets necessários (fornecidos pelo usuário)
-- `assets/alloy/alloy-logo.png` — sem caixa, para README (já referenciado).
-- `assets/alloy/alloy-icon.png` — com caixa de app, fonte do `.ico`/`.icns` e do
+- `assets/alloy/astra-logo.png` — sem caixa, para README (já referenciado).
+- `assets/alloy/astra-icon.png` — com caixa de app, fonte do `.ico`/`.icns` e do
   ícone de janela. **Bloqueio atual:** arquivos PNG precisam ser salvos em disco.
 
 ## Testes / verificação
 - **`astra-vm` (CI):** testes de captura de saída (buffer) + os existentes.
-- **`alloy-gui`:** não linka no CI portátil (precisa de `MOCIDA_LIB_DIR`); a
+- **`astra-gui`:** não linka no CI portátil (precisa de `MOCIDA_LIB_DIR`); a
   lógica de `backend.rs` que não depende de mocida (`run_source`, `read_file`,
   parsing de versão do updater) é testável isoladamente. A GUI em si **não é
   testada neste ambiente** (decisão do usuário) — só escrita.
@@ -126,7 +126,7 @@ Esta é a **primeira tarefa** (no crate portátil, testável no CI).
 
 ## Fases internas
 1. **Captura de saída no `astra-vm`** (testável, CI). ← primeiro
-2. **Crate `alloy-gui`**: scaffold + `main.rs` dual-mode (CLI passthrough já
+2. **Crate `astra-gui`**: scaffold + `main.rs` dual-mode (CLI passthrough já
    funciona) + `backend::run_source` (testável sem mocida).
 3. **`alloy.mui`** + wiring de signals (playground + runner).
 4. **Atualizador** (`check_update`/`apply_update`).

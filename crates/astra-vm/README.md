@@ -9,7 +9,7 @@
 </p>
 
 > **Alloy → Astra** (branding). O binário da VM é **`astra`**. O nome de crate
-> `astra-vm` e o magic `ALLOYBC` do artefato ficam como estão.
+> `astra-vm` e o magic `ASTRABC` do artefato ficam como estão.
 >
 > Backlog: [`docs/TODO-astra.md`](../../docs/TODO-astra.md)
 
@@ -32,7 +32,7 @@ AST do `mikasa-syntax` que o transpiler (`mikasa` / `cforge`) — o que roda aqu
 ```sh
 astra run program.mika          # interpreta
 astra build program.mika -o out.ast   # artefato portável (.ast / .loy)
-astra run out.ast               # roda artefato (magic ALLOYBC)
+astra run out.ast               # roda artefato (magic ASTRABC)
 astra check program.mika        # rustc + Miri (via mikasa/cforge)
 mikasa vm run program.mika      # mesmo engine
 ```
@@ -55,7 +55,7 @@ func main() {
 ```
 
 ```sh
-$ astra run examples/mikasa/alloy-hello.mika
+$ astra run examples/mikasa/astra-hello.mika
 Astra VM
 sum 1..5 = 10
 ```
@@ -67,7 +67,7 @@ sum 1..5 = 10
 - Checagem de tipo de retorno no interpreter
 - Stdlib (`mika`/`cstd`, `fs`, `time`, `json`, `http`, …)
 - Imports locais `.mika` (merge) e **`import("arquivo.mika")`**
-- **`.rs` via wasm** (`wasmi`, cache `~/.alloy/cache`): `i64` / `i32` / `bool` / `f64`;
+- **`.rs` via wasm** (`wasmi`, cache `~/.astra/cache`): `i64` / `i32` / `bool` / `f64`;
   `pub fn` idiomático é auto-wrapped (não precisa `extern "C"`)
 - Artefato `.ast`/`.loy` com wasm embutido (`astra build`)
 

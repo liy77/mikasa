@@ -7,7 +7,8 @@
 | **[TODO-mikasa.md](./TODO-mikasa.md)** | Transpilador `mikasa`, sintaxe, LSP, MUI codegen, `mika_import!` |
 | **[TODO-astra.md](./TODO-astra.md)** | VM `astra`, wasm interop, `astra-gui` |
 
-README da VM: [`crates/astra-vm/README.md`](../crates/astra-vm/README.md).
+README da VM: [`crates/astra-vm/README.md`](../crates/astra-vm/README.md).  
+MUI / Astra GUI: [`docs/mui.md`](./mui.md) · [`astra-gui/README.md`](../astra-gui/README.md).
 
 ---
 

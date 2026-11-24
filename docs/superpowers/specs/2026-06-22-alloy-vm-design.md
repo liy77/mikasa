@@ -6,8 +6,8 @@
 ## Resumo
 
 Alloy é uma **VM de bytecode** para Copper, distribuída como um binário separado
-(`alloy`), pensada para iteração rápida: `alloy run`, `alloy repl`, hot-reload
-de MUI e `alloy build` (binário self-contained). Ela **não substitui** o caminho
+(`astra`), pensada para iteração rápida: `astra run`, `astra repl`, hot-reload
+de MUI e `astra build` (binário self-contained). Ela **não substitui** o caminho
 de produção atual (transpile `.crs` → Rust → `cargo build`, dono do `cforge`),
 que continua sendo o alvo de release nativo.
 
@@ -18,7 +18,7 @@ transpiler e é 100% compatível com Rust por construção. Alloy adiciona um al
 ### Invariante de compatibilidade
 
 O mesmo `.crs` deve produzir o mesmo comportamento observável nos dois alvos
-(`alloy run` e `cforge run`). Isso é verificado no CI (harness de paridade) e é
+(`astra run` e `cforge run`). Isso é verificado no CI (harness de paridade) e é
 a forma concreta de "Alloy continua compatível com Rust".
 
 ## Arquitetura
@@ -40,8 +40,8 @@ a forma concreta de "Alloy continua compatível com Rust".
 
 - **AST única e compartilhada** (`mikasa-syntax`) é a fonte de verdade dos dois
   alvos. Nenhum backend re-tokeniza.
-- **`alloy` é binário separado** do `cforge`. `cforge` continua dono do
-  transpile/release; `alloy` é dono da VM.
+- **`astra` é binário separado** do `cforge`. `cforge` continua dono do
+  transpile/release; `astra` é dono da VM.
 - **Crates novos isolados** (`alloy-compiler`, `astra-vm`). `cforge` e `mui-*`
   não dependem deles, então o CI Linux/macOS/Windows não quebra por causa do
   Alloy.
@@ -75,7 +75,7 @@ conforme a VM os exercita, não como uma fase prévia.
 
 Decisão de implementação: começar como **interpretador tree-walking** que
 executa o `Program` de `program.rs` diretamente — caminho mais curto até
-`alloy run` funcional, reaproveita 100% da AST e é trivial de depurar.
+`astra run` funcional, reaproveita 100% da AST e é trivial de depurar.
 Bytecode de pilha e/ou JIT Cranelift são **otimizações posteriores** (a AST já
 suporta Cranelift), cada uma em seu próprio plano.
 
@@ -95,11 +95,11 @@ suporta Cranelift), cada uma em seu próprio plano.
 Estratégia híbrida — entrega "carregar Rust em runtime" sem pagar o custo do
 cargo em todo run:
 
-- **Stdlib + crates comuns:** funções nativas **registradas** no binário `alloy`
+- **Stdlib + crates comuns:** funções nativas **registradas** no binário `astra`
   (`cstd`, `http`, etc. expostas via funções Rust). Instantâneo, sem cargo.
 - **Crates arbitrários:** carregados **sob demanda** via compilação de um shim
   `cdylib` com wrappers `extern "C"`, carregado com `libloading`. O shim
-  compilado é **cacheado** (`~/.alloy/shims/`), então só o primeiro uso paga o
+  compilado é **cacheado** (`~/.astra/shims/`), então só o primeiro uso paga o
   `cargo build`; execuções seguintes reusam o `.dylib`/`.so`/`.dll`.
 - Fronteira é **C-ABI**: tipos complexos (`String`, `Vec`, genéricos, traits)
   exigem superfície C-friendly; o wrapper é gerado quando possível, senão é erro
@@ -111,20 +111,20 @@ a stdlib registrada evita o custo no caminho comum.
 
 ### 5. `bin/alloy`
 
-- `alloy run f.crs` — interpreta direto.
-- `alloy build f.crs` — binário self-contained (VM + bytecode embutido).
-- `alloy repl` — REPL interativo.
-- `alloy check f.crs` — só checagem de tipos/nomes, sem executar.
+- `astra run f.crs` — interpreta direto.
+- `astra build f.crs` — binário self-contained (VM + bytecode embutido).
+- `astra repl` — REPL interativo.
+- `astra check f.crs` — só checagem de tipos/nomes, sem executar.
 
 ### 6. Ponte de paridade (CI)
 
-Harness que roda cada `examples/copper/*.crs` em `alloy run` e `cforge run` e
+Harness que roda cada `examples/copper/*.crs` em `astra run` e `cforge run` e
 compara stdout/exit. Divergência = falha de CI.
 
 ## Tratamento de erros
 
 - **Compile-time da VM:** erros de tipo/nome viram diagnósticos com span
-  (reusa a infra de erro recuperável da AST). `alloy check` expõe só isso.
+  (reusa a infra de erro recuperável da AST). `astra check` expõe só isso.
 - **Runtime:** panics da VM com **stack trace Copper** (linha/coluna do `.crs`),
   não stack trace Rust.
 - **Shim/interop:** falha de `cargo build` do shim é reportada como erro de
@@ -145,12 +145,12 @@ próprio.
 
 1. ~~**AST completa**~~ — **JÁ EXISTE** (`expr.rs` + `program.rs`). Pulada.
 2. **VM núcleo (tree-walking):** avaliação de expr, vars, funcs, controle de
-   fluxo, `println`. Crate `astra-vm` + binário `alloy` com `run`. → primeiro
-   `alloy run`. **(primeiro plano de implementação)**
+   fluxo, `println`. Crate `astra-vm` + binário `astra` com `run`. → primeiro
+   `astra run`. **(primeiro plano de implementação)**
 3. **Tipos compostos:** struct/class/enum/impl/match/closures na VM.
 4. **Genéricos + traits** na VM (e fechar gaps de `Raw` na AST sob demanda).
 5. **Interop:** stdlib registrada + shim C-ABI cacheado sob demanda.
-6. **`alloy build`** self-contained + `repl` + harness de paridade no CI.
+6. **`astra build`** self-contained + `repl` + harness de paridade no CI.
 7. **(futuro, opcional)** backend bytecode e/ou JIT Cranelift como otimização.
 
 ## Riscos

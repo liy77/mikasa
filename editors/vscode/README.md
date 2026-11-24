@@ -30,7 +30,7 @@ cargo build --release -p mikasa-lsp
 | `copper.serverPath` | `mikasa-lsp` | Executable to launch as the LSP server. |
 | `copper.trace.server` | `off` | LSP message tracing — `off` / `messages` / `verbose`. |
 | `mikasa.runtime` | `astra` | `astra` interprets, `mikasa` transpiles to Rust. |
-| `mikasa.astraPath` | `alloy` | Path to the Astra interpreter. |
+| `mikasa.astraPath` | `astra` | Path to the Astra interpreter. |
 | `mikasa.mikasaPath` | `mikasa` | Path to the transpiler. |
 
 ## Building the extension
