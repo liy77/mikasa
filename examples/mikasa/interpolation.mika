@@ -1,13 +1,10 @@
-// Demonstrates string interpolation.
+// String interpolation.
 //
-// Two forms:
 //   $name        — bare identifier
-//   ${expr}      — full Rust expression, brace-balanced
+//   ${expr}      — full expression, brace-balanced
 //
-// Inside a `name!(...)` macro call (println!, format!, write!...) the
-// interpolated literal expands directly into the macro's format-string +
-// args. Anywhere else it expands to a `format!(...)` call producing a
-// String, so it works in assignments and any expression position.
+// Inside `println!("…")` interpolations expand into the format string.
+// In assignments they produce a string.
 
 mut name = "Brian"
 mut count = 3
@@ -16,16 +13,15 @@ println!("Hello $name!")
 println!("You have $count messages, doubled = ${count * 2}")
 
 mut greeting = "Hi $name, welcome back."
-println!("{}", greeting)
+println!("${greeting}")
 
 for i in 0..3 {
     println!("Iteration ${i + 1} of $count")
 }
 
 class Greeting {
-    name: String
-    Greeting(name: String) {
+    name: string
+    Greeting(name: string) {
         self.name = name
     }
 }
-

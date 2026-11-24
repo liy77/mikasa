@@ -32,6 +32,28 @@ fn phantom_marker_lowers_to_phantom_data() {
 }
 
 #[test]
+fn phantom_literal_auto_fills_marker() {
+    let rust = transpile(
+        "struct Holder<T> {\n\
+             phantom T\n\
+             value: int\n\
+         }\n\
+         func void main() {\n\
+             h = Holder::<int> { value: 1 }\n\
+             println(\"${h.value}\")\n\
+         }\n",
+    );
+    assert!(
+        rust.contains("_phantom_t") && rust.contains("PhantomData"),
+        "literal should auto-fill phantom field:\n{rust}"
+    );
+    assert!(
+        !rust.contains("PhantomData\n") || rust.contains("_phantom_t: PhantomData"),
+        "expected injected field:\n{rust}"
+    );
+}
+
+#[test]
 fn phantom_multi_params() {
     let rust = transpile(
         "struct PairMark<T, U> {\n\

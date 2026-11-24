@@ -1,3 +1,9 @@
-func answer() -> int {
+// Plain Mikasa — the Rust host only calls `mika_import!("logic.mika")`.
+
+func int answer() {
     return 40 + 2
+}
+
+func void greet(name: &str) {
+    println("hello from mikasa, ${name}")
 }

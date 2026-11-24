@@ -6,11 +6,19 @@ Compile-time bridge from Mikasa (`.mika`) into Rust.
 mika_import::mika_import!("logic.mika");
 
 fn main() {
-    greeter(); // defined in logic.mika
+    println!("{}", answer()); // defined in logic.mika
 }
 ```
 
-Inside `.mika` the same idea is written without the macro name:
+The `.mika` side is plain Mikasa (never Rust):
+
+```mika
+func int answer() {
+    return 40 + 2
+}
+```
+
+Inside another `.mika` the include is spelled without the macro name:
 
 ```mika
 import("logic.mika")

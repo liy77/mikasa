@@ -1,5 +1,5 @@
-// Actors: isolated state behind `Arc<Mutex<_>>`. Methods take `&self` and
-// lock internally — safe to share across clones without `mut`.
+// Actors: isolated shared state. Methods take `self` and lock internally —
+// safe to share across clones without `mut`.
 
 actor Counter {
     count: int
@@ -41,18 +41,16 @@ actor BankAccount {
     }
 }
 
-// Counter — clone shares the same inner mutex.
 c = Counter::new(0)
 c.inc()
 c.inc()
 c2 = c.clone()
 c2.add(3)
-println!("counter shared = {} (via clone = {})", c.get(), c2.get())
+println!("counter shared = ${c.get()} (via clone = ${c2.get()})")
 
-// Bank account — deposits / withdrawals under the lock.
 acct = BankAccount::new(100)
 ok1 = acct.deposit(50)
 ok2 = acct.withdraw(30)
 ok3 = acct.withdraw(999)
-println!("deposit50 = {}  withdraw30 = {}  withdraw999 = {}", ok1, ok2, ok3)
-println!("balance = {}", acct.balance())
+println!("deposit50 = ${ok1}  withdraw30 = ${ok2}  withdraw999 = ${ok3}")
+println!("balance = ${acct.balance()}")

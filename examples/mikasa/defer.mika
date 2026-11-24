@@ -15,7 +15,7 @@ func void demo() {
 
 demo()
 
-func i32 early(n: i32) {
+func int early(n: int) {
     defer {
         println!("cleanup")
     }
@@ -30,7 +30,6 @@ println!("got ${early(-1)}")
 println!("-- early(3)")
 println!("got ${early(3)}")
 
-// A defer past a `return` never runs — control never reached it.
 func void skipped() {
     return
     defer {
@@ -40,7 +39,6 @@ func void skipped() {
 
 skipped()
 
-// Scope exit by falling off the end of a block.
 func void block_exit() {
     defer {
         println!("block done")

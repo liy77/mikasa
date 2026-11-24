@@ -93,8 +93,12 @@ fn at_field_start(tokens: &[Token], idx: usize) -> bool {
     }
 }
 
-/// Lower `phantom T` / `phantom T, U` field markers inside struct/class bodies.
+/// Lower `phantom T` / `phantom T, U` field markers inside struct/class bodies,
+/// and fill missing `_phantom_*` fields in `Type { … }` / `Type::<…> { … }`
+/// literals so source never needs to mention `PhantomData`.
 pub(super) fn rewrite(tokens: Vec<Token>) -> Vec<Token> {
+    let mut phantoms: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
     let mut out = Vec::with_capacity(tokens.len() + 16);
     let mut i = 0usize;
     while i < tokens.len() {
@@ -105,6 +109,10 @@ pub(super) fn rewrite(tokens: Vec<Token>) -> Vec<Token> {
             i += 1;
             continue;
         }
+
+        let type_name = next_sig(&tokens, i + 1)
+            .filter(|&n| tokens[n].kind == TokenKind::Identifier)
+            .map(|n| tokens[n].value.clone());
 
         let mut j = i;
         let mut open_brace = None;
@@ -130,16 +138,25 @@ pub(super) fn rewrite(tokens: Vec<Token>) -> Vec<Token> {
         };
 
         out.extend_from_slice(&tokens[i..=ob]);
-        let body = rewrite_body_phantoms(&tokens[ob + 1..cb]);
+        let (body, marked) = rewrite_body_phantoms(&tokens[ob + 1..cb]);
+        if let Some(name) = type_name {
+            if !marked.is_empty() {
+                phantoms.insert(name, marked);
+            }
+        }
         out.extend(body);
         out.push(tokens[cb].clone());
         i = cb + 1;
     }
-    out
+    if phantoms.is_empty() {
+        return out;
+    }
+    inject_phantom_in_literals(out, &phantoms)
 }
 
-fn rewrite_body_phantoms(body: &[Token]) -> Vec<Token> {
+fn rewrite_body_phantoms(body: &[Token]) -> (Vec<Token>, Vec<String>) {
     let mut out = Vec::with_capacity(body.len() + 8);
+    let mut marked = Vec::new();
     let mut i = 0usize;
     while i < body.len() {
         if body[i].value == "phantom"
@@ -157,6 +174,7 @@ fn rewrite_body_phantoms(body: &[Token]) -> Vec<Token> {
                             out.push(synth(TokenKind::Newline, "\n"));
                         }
                         out.extend(phantom_field_tokens(name));
+                        marked.push(name.clone());
                     }
                     let mut k = end;
                     while k < body.len()
@@ -180,7 +198,102 @@ fn rewrite_body_phantoms(body: &[Token]) -> Vec<Token> {
         out.push(body[i].clone());
         i += 1;
     }
+    (out, marked)
+}
+
+fn inject_phantom_in_literals(
+    tokens: Vec<Token>,
+    phantoms: &std::collections::HashMap<String, Vec<String>>,
+) -> Vec<Token> {
+    let mut out = Vec::with_capacity(tokens.len() + 8);
+    let mut i = 0usize;
+    while i < tokens.len() {
+        if tokens[i].kind == TokenKind::Identifier {
+            if let Some(params) = phantoms.get(&tokens[i].value) {
+                if !is_type_definition_name(&tokens, i) {
+                    if let Some((brace, close)) = struct_lit_span(&tokens, i) {
+                        out.extend_from_slice(&tokens[i..=brace]);
+                        let inner = &tokens[brace + 1..close];
+                        let existing = field_names_in_lit(inner);
+                        let mut has_fields = inner.iter().any(|t| {
+                            !is_trivia(t) && t.kind != TokenKind::Newline && t.value != ","
+                        });
+                        out.extend_from_slice(inner);
+                        for p in params {
+                            let fname = format!("_phantom_{}", p.to_ascii_lowercase());
+                            if existing.contains(&fname) {
+                                continue;
+                            }
+                            if has_fields {
+                                out.push(synth(TokenKind::Comma, ","));
+                            }
+                            has_fields = true;
+                            out.push(synth(TokenKind::Identifier, &fname));
+                            out.push(synth(TokenKind::Operator, ":"));
+                            out.push(synth(TokenKind::Identifier, "PhantomData"));
+                        }
+                        out.push(tokens[close].clone());
+                        i = close + 1;
+                        continue;
+                    }
+                }
+            }
+        }
+        out.push(tokens[i].clone());
+        i += 1;
+    }
     out
+}
+
+fn is_type_definition_name(tokens: &[Token], name_idx: usize) -> bool {
+    match prev_sig(tokens, name_idx) {
+        Some(p) => {
+            matches!(tokens[p].kind, TokenKind::Struct)
+                || (tokens[p].kind == TokenKind::Keyword
+                    && matches!(
+                        tokens[p].value.as_str(),
+                        "class" | "codable" | "actor" | "pub" | "public"
+                    ))
+        }
+        None => false,
+    }
+}
+
+/// `Name {` or `Name::<…> {` / `Name<…> {` starting at the type identifier.
+fn struct_lit_span(tokens: &[Token], name_idx: usize) -> Option<(usize, usize)> {
+    let mut b = next_sig(tokens, name_idx + 1)?;
+    if tokens[b].value == "::" {
+        let n = next_sig(tokens, b + 1)?;
+        if tokens[n].value != "<" {
+            return None;
+        }
+        let gt = find_matching_angle(tokens, n)?;
+        b = next_sig(tokens, gt + 1)?;
+    } else if tokens[b].value == "<" {
+        let gt = find_matching_angle(tokens, b)?;
+        b = next_sig(tokens, gt + 1)?;
+    }
+    if tokens[b].value != "{" {
+        return None;
+    }
+    let close = find_matching_brace(tokens, b)?;
+    Some((b, close))
+}
+
+fn field_names_in_lit(inner: &[Token]) -> std::collections::HashSet<String> {
+    let mut set = std::collections::HashSet::new();
+    let mut i = 0usize;
+    while i < inner.len() {
+        if inner[i].kind == TokenKind::Identifier {
+            if let Some(n) = next_sig(inner, i + 1) {
+                if inner[n].value == ":" {
+                    set.insert(inner[i].value.clone());
+                }
+            }
+        }
+        i += 1;
+    }
+    set
 }
 
 fn parse_phantom_list(tokens: &[Token], start: usize) -> Option<(Vec<String>, usize)> {

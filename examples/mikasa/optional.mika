@@ -1,29 +1,37 @@
-// Optional chaining: `?.` safely accesses fields/methods on Option<T>.
-// Each `obj?.x` rewrites to `obj.as_ref().map(|c| c.x)`, returning Option.
+// Optional chaining: `?.` safely accesses fields/methods on Option values.
+// Each `obj?.x` returns an Option — missing values short-circuit, no panic.
 
 struct User {
-    name: String,
-    age: i32,
+    name: string
+    age: int
 }
 
 mut user: Option<User> = Some(User {
-    name: "Brian".to_string(),
+    name: "Brian",
     age: 30,
 })
 
-// Safe field access — returns Option<&i32>
 mut age = user?.age
-println!("age = {:?}", age)
+match age {
+    Some(a) => println!("age = ${a}"),
+    None => println!("age = none"),
+}
 
-// Safe method call — returns Option<usize>
 mut name_len = user?.name.len()
-println!("name_len = {:?}", name_len)
+match name_len {
+    Some(n) => println!("name_len = ${n}"),
+    None => println!("name_len = none"),
+}
 
-// None case — short-circuits to None, no panic
 mut missing: Option<User> = None
 mut missing_age = missing?.age
-println!("missing_age = {:?}", missing_age)
+match missing_age {
+    Some(a) => println!("missing_age = ${a}"),
+    None => println!("missing_age = none"),
+}
 
-// Chained access still works through the same closure
 mut greeting_len = user?.name.chars().count()
-println!("greeting_len = {:?}", greeting_len)
+match greeting_len {
+    Some(n) => println!("greeting_len = ${n}"),
+    None => println!("greeting_len = none"),
+}

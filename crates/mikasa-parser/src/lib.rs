@@ -97,10 +97,33 @@ fn polish_for_include(code: &str) -> String {
 
 fn strip_stub_main(code: &str) -> String {
     // Match a trailing (or lone) empty/stub `fn main() { … }` the streaming
-    // emit always appends for script-style files.
+    // emit always appends for script-style files — including the one-liner
+    // `fn main() {}`.
     let mut lines: Vec<&str> = code.lines().collect();
-    // Walk from the end: drop a final `fn main() { … }` block whose body is
-    // only whitespace / `;`.
+    // Drop trailing blank lines first so the stub is last.
+    while lines.last().is_some_and(|l| l.trim().is_empty()) {
+        lines.pop();
+    }
+    if let Some(last) = lines.last() {
+        let t = last.trim();
+        if (t.starts_with("fn main(") || t.starts_with("pub fn main("))
+            && t.ends_with('}')
+            && t.chars().filter(|&c| c == '{').count() == 1
+        {
+            // Body between `{` and `}` is only whitespace / `;`.
+            if let (Some(a), Some(b)) = (t.find('{'), t.rfind('}')) {
+                let body = t[a + 1..b].trim();
+                if body.is_empty() || body == ";" {
+                    lines.pop();
+                    while lines.last().is_some_and(|l| l.trim().is_empty()) {
+                        lines.pop();
+                    }
+                    return lines.join("\n") + if code.ends_with('\n') { "\n" } else { "" };
+                }
+            }
+        }
+    }
+    // Multi-line stub: walk from the end for `}` then matching `fn main()`.
     let mut i = lines.len();
     while i > 0 {
         i -= 1;
@@ -109,7 +132,6 @@ fn strip_stub_main(code: &str) -> String {
             continue;
         }
         if t == "}" {
-            // find matching `fn main()`
             let mut j = i;
             let mut body_ok = true;
             while j > 0 {
@@ -124,7 +146,6 @@ fn strip_stub_main(code: &str) -> String {
                 if u.is_empty() || u == ";" || u == "{" {
                     continue;
                 }
-                // Non-trivial body — keep main.
                 body_ok = false;
             }
             break;
@@ -141,6 +162,14 @@ mod include_polish_tests {
         let raw = "fn answer() -> i64{\n return 40+2,\n}\n\nfn main() {\n;\n}\n";
         let out = super::polish_for_include(&super::promote_top_level_pub(raw));
         assert!(out.contains("return 40+2;"), "{out}");
+        assert!(!out.contains("fn main"), "{out}");
+        assert!(out.contains("pub fn answer"), "{out}");
+    }
+
+    #[test]
+    fn strips_oneline_empty_main() {
+        let raw = "pub fn answer() -> i64 {\n    return 40 + 2;\n}\n\nfn main() {}\n";
+        let out = super::polish_for_include(raw);
         assert!(!out.contains("fn main"), "{out}");
         assert!(out.contains("pub fn answer"), "{out}");
     }

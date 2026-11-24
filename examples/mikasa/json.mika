@@ -1,10 +1,16 @@
-// `json` — read values out of a JSON string (serde_json-backed).
-import { get, get_int, get_bool, has, len, pretty } from json
+// `json` — read values out of a JSON string.
+import { get, get_int, get_bool, has, len } from json
 
 doc = "{\"user\":{\"name\":\"Ana\",\"age\":28,\"admin\":true},\"tags\":[\"a\",\"b\",\"c\"]}"
-println!("name  = {}", get(doc, "user.name"))
-println!("age   = {}", get_int(doc, "user.age"))
-println!("admin = {}", get_bool(doc, "user.admin"))
-println!("tag0  = {}", get(doc, "tags.0"))
-println!("#tags = {}", len(doc, "tags"))
-println!("email? {}", has(doc, "user.email"))
+name = get(doc, "user.name")
+age = get_int(doc, "user.age")
+admin = get_bool(doc, "user.admin")
+tag0 = get(doc, "tags.0")
+ntags = len(doc, "tags")
+has_email = has(doc, "user.email")
+println!("name  = ${name}")
+println!("age   = ${age}")
+println!("admin = ${admin}")
+println!("tag0  = ${tag0}")
+println!("#tags = ${ntags}")
+println!("email? ${has_email}")

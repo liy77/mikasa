@@ -1,4 +1,4 @@
-// Property wrappers: `@Wrapper field` stores a wrapper value instead of the
+// Property wrappers: `@Wrapper field` stores a wrapper instead of the
 // annotated type. Read/write through `.wrappedValue`.
 
 @propertyWrapper
@@ -29,7 +29,7 @@ struct NonEmpty {
 impl NonEmpty {
     func NonEmpty new(s: string) {
         if s.is_empty() {
-            return NonEmpty { wrappedValue: "(empty)".to_string() }
+            return NonEmpty { wrappedValue: "(empty)" }
         }
         return NonEmpty { wrappedValue: s }
     }
@@ -42,11 +42,11 @@ struct Form {
 
 mut f = Form {
     age: Clamped::new(150, 0, 120),
-    name: NonEmpty::new("".to_string()),
+    name: NonEmpty::new(""),
 }
-println!("clamped age = {} (was 150, max 120)", f.age.wrappedValue)
-println!("nonempty name = {}", f.name.wrappedValue)
+println!("clamped age = ${f.age.wrappedValue} (was 150, max 120)")
+println!("nonempty name = ${f.name.wrappedValue}")
 
 f.age = Clamped::new(25, 0, 120)
-f.name = NonEmpty::new("Ada".to_string())
-println!("age = {}  name = {}", f.age.wrappedValue, f.name.wrappedValue)
+f.name = NonEmpty::new("Ada")
+println!("age = ${f.age.wrappedValue}  name = ${f.name.wrappedValue}")

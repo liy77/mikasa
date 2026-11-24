@@ -3,10 +3,7 @@ import { input } from cstd
 /* Multi-line block comment.
    Verifies the tokenizer skips block comments while preserving line numbers. */
 
-// Line comments still work too.
-
-func i32 describe(n: i32) {
-    /* arms cover the small, the medium, and everything else */
+func int describe(n: int) {
     return match n {
         0 => 0,
         1 | 2 | 3 => 1,
@@ -15,7 +12,7 @@ func i32 describe(n: i32) {
     }
 }
 
-mut maybe: Option<i32> = Some(7)
+mut maybe: Option<i64> = Some(7)
 
 if let Some(value) = maybe {
     println!("got value $value")
@@ -23,8 +20,8 @@ if let Some(value) = maybe {
     println!("nothing")
 }
 
-mut iter = vec![10, 20, 30].into_iter()
-while let Some(n) = iter.next() {
+mut items = [10, 20, 30]
+for n in items {
     println!("next = $n")
 }
 

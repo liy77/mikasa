@@ -202,6 +202,8 @@ pub struct Parser {
     phantom_hints: Vec<String>,
     /// `phantom T` sugar was lowered — emit `use std::marker::PhantomData`.
     uses_phantom: bool,
+    /// Interpolation used — emit `__mika_show` (Display, else Debug).
+    uses_mika_show: bool,
 }
 
 /// Drop the `;` from a statement-terminating newline when the next
@@ -498,6 +500,9 @@ impl Parser {
         let uses_phantom = lowered
             .iter()
             .any(|t| t.value.starts_with("_phantom_") || t.value == "PhantomData");
+        let uses_mika_show = lowered.iter().any(|t| {
+            t.kind == TokenKind::InterpolatedString || t.value.contains("__mika_show")
+        });
         let uses_keypath = lowered.iter().any(|t| t.value.contains("__MikaKeyPath"));
         let needs_async = lowered.iter().any(|t| {
             t.value == "await"
@@ -545,6 +550,7 @@ impl Parser {
             emit_prelude: true,
             phantom_hints,
             uses_phantom,
+            uses_mika_show,
         }
     }
 
@@ -5197,6 +5203,7 @@ impl Parser {
             ".reduce(",
             ".sorted(",
             ".reversed(",
+            ".show(",
         ]
         .iter()
         .any(|pat| haystack.contains(pat));
@@ -5215,6 +5222,8 @@ impl Parser {
             "    fn reduce<U, F: FnMut(U, T) -> U>(&self, init: U, f: F) -> U;\n",
             "    fn reversed(&self) -> Vec<T>;\n",
             "    fn sorted(&self) -> Vec<T> where T: PartialOrd;\n",
+            "    /// Display-friendly list text for `$vec` / `${vec.show()}` interpolation.\n",
+            "    fn show(&self) -> String where T: std::fmt::Display;\n",
             "}\n",
             "impl<T: Clone> __CopperVecExt<T> for [T] {\n",
             "    fn map<U, F: FnMut(T) -> U>(&self, mut f: F) -> Vec<U> { self.iter().cloned().map(|x| f(x)).collect() }\n",
@@ -5226,6 +5235,15 @@ impl Parser {
             "    fn reduce<U, F: FnMut(U, T) -> U>(&self, mut init: U, mut f: F) -> U { for x in self.iter().cloned() { init = f(init, x); } init }\n",
             "    fn reversed(&self) -> Vec<T> { let mut v = self.to_vec(); v.reverse(); v }\n",
             "    fn sorted(&self) -> Vec<T> where T: PartialOrd { let mut v = self.to_vec(); v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)); v }\n",
+            "    fn show(&self) -> String where T: std::fmt::Display {\n",
+            "        let mut s = String::from(\"[\");\n",
+            "        for (i, x) in self.iter().enumerate() {\n",
+            "            if i > 0 { s.push_str(\", \"); }\n",
+            "            s.push_str(&x.to_string());\n",
+            "        }\n",
+            "        s.push(']');\n",
+            "        s\n",
+            "    }\n",
             "}\n\n",
         );
         self.result.prepend_value(ext);
@@ -5247,6 +5265,57 @@ impl Parser {
         }
         self.result
             .prepend_value("#[allow(unused_imports)]\nuse std::marker::PhantomData;\n\n");
+    }
+
+    /// Prefer `Display`, fall back to `Debug` for `$x` / `${expr}` args.
+    /// Autoref specialization: `(&Wrap(x)).out()` picks Display when available.
+    fn prepend_mika_show_if_used(&mut self) {
+        if !self.uses_mika_show || !self.emit_prelude {
+            return;
+        }
+        let haystack = format!("{}{}", self.result.value, self.result.main_function_code);
+        if haystack.contains("macro_rules! __mika_show") {
+            return;
+        }
+        // Macro + tag dispatch (anyhow-style autoref specialization):
+        // Display wins when available; Debug is the fallback. Must be a macro
+        // so method resolution sees the concrete type at each `$x` site.
+        let helper = concat!(
+            "#[allow(dead_code)]\n",
+            "mod __mika_show_spec {\n",
+            "    pub struct __MikaDisplayTag;\n",
+            "    pub struct __MikaDebugTag;\n",
+            "    pub trait __MikaDisplayKind {\n",
+            "        #[inline]\n",
+            "        fn __mika_kind(&self) -> __MikaDisplayTag { __MikaDisplayTag }\n",
+            "    }\n",
+            "    impl<T: std::fmt::Display> __MikaDisplayKind for T {}\n",
+            "    pub trait __MikaDebugKind {\n",
+            "        #[inline]\n",
+            "        fn __mika_kind(&self) -> __MikaDebugTag { __MikaDebugTag }\n",
+            "    }\n",
+            "    impl<T: std::fmt::Debug> __MikaDebugKind for &T {}\n",
+            "    impl __MikaDisplayTag {\n",
+            "        #[inline]\n",
+            "        pub fn show(self, v: &impl std::fmt::Display) -> String { v.to_string() }\n",
+            "    }\n",
+            "    impl __MikaDebugTag {\n",
+            "        #[inline]\n",
+            "        pub fn show(self, v: &impl std::fmt::Debug) -> String { format!(\"{:?}\", v) }\n",
+            "    }\n",
+            "}\n",
+            "#[allow(unused_macros)]\n",
+            "macro_rules! __mika_show {\n",
+            "    ($e:expr) => {{\n",
+            "        #[allow(unused_imports)]\n",
+            "        use __mika_show_spec::{__MikaDisplayKind, __MikaDebugKind};\n",
+            "        match $e {\n",
+            "            v => (&v).__mika_kind().show(&v),\n",
+            "        }\n",
+            "    }};\n",
+            "}\n\n",
+        );
+        self.result.prepend_value(helper);
     }
 
     fn prepend_defer_guard_if_used(&mut self) {
@@ -5302,6 +5371,7 @@ impl Parser {
                 self.prepend_vec_ext_if_used();
                 self.prepend_defer_guard_if_used();
                 self.prepend_phantom_use_if_used();
+                self.prepend_mika_show_if_used();
                 self.prepend_keypath_helper_if_used();
                 self.prepend_used_std_modules();
                 self.result.append_codable_impls();

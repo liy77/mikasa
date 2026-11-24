@@ -1,11 +1,7 @@
-// Demonstrates the three loop forms supported by Mikasa.
-//
-//   loop  { ... }            — infinite, exit with `break`
-//   while cond { ... }       — pre-tested
-//   for x in iter { ... }    — iterator-driven
-//
-// `break` and `continue` work as in Rust. Variables follow Mikasa's usual
-// rules — `mut name = value` for mutable, bare `name = value` for immutable.
+// Loop forms:
+//   loop  { … }          — infinite, exit with `break`
+//   while cond { … }     — pre-tested
+//   for x in iter { … }  — iterator-driven
 
 mut count = 0
 loop {
@@ -24,5 +20,5 @@ while n > 0 {
 }
 
 for i in 0..5 {
-    println!("i = {}", i)
+    println!("i = ${i}")
 }

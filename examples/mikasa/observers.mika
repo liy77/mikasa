@@ -28,7 +28,7 @@ class Score {
 mut t = Thermometer::new(0.0)
 t.set_temp(36.5)
 t.set_temp(37.2)
-println!("final temp = {}", t.temp())
+println!("final temp = ${t.temp()}")
 
 mut s = Score::new(0)
 s.set_points(10)

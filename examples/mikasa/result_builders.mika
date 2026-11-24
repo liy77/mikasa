@@ -1,5 +1,5 @@
 // Result builders: annotate a function with `@Builder` and write bare
-// expressions in the body — they become `Builder::buildBlock(vec![…])`.
+// expressions in the body — they become `Builder::buildBlock([…])`.
 
 @resultBuilder
 struct IntList {}
@@ -33,5 +33,5 @@ func Vec<String> greet() {
     "mikasa".to_string()
 }
 
-println!("odds  = {:?}", odds())
-println!("greet = {:?}", greet())
+println!("odds  = ${odds()}")
+println!("greet = ${greet()}")

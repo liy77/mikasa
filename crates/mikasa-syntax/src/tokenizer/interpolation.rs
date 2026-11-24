@@ -94,16 +94,24 @@ pub fn parse(quoted: &str) -> Option<Interpolated> {
     Some(Interpolated { placeholder, args })
 }
 
+/// Wrap an interpolation argument so the transpiler can prefer `Display`
+/// and fall back to `Debug` without the source writing `{:?}`.
+/// Must be a macro (not a generic fn) so autoref specialization sees the
+/// concrete type at each call site.
+fn show_arg(arg: &str) -> String {
+    format!("__mika_show!({arg})")
+}
+
 /// Render the interpolated literal as a `format!(...)` call. This is the
 /// default expansion — works in any expression position.
 pub fn render_format_call(interp: &Interpolated) -> String {
-    let mut out = String::with_capacity(interp.placeholder.len() + 16);
+    let mut out = String::with_capacity(interp.placeholder.len() + 32);
     out.push_str("format!(\"");
     out.push_str(&interp.placeholder);
     out.push('"');
     for arg in &interp.args {
         out.push_str(", ");
-        out.push_str(arg);
+        out.push_str(&show_arg(arg));
     }
     out.push(')');
     out
@@ -113,13 +121,13 @@ pub fn render_format_call(interp: &Interpolated) -> String {
 /// for splicing directly into the argument list of a `name!(...)` macro call
 /// that already takes a format string (e.g. `println!`, `format!`, `write!`).
 pub fn render_macro_args(interp: &Interpolated) -> String {
-    let mut out = String::with_capacity(interp.placeholder.len() + 8);
+    let mut out = String::with_capacity(interp.placeholder.len() + 24);
     out.push('"');
     out.push_str(&interp.placeholder);
     out.push('"');
     for arg in &interp.args {
         out.push_str(", ");
-        out.push_str(arg);
+        out.push_str(&show_arg(arg));
     }
     out
 }
@@ -219,5 +227,20 @@ mod tests {
         let i = parse("\"${ vec![1,2,3].iter().sum::<i32>() }\"").unwrap();
         assert_eq!(i.placeholder, "{}");
         assert_eq!(i.args, vec!["vec![1,2,3].iter().sum::<i32>()".to_string()]);
+    }
+
+    #[test]
+    fn render_wraps_args_with_mika_show() {
+        let i = parse("\"x = $v\"").unwrap();
+        let call = render_format_call(&i);
+        assert!(
+            call.contains("__mika_show!(v)"),
+            "expected Display/Debug helper wrap: {call}"
+        );
+        let args = render_macro_args(&i);
+        assert!(
+            args.contains("__mika_show!(v)"),
+            "expected Display/Debug helper wrap: {args}"
+        );
     }
 }

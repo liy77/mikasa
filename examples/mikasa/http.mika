@@ -1,19 +1,15 @@
-// `http` — HTTP/HTTPS client (TLS via the bundled `ureq` crate).
-// Request functions return a rich `Response` (status / body / ok / json).
+// `http` — HTTP/HTTPS client. Requests return a rich Response.
 import { get, post_json, download } from http
 
-// HTTPS GET — the response is a Response object.
 r = get("https://example.com")
-println!("status = {}", r.status)
-println!("body   = {} bytes", r.body.len())
-println!("ok     = {}", r.is_ok())
+println!("status = ${r.status}")
+println!("body   = ${r.body.len()} bytes")
+println!("ok     = ${r.is_ok()}")
 
-// POST a JSON payload; `.json()` returns a serde_json::Value to navigate.
 reply = post_json("https://httpbin.org/post", "{\"hello\":\"mikasa\"}")
-println!("post status = {}", reply.status)
+println!("post status = ${reply.status}")
 body = reply.json()
-println!("post echo   = {}", body["json"]["hello"])
+println!("post echo   = ${body[\"json\"][\"hello\"]}")
 
-// Stream a URL straight to disk.
 saved = download("https://example.com", "example.html")
-println!("downloaded = {}", saved)
+println!("downloaded = ${saved}")

@@ -1,13 +1,14 @@
-// `net` — TCP/UDP over the Rust std library (no external deps).
+// `net` — TCP/UDP over the standard library.
 import { resolve, is_port_open, tcp_request, local_ip } from net
 
-// DNS resolve + local interface IP.
-println!("cloudflare = {}", resolve("one.one.one.one:80"))
-println!("my ip      = {}", local_ip())
+cf = resolve("one.one.one.one:80")
+ip = local_ip()
+println!("cloudflare = ${cf}")
+println!("my ip      = ${ip}")
 
-// A raw HTTP/1.0 request over plain TCP (request/response one-shot).
 req = "GET / HTTP/1.0\r\nHost: example.com\r\nConnection: close\r\n\r\n"
 resp = tcp_request("example.com:80", req)
-println!("got {} bytes from example.com", resp.len())
+println!("got ${resp.len()} bytes from example.com")
 
-println!("port 80 open: {}", is_port_open("example.com", 80))
+open80 = is_port_open("example.com", 80)
+println!("port 80 open: ${open80}")
