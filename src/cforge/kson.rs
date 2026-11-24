@@ -6,6 +6,9 @@ use std::{env, fs};
 use crate::cforge::COPPER_PATH;
 
 /// Locate the lson binary, building it from lson-src/ if necessary.
+///
+/// Mikasa parses KSON in-process through the `lson` crate. This remains for
+/// callers that still want the standalone seal/verify CLI.
 #[allow(dead_code)]
 fn find_lson_binary() -> PathBuf {
     let binary_name = if cfg!(windows) { "lson.exe" } else { "lson" };
@@ -79,13 +82,83 @@ fn find_lson_binary() -> PathBuf {
     installed
 }
 
-/// Fast native KSON parser supporting:
-/// - Top-level `key = value` pairs
-/// - `$section` headers (e.g. `$dependencies`, `$dev_dependencies`, `$features`)
-/// - Strings, integers, floats, booleans, arrays `["a", "b"]`, and inline
-///   objects `{ version = "1.0", features = ["derive"], path = "../foo" }`
-/// - `@env(VAR)` environment variable bindings
+/// Parse KSON with the LSON toolkit (the crate in `lson-src`).
+///
+/// Covers the historical `key = value` / `$section` / `@env` files and the
+/// typed forms (bytes, dates, anchors, tags, comments, multiline strings).
+/// Returns `None` only when the text is not valid KSON.
+///
+/// Mikasa-specific shorthand inside strings (`"path:../foo"`,
+/// `"0.31 [derive]"`) is applied after the toolkit parse so `properties.kson`
+/// still lowers to the objects [`crate::cforge::properties`] expects.
 pub fn parse_native_kson(text: &str) -> Option<Value> {
+    let doc = lson::parse_str(text).ok()?;
+    let resolved = lson::resolve(&doc, |name| env::var(name).ok()).ok()?;
+    let json = lson::to_json(&lson::value::sort_value(&resolved)).ok()?;
+    let mut value: Value = serde_json::from_str(&json).ok()?;
+    apply_dep_shorthand(&mut value);
+    Some(value)
+}
+
+/// `"path:../foo"` → `{path}`, `"0.31 [derive]"` → `{version, features}`.
+/// Applied to every string in the tree. Other strings are unchanged.
+fn apply_dep_shorthand(value: &mut Value) {
+    match value {
+        Value::String(s) => {
+            if let Some(rewritten) = dep_shorthand(s) {
+                *value = rewritten;
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                apply_dep_shorthand(item);
+            }
+        }
+        Value::Object(map) => {
+            // Tagged extras (`$type` / `$tag`) are toolkit values, not deps.
+            if map.contains_key("$type") || map.contains_key("$tag") {
+                return;
+            }
+            for child in map.values_mut() {
+                apply_dep_shorthand(child);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn dep_shorthand(inner: &str) -> Option<Value> {
+    if let Some(path_target) = inner.strip_prefix("path:") {
+        let mut m = Map::new();
+        m.insert(
+            "path".to_string(),
+            Value::String(path_target.trim().to_string()),
+        );
+        return Some(Value::Object(m));
+    }
+    if let Some((ver_part, feat_part)) = inner.split_once('[') {
+        if let Some(feat_inner) = feat_part.strip_suffix(']') {
+            let feats: Vec<Value> = feat_inner
+                .split(',')
+                .map(|f| f.trim().trim_matches('"'))
+                .filter(|f| !f.is_empty())
+                .map(|f| Value::String(f.to_string()))
+                .collect();
+            let mut m = Map::new();
+            m.insert(
+                "version".to_string(),
+                Value::String(ver_part.trim().to_string()),
+            );
+            m.insert("features".to_string(), Value::Array(feats));
+            return Some(Value::Object(m));
+        }
+    }
+    None
+}
+
+/// Historical line walker kept so a properties file that the toolkit rejects
+/// still loads. New typed forms go through [`parse_native_kson`].
+fn parse_native_kson_legacy(text: &str) -> Option<Value> {
     let mut root = Map::new();
     let mut current_section: Option<String> = None;
     let mut section_map = Map::new();
@@ -302,32 +375,11 @@ pub fn parse(text: &str) -> Value {
     if let Some(val) = parse_native_kson(text) {
         return val;
     }
-    let lson_bin = find_lson_binary();
-    let cmd = Command::new(&lson_bin)
-        .arg("raw")
-        .arg("compile")
-        .args(["-t", "json"])
-        .args(["--text", text])
-        .output();
-
-    match cmd {
-        Ok(out) => {
-            let mut stdout = String::from_utf8_lossy(&out.stdout);
-            if stdout
-                .lines()
-                .next()
-                .map(|l| l.starts_with("warning "))
-                .unwrap_or(false)
-            {
-                stdout = stdout.lines().skip(1).collect();
-            }
-            serde_json::from_str(&stdout).expect("Invalid KSON file")
-        }
-        Err(e) => {
-            println!("Failed to execute lson: {}", e);
-            exit(1);
-        }
+    if let Some(val) = parse_native_kson_legacy(text) {
+        return val;
     }
+    println!("Error: invalid KSON");
+    exit(1);
 }
 
 /// Read properties from a KSON or TOML file.
@@ -354,4 +406,39 @@ pub fn read_properties(file: &str) -> (bool, Value) {
 
     let text = String::from_utf8(c.unwrap()).unwrap();
     (false, parse(&text))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn properties_file_parses_through_lson_and_keeps_dep_shorthand() {
+        let text = r#"
+name = "demo"
+version = "0.1.0"
+edition = 2021
+
+$dependencies
+    serde = "1.0 [derive]"
+    local = "path:../local"
+"#;
+        let value = parse(text);
+        assert_eq!(value["name"], "demo");
+        assert_eq!(value["edition"], 2021);
+        assert_eq!(value["dependencies"]["serde"]["version"], "1.0");
+        assert_eq!(value["dependencies"]["serde"]["features"][0], "derive");
+        assert_eq!(value["dependencies"]["local"]["path"], "../local");
+    }
+
+    #[test]
+    fn typed_kson_reaches_mikasa_through_the_toolkit() {
+        let text = "blob = b\"6869\"\nborn = d\"2020-01-02\"\nstatus = #Ok(1)\n";
+        let value = parse(text);
+        assert_eq!(value["blob"]["$type"], "bytes");
+        assert_eq!(value["blob"]["$value"], "6869");
+        assert_eq!(value["born"]["$type"], "date");
+        assert_eq!(value["status"]["$tag"], "Ok");
+        assert_eq!(value["status"]["$value"], 1);
+    }
 }

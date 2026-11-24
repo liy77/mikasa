@@ -3,7 +3,7 @@ members = [".", "crates/mikasa-syntax", "crates/mikasa-parser", "crates/mikasa-l
 # `dist/rust` is the output dir for cforge-transpiled programs; it has its
 # own Cargo.toml that must NOT be a workspace member. The installer-gui
 # is its own self-contained Tauri app — also kept out.
-exclude = ["dist", "installer-gui", "lson-src", "alloy-gui", "examples/mika-import-rs"]
+exclude = ["dist", "installer-gui", "alloy-gui", "examples/mika-import-rs"]
 resolver = "2"
 
 [package]
@@ -35,3 +35,4 @@ toml = "1.1.2"
 quick-xml = "0.40.1"
 walkdir = "2.5.0"
 sha2 = "0.10"
+lson = { path = "lson-src" }
