@@ -203,12 +203,23 @@
     var size = viewportSize();
     var w = size.w;
     var h = size.h;
+    /* Cap DPR like mocida web text SS — phones often report 3×; keep layout in
+       CSS pixels so Window.width matches the visible box (no side crop). */
+    var dpr = window.devicePixelRatio || 1;
+    if (dpr > 2) dpr = 2;
+    if (dpr < 1) dpr = 1;
 
     canvas.style.position = "fixed";
     canvas.style.left = "0";
     canvas.style.top = "0";
+    canvas.style.right = "auto";
+    canvas.style.bottom = "auto";
+    canvas.style.margin = "0";
+    canvas.style.transform = "none";
     canvas.style.width = w + "px";
     canvas.style.height = h + "px";
+    canvas.style.maxWidth = "100%";
+    canvas.style.maxHeight = "100%";
     canvas.style.display = "block";
     canvas.style.border = "none";
     canvas.style.outline = "none";
@@ -216,6 +227,20 @@
     canvas.style.opacity = "1";
     canvas.style.zIndex = "1";
     if (canvas.style.touchAction !== undefined) canvas.style.touchAction = "none";
+
+    /* Tell SDL/emscripten the CSS logical size. Without this, the canvas
+       attribute can stay at the HTML stub (300×150) or a stale App() size while
+       CSS fills the phone — layout overflows and clips like a zoomed desktop. */
+    try {
+      if (typeof Module !== "undefined" && typeof Module.setCanvasSize === "function") {
+        Module.setCanvasSize(w, h, false);
+      } else {
+        var bw = Math.max(1, Math.round(w * dpr));
+        var bh = Math.max(1, Math.round(h * dpr));
+        if (canvas.width !== bw) canvas.width = bw;
+        if (canvas.height !== bh) canvas.height = bh;
+      }
+    } catch (eFit) { /* ignore mid-boot */ }
 
     if (w !== lastW || h !== lastH) {
       lastW = w;
