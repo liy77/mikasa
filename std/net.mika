@@ -1,4 +1,4 @@
-// Copper `net` standard library — TCP / UDP networking over the Rust
+// Mikasa `net` standard library — TCP / UDP networking over the Rust
 // standard library (no external dependencies).
 //
 // Loaded when a program does `import { ... } from net`. The compiler wraps

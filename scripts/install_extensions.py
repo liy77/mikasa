@@ -30,7 +30,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _pretty import banner, c, DIM, COPPER, fail, head, info, ok, step, warn  # noqa: E402
+from _pretty import banner, c, DIM, MIKASA, fail, head, info, ok, step, warn  # noqa: E402
 
 SYS = platform.system()
 ROOT = Path(__file__).resolve().parent.parent

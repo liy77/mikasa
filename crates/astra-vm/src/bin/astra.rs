@@ -1,9 +1,9 @@
-//! Astra CLI: tree-walking interpreter for Copper.
+//! Astra CLI: tree-walking interpreter for Mikasa.
 //!
 //! * `astra run <file>` — runs instantly (node/python style): interprets a
 //!   `.crs` directly (no compilation step), merges local `.crs` imports,
 //!   or executes a `.loy`. Imported Rust (`.rs`) runs via embedded wasm
-//!   (compiled once + cached); non-exported `.rs` falls back to `cforge`.
+//!   (compiled once + cached); non-exported `.rs` falls back to `mikasa`.
 //! * `astra build <file.crs>` — compiles to a portable `.loy` artifact
 //!   (serialized AST + any imported `.rs` compiled to embedded wasm, so the
 //!   artifact runs on any `astra` without rustc).
@@ -18,7 +18,7 @@ use astra_vm::loader;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "astra", about = "Astra interpreter for Copper")]
+#[command(name = "astra", about = "Astra interpreter for Mikasa")]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
@@ -35,7 +35,7 @@ enum Cmd {
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
-    /// Checks a `.crs` with real Rust (borrow checker + Miri) — delegates to cforge,
+    /// Checks a `.crs` with real Rust (borrow checker + Miri) — delegates to mikasa,
     /// which provisions the toolchain automatically.
     Check {
         file: PathBuf,
@@ -53,10 +53,10 @@ fn main() -> ExitCode {
     }
 }
 
-/// `astra check` delegates to `cforge check` (which transpiles + runs the Rust
+/// `astra check` delegates to `mikasa check` (which transpiles + runs the Rust
 /// checker with an automatically provisioned toolchain).
 fn check(file: &Path, no_miri: bool) -> ExitCode {
-    for cf in cforge_candidates() {
+    for cf in mikasa_candidates() {
         let mut cmd = Command::new(&cf);
         cmd.arg("check").arg(file);
         if no_miri {
@@ -131,20 +131,20 @@ fn run(file: &Path) -> ExitCode {
         let rt = match astra_vm::wasm::WasmRuntime::from_rs_named(&imp.rs_path, &imp.names) {
             Ok(rt) => rt,
             Err(e) => {
-                // Couldn't compile/run the Rust as wasm → fall back to cforge.
+                // Couldn't compile/run the Rust as wasm → fall back to mikasa.
                 eprintln!(
-                    "astra: could not run {} via wasm ({e}); delegating to cforge…",
+                    "astra: could not run {} via wasm ({e}); delegating to mikasa…",
                     imp.rs_path.display()
                 );
-                return delegate_to_cforge(file);
+                return delegate_to_mikasa(file);
             }
         };
         if let Some(missing) = imp.names.iter().find(|n| !rt.exports(n)) {
             eprintln!(
-                "astra: `{missing}` from {} isn't exported after wrap; delegating to cforge…",
+                "astra: `{missing}` from {} isn't exported after wrap; delegating to mikasa…",
                 imp.rs_path.display()
             );
-            return delegate_to_cforge(file);
+            return delegate_to_mikasa(file);
         }
         interp.register_wasm(&imp.names, Rc::new(RefCell::new(rt)));
     }
@@ -213,10 +213,10 @@ fn build(file: &Path, output: Option<&Path>) -> ExitCode {
     }
 }
 
-/// Locates the `cforge` binary and runs `cforge run <file>`, propagating the
+/// Locates the `mikasa` binary and runs `mikasa run <file>`, propagating the
 /// exit code. Looks beside the `astra` binary itself, then in PATH.
-fn delegate_to_cforge(file: &Path) -> ExitCode {
-    let candidates = cforge_candidates();
+fn delegate_to_mikasa(file: &Path) -> ExitCode {
+    let candidates = mikasa_candidates();
     for cf in &candidates {
         match Command::new(cf).arg("run").arg(file).status() {
             Ok(status) => {
@@ -233,7 +233,7 @@ fn delegate_to_cforge(file: &Path) -> ExitCode {
     ExitCode::FAILURE
 }
 
-fn cforge_candidates() -> Vec<PathBuf> {
+fn mikasa_candidates() -> Vec<PathBuf> {
     let mut v = Vec::new();
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {

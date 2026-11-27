@@ -18,7 +18,7 @@ Dois verbos no toolchain:
 
 | Comando | Efeito |
 | --- | --- |
-| `mikasa run foo.mui` (ou `cforge run`) | Dev render via `mui-dev` (nunca linka mocida no crate portátil) |
+| `mikasa run foo.mui` (ou `mikasa run`) | Dev render via `mui-dev` (nunca linka mocida no crate portátil) |
 | `mikasa -c [-r] [-b] foo.mui` | Codegen M5 → projeto cargo em `<out>/mui/` |
 
 Astra GUI (`astra-gui/`) é um **host separado**: parseia `astra.mika`, linka

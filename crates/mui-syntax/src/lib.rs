@@ -7,7 +7,7 @@
 //! [`mikasa_syntax::expr`] trees is the next increment (the dependency is
 //! already wired — the AST carries `Expr`/`Block` from mikasa-syntax).
 //!
-//! Lexing reuses Copper's own tokenizer so MUI and Copper stay in lockstep.
+//! Lexing reuses Mikasa's own tokenizer so MUI and Mikasa stay in lockstep.
 
 pub mod ast;
 pub mod loader;
@@ -25,7 +25,7 @@ use mikasa_syntax::tokenizer::tokens::Token;
 /// Parse a MUI document. Never panics; recoverable errors land in
 /// [`Document::errors`].
 pub fn parse(source: &str) -> Document {
-    // The Copper tokenizer silently drops `#` and splits the hex body, so a
+    // The Mikasa tokenizer silently drops `#` and splits the hex body, so a
     // `#rrggbb` color is unrecoverable post-lex. Rewrite each color literal to
     // a placeholder identifier (`__mui_color_RRGGBBAA`) that survives lexing
     // intact; `parse_arg_value` decodes it back into a `MuiValue::Color`.
@@ -75,7 +75,7 @@ pub fn parse(source: &str) -> Document {
                     app = Some(cfg);
                 }
             }
-            // A `}` at file level that closes no skipped Copper block: an extra
+            // A `}` at file level that closes no skipped Mikasa block: an extra
             // brace inside a view body ended it early, silently dropping
             // everything after it.
             Some("}") if skipped_depth == 0 => {
@@ -83,7 +83,7 @@ pub fn parse(source: &str) -> Document {
                 p.pos += 1;
             }
             other => {
-                // Skip anything else (Copper items in .crm, bare statements).
+                // Skip anything else (Mikasa items in .crm, bare statements).
                 match other {
                     Some("{") => skipped_depth += 1,
                     Some("}") => skipped_depth -= 1,
@@ -113,7 +113,7 @@ const COLOR_TAG: &str = "__mui_color_";
 
 /// Rewrite `#rrggbb` / `#rrggbbaa` color literals to `__mui_color_RRGGBBAA`
 /// identifiers (always 8 hex digits, alpha defaulted to `ff`) so they survive
-/// Copper lexing as a single token. Skips `#` inside string literals and
+/// Mikasa lexing as a single token. Skips `#` inside string literals and
 /// comments. Everything else is passed through untouched.
 fn rewrite_color_literals(source: &str) -> String {
     let bytes = source.as_bytes();
@@ -261,7 +261,7 @@ impl Parser {
         self.eat("}");
         self.eat("from");
         // The path: collect the remaining tokens on this entry and pull the
-        // string out (Copper makes a `Literal::Str` / `format("...")`).
+        // string out (Mikasa makes a `Literal::Str` / `format("...")`).
         let (raw, _) = self.collect_arg_tokens();
         let path = match mikasa_syntax::expr::parse_expr(&raw).0 {
             Some(e) => prop_string(&PropValue::Expr(e)).unwrap_or(raw),
@@ -385,6 +385,23 @@ impl Parser {
             "fonts" | "fontFace" | "fontFaces" => {
                 cfg.fonts.extend(parse_font_faces(&value));
             }
+            // Web boot splash labels (listen / `--web`). Defaults are English;
+            // set any of these on `App()` to localize.
+            "loadingText" | "loadingLabel" | "bootLabel" => {
+                cfg.loading_text = prop_string(&value)
+            }
+            "loadingStarting" | "bootStarting" => cfg.loading_starting = prop_string(&value),
+            "loadingDownloading" | "bootDownloading" => {
+                cfg.loading_downloading = prop_string(&value)
+            }
+            "loadingCompiling" | "bootCompiling" => cfg.loading_compiling = prop_string(&value),
+            "loadingAlmost" | "bootAlmost" => cfg.loading_almost = prop_string(&value),
+            "loadingModules" | "bootModules" => cfg.loading_modules = prop_string(&value),
+            "loadingFiles" | "bootFiles" => cfg.loading_files = prop_string(&value),
+            "loadingImages" | "bootImages" => cfg.loading_images = prop_string(&value),
+            "loadingReady" | "bootReady" => cfg.loading_ready = prop_string(&value),
+            "loadingOpening" | "bootOpening" => cfg.loading_opening = prop_string(&value),
+            "loadingTagline" | "bootTagline" => cfg.loading_tagline = prop_string(&value),
             _ => {} // unknown key — ignored (forward-compatible)
         }
     }
@@ -447,7 +464,7 @@ impl Parser {
             if !parts.is_empty() {
                 ty = Some(parts.join(""));
             }
-            // Default value `= EXPR`, lowered to a Copper expression. Collect
+            // Default value `= EXPR`, lowered to a Mikasa expression. Collect
             // the raw tokens up to the next top-level `,` / `)` and parse them.
             let mut default = None;
             if self.eat("=") {
@@ -510,7 +527,7 @@ impl Parser {
 
     fn parse_node(&mut self) -> Option<Node> {
         match self.peek_val() {
-            // Copper has no `let`. State is `mut name = expr` (mutable) or a
+            // Mikasa has no `let`. State is `mut name = expr` (mutable) or a
             // bare `name = expr` (immutable). The mutable form is keyword-led.
             Some("mut") => self.parse_bind_node(),
             Some("effect") => self.parse_effect_node(),
@@ -582,7 +599,7 @@ impl Parser {
     /// Parse an element argument list `( ... )`. The first bare argument (no
     /// `name:`) is the positional content; `name: value` pairs are props.
     /// `key:` is lifted out for reconciliation. Each value is classified into
-    /// a [`PropValue`] (handler, MUI color/enum literal, or Copper expression).
+    /// a [`PropValue`] (handler, MUI color/enum literal, or Mikasa expression).
     fn parse_args(
         &mut self,
         positional: &mut Option<Expr>,
@@ -640,7 +657,7 @@ impl Parser {
 
     /// Parse a single argument value up to the next top-level `,` or the
     /// closing `)`. Classifies it as a handler block, a MUI color/enum
-    /// literal, or a lowered Copper expression.
+    /// literal, or a lowered Mikasa expression.
     fn parse_arg_value(&mut self) -> PropValue {
         // Event handler: `{ |a, b| ... }` or `{ ... }`.
         if self.peek_val() == Some("{") {
@@ -661,9 +678,18 @@ impl Parser {
         if let Some(v) = classify_mui_value(&raw) {
             return PropValue::Mui(v);
         }
+        // Spaced anchors (`top left`, `bottom right`) — Mikasa's expr parser
+        // would keep only the first ident and drop `left`, so `anchor: top left`
+        // silently became top+center and shoved every HUD chip to mid-screen.
+        if let Some(joined) = normalize_spaced_anchor(&raw) {
+            return PropValue::Expr(mikasa_syntax::expr::Expr::new(
+                mikasa_syntax::expr::ExprKind::Ident(joined),
+                exprs_span,
+            ));
+        }
         // `${expr}` reactive slot. The author wrote this bare (not inside a
         // string literal) to force the parser to treat the contents as a
-        // Copper expression — strip the `${` / `}` and re-parse the inner
+        // Mikasa expression — strip the `${` / `}` and re-parse the inner
         // text. If the inner parses, the prop becomes a real `Expr` (so
         // `eval_dim_reactive` can walk it); otherwise we fall through to the
         // generic fallback below.
@@ -672,7 +698,7 @@ impl Parser {
                 return PropValue::Expr(e);
             }
         }
-        // Fall back to a lowered Copper expression.
+        // Fall back to a lowered Mikasa expression.
         match mikasa_syntax::expr::parse_expr(&raw).0 {
             Some(e) => PropValue::Expr(e),
             None => PropValue::Expr(mikasa_syntax::expr::Expr::new(
@@ -684,7 +710,7 @@ impl Parser {
 
     /// `{ |params| body }` / `{ body }` — recognised structurally. The body is
     /// captured by skipping the balanced braces (lowering the statements into a
-    /// Copper [`Block`] is the evaluator's job, in M3).
+    /// Mikasa [`Block`] is the evaluator's job, in M3).
     fn parse_handler(&mut self) -> Handler {
         let mut params = Vec::new();
         self.eat("{");
@@ -773,7 +799,7 @@ impl Parser {
         // keywords don't fuse: `if true` was joining to `iftrue`, which then
         // misparsed as a struct literal `iftrue { ... }` (breaking conditional
         // props/text like `if ok { "[ok]" } else { "[x]" }`). Symbols, quotes and
-        // braces still join tight, matching the source closely enough for Copper.
+        // braces still join tight, matching the source closely enough for Mikasa.
         let mut joined = String::new();
         for part in &parts {
             if let (Some(l), Some(f)) = (joined.chars().last(), part.chars().next()) {
@@ -819,8 +845,8 @@ impl Parser {
             .unwrap_or(fallback)
     }
 
-    /// Parse a Copper binding node: `mut name = expr` (mutable) or
-    /// `name = expr` (immutable). There is no `let` keyword in Copper.
+    /// Parse a Mikasa binding node: `mut name = expr` (mutable) or
+    /// `name = expr` (immutable). There is no `let` keyword in Mikasa.
     fn parse_bind_node(&mut self) -> Option<Node> {
         let start = span_of(self.toks.get(self.pos)?);
         let mutable = self.peek_val() == Some("mut");
@@ -831,7 +857,7 @@ impl Parser {
         // Consume the `=` that introduces the initializer.
         self.eat("=");
         // Collect the initializer's tokens up to the statement boundary — a
-        // Newline (`;\n`) or the block's `}` — and lower them to a Copper
+        // Newline (`;\n`) or the block's `}` — and lower them to a Mikasa
         // expression (e.g. `signal(0)`, `computed { ... }`, a literal).
         let mut value = None;
         {
@@ -960,7 +986,7 @@ impl Parser {
         let pattern = self.expect_ident("loop variable");
         self.eat("in");
         // Capture the iterable tokens up to the opening `{` (space-joined),
-        // then lower them to a real Copper expression so codegen/runtime can
+        // then lower them to a real Mikasa expression so codegen/runtime can
         // emit `for <pat> in <iter>`.
         let mut iter_parts: Vec<String> = Vec::new();
         while let Some(v) = self.peek_val() {
@@ -1101,14 +1127,14 @@ fn empty_block() -> mikasa_syntax::expr::Block {
 }
 
 /// Placeholder expression used where the structural pass records a node but
-/// the embedded Copper expression isn't lowered yet (next increment).
+/// the embedded Mikasa expression isn't lowered yet (next increment).
 fn raw_expr() -> mikasa_syntax::expr::Expr {
     mikasa_syntax::expr::parse_expr("0")
         .0
         .expect("placeholder literal parses")
 }
 
-/// Extract a string from a prop value (a string literal, lowered by Copper
+/// Extract a string from a prop value (a string literal, lowered by Mikasa
 /// into a `format("...")` call or a `Literal::Str`).
 fn prop_string(value: &PropValue) -> Option<String> {
     use mikasa_syntax::expr::{ExprKind, Literal, StrPart};
@@ -1127,7 +1153,7 @@ fn prop_string(value: &PropValue) -> Option<String> {
             .collect();
         return Some(s);
     }
-    // Copper lowers `"My App"` (no interpolation) to `format("My App")`.
+    // Mikasa lowers `"My App"` (no interpolation) to `format("My App")`.
     if let ExprKind::Call { callee, args, .. } = &e.kind {
         if matches!(&callee.kind, ExprKind::Ident(n) if n == "format" || n == "format!") {
             if let Some(first) = args.first() {
@@ -1184,7 +1210,7 @@ fn prop_ident_or_string(value: &PropValue) -> Option<String> {
     prop_string(value)
 }
 
-/// Pull a string out of a Copper [`Expr`] (literal / `format("…")` / ident).
+/// Pull a string out of a Mikasa [`Expr`] (literal / `format("…")` / ident).
 fn expr_string(e: &mikasa_syntax::expr::Expr) -> Option<String> {
     prop_string(&PropValue::Expr(e.clone())).or_else(|| {
         if let mikasa_syntax::expr::ExprKind::Ident(n) = &e.kind {
@@ -1323,9 +1349,9 @@ fn parse_hex_color(hex: &str) -> Option<MuiValue> {
 }
 
 /// Classify a raw argument source into a [`MuiValue`] if it's a MUI literal
-/// the Copper grammar doesn't model: an `Enum.Member` access. (Colors are
+/// the Mikasa grammar doesn't model: an `Enum.Member` access. (Colors are
 /// handled earlier, before token collection, because of the `#` sigil.)
-/// Returns `None` for anything that should be a normal Copper expression —
+/// Returns `None` for anything that should be a normal Mikasa expression —
 /// notably function calls (`signal(0)`) and arithmetic, which contain `(` or
 /// operators.
 fn classify_mui_value(raw: &str) -> Option<MuiValue> {
@@ -1347,7 +1373,7 @@ fn classify_mui_value(raw: &str) -> Option<MuiValue> {
 
 /// If `raw` is a bare `${expr}` reactive slot, return the inner text with
 /// surrounding whitespace stripped. The slot form forces the parser to treat
-/// the contents as a Copper expression (not a string literal), which is what
+/// the contents as a Mikasa expression (not a string literal), which is what
 /// the reactive prop machinery needs. Used by `parse_arg_value` to re-parse
 /// the inner text as a real `Expr` when the slot appears in a prop position.
 fn strip_reactive_slot(raw: &str) -> Option<String> {
@@ -1370,6 +1396,28 @@ fn is_plain_ident(s: &str) -> bool {
     s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
+/// `top left` / `bottom-right` → `topleft` so [`style::parse_anchor`] sees both
+/// axes. Returns `None` unless every token is an anchor keyword.
+fn normalize_spaced_anchor(raw: &str) -> Option<String> {
+    let parts: Vec<&str> = raw
+        .split(|c: char| c.is_whitespace() || c == '-' || c == '_')
+        .filter(|p| !p.is_empty())
+        .collect();
+    if parts.len() < 2 {
+        return None;
+    }
+    let ok = |p: &str| {
+        matches!(
+            p.to_ascii_lowercase().as_str(),
+            "top" | "bottom" | "left" | "right" | "center" | "middle"
+        )
+    };
+    if !parts.iter().all(|p| ok(p)) {
+        return None;
+    }
+    Some(parts.iter().map(|p| p.to_ascii_lowercase()).collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1379,7 +1427,7 @@ mod tests {
 view Hello(name: string = "world") {
   Stack(orientation: vertical, gap: 12, padding: 24) {
     Text("Hello, ${name}!", size: 28, color: #0f172a)
-    Text("Built with mocida + copper.", size: 14, color: #64748b)
+    Text("Built with mocida + mikasa.", size: 14, color: #64748b)
   }
 }
 "#;
@@ -1422,7 +1470,7 @@ view Hello(name: string = "world") {
             panic!("expected Stack");
         };
         // Stack(orientation: vertical, gap: 12, padding: 24)
-        // A bare ident (`vertical`) is syntactically a Copper expression; the
+        // A bare ident (`vertical`) is syntactically a Mikasa expression; the
         // runtime resolves it to the right enum per prop. Only the explicit
         // dotted `Type.Member` form is a MuiValue::Enum (see the next test).
         assert_eq!(stack.props.len(), 3, "stack props: {:?}", stack.props);
@@ -1436,13 +1484,13 @@ view Hello(name: string = "world") {
                 &orientation.value,
                 PropValue::Expr(e) if matches!(&e.kind, mikasa_syntax::expr::ExprKind::Ident(n) if n == "vertical")
             ),
-            "orientation `vertical` should be a Copper ident expr, got {:?}",
+            "orientation `vertical` should be a Mikasa ident expr, got {:?}",
             orientation.value
         );
         let gap = stack.props.iter().find(|p| p.name == "gap").unwrap();
         assert!(
             matches!(&gap.value, PropValue::Expr(_)),
-            "gap should be a Copper expr, got {:?}",
+            "gap should be a Mikasa expr, got {:?}",
             gap.value
         );
 
@@ -1517,7 +1565,7 @@ view V() {
             "onChange should have one param `v`, got {:?}",
             on_change.value
         );
-        // `value: t` is a plain Copper expression (signal binding).
+        // `value: t` is a plain Mikasa expression (signal binding).
         let value = slider.props.iter().find(|p| p.name == "value").unwrap();
         assert!(matches!(&value.value, PropValue::Expr(_)));
     }
@@ -1557,7 +1605,7 @@ view Counter(start: int = 0) {
 
     #[test]
     fn immutable_binding_vs_element() {
-        // `total = ...` is an immutable Copper binding; `Text(...)` is an
+        // `total = ...` is an immutable Mikasa binding; `Text(...)` is an
         // element. The parser must not confuse the two — both start with an
         // identifier.
         let src = r#"

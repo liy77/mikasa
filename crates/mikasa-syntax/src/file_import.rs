@@ -1,7 +1,7 @@
 //! Textual expansion of `import("path.mika")` (dynamic file import).
 //!
 //! Replaces each `import("…")` / `import('…')` with the contents of the
-//! referenced Mikasa source file (recursively). Used by the cforge transpile
+//! referenced Mikasa source file (recursively). Used by the mikasa transpile
 //! path (streaming parser) and by the `mika_import!` Rust macro before it
 //! lowers Mikasa → Rust. The Astra interpreter expands the same form via the
 //! AST ([`crate::program::ImportKind::File`]) instead.

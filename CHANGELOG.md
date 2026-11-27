@@ -1,15 +1,15 @@
 # Changelog
 
-All notable changes to Mikasa / cforge. Versions follow the project's
+All notable changes to Mikasa / mikasa. Versions follow the project's
 CalVer scheme (`0.YY.M`, stamped from the build date).
 
 ## [Unreleased]
 
 ### Added
-- **`cforge update`** — downloads the newest `nightly*` release of
+- **`mikasa update`** — downloads the newest `nightly*` release of
   `liy77/copper-lang` whose asset matches this OS (`apple`/`darwin`,
-  `windows`, `linux`) and replaces the running `cforge` binary.
-- **`cforge format`** — a pretty-printer for MUI (`.mui` / `.crm`) files. Tokenizes
+  `windows`, `linux`) and replaces the running `mikasa` binary.
+- **`mikasa format`** — a pretty-printer for MUI (`.mui` / `.crm`) files. Tokenizes
   the source (keeping comments + strings verbatim), builds a shallow node tree and
   re-emits it with a **fit-or-break** rule: an element call `Name(prop: v, …)` that
   fits in 100 cols stays on one line, otherwise every argument breaks onto its own
@@ -19,12 +19,12 @@ CalVer scheme (`0.YY.M`, stamped from the build date).
   string literals are reproduced byte-for-byte and the output is idempotent. Works
   on a file or a directory (recurses, skipping `dist`/`target`/`.git`); `--check`
   reports files that would change (exit 1) without writing, `--stdout` prints the
-  result. Implementation: `src/cforge/mui_fmt.rs`.
-- **`cforge build <file>`** — a friendly alias for `cforge -c -i <file>`. Accepts
+  result. Implementation: `src/mikasa/mui_fmt.rs`.
+- **`mikasa build <file>`** — a friendly alias for `mikasa -c -i <file>`. Accepts
   the same flags (`--release`, `--clean`, `--bundle`, `--output`, `--target`,
-  `--verbose`), so `cforge build app.mui --release --clean` behaves exactly like
-  `cforge -c -i app.mui -r --clean`. The original `-c -i` form is unchanged.
-- **Copper: optional return-type sugar** — `func Type? name(...)` lowers to
+  `--verbose`), so `mikasa build app.mui --release --clean` behaves exactly like
+  `mikasa -c -i app.mui -r --clean`. The original `-c -i` form is unchanged.
+- **Mikasa: optional return-type sugar** — `func Type? name(...)` lowers to
   `-> Option<Type>` (the tokenizer folds the trailing `?` into the return-type
   token, so `convert_type` resolves it).
 - **MUI: computed dimension props** — `width` / `height` now resolve
@@ -52,13 +52,13 @@ CalVer scheme (`0.YY.M`, stamped from the build date).
   lifetime. New example: `examples/mui/dialog/`.
 
 ### Changed
-- **Copper: a bare `self` receiver now borrows (`&self`)** on `impl` methods,
-  matching the `class` path and the convention across real Copper code
+- **Mikasa: a bare `self` receiver now borrows (`&self`)** on `impl` methods,
+  matching the `class` path and the convention across real Mikasa code
   (read-only accessors). Methods no longer consume the receiver by default, so a
   value can be inspected by many methods without being moved.
 
 ### Fixed
-- **Copper: `for x in <identifier> { … }` got `,` separators instead of `;`.**
+- **Mikasa: `for x in <identifier> { … }` got `,` separators instead of `;`.**
   The struct-literal brace detector mistook the loop body `{` (which follows an
   identifier) for a struct literal, so multi-statement loop bodies transpiled to
   invalid Rust. `for` now arms `expect_block_brace` like the other control-flow
@@ -69,20 +69,20 @@ CalVer scheme (`0.YY.M`, stamped from the build date).
   wrapper failed with ~40 "cannot find function in sys" errors. It now uses the
   staged SDK only when it's at least as fresh as `mocida/src/headers`, otherwise
   binds against the source headers + the source `build/` lib.
-- **Copper: generic return / parameter types on `impl` methods** —
+- **Mikasa: generic return / parameter types on `impl` methods** —
   `func Option<T> find(self, xs: Vec<T>)` no longer silently drops the method.
   `process_impl_methods` now gobbles the `<…>` after the return-type base (so it
   finds the real method name) and on param types (so `Vec<T>` isn't split at the
   inner comma). New example: `examples/mikasa/methods.crs`.
-- **Copper: `impl` method bodies now lower through the real statement machinery**
+- **Mikasa: `impl` method bodies now lower through the real statement machinery**
   (a sub-parser) instead of a naive token-join. Multi-statement bodies get `let`
   injection and `;` terminators, instead of collapsing onto one invalid line
   (`len = self.length() if len == 0.0 {…}`).
-- **Copper: struct-literal fields are no longer mistaken for typed declarations**
+- **Mikasa: struct-literal fields are no longer mistaken for typed declarations**
   — `Vec2 { x: self.x }` stayed correct but `x: self.x` (identifier value) became
   `let x: self; .x`. `parse_type_declaration` now skips when the value continues
   as an expression or sits between struct fields.
-- **Copper: multi-line struct literals and operator-continued lines** no longer
+- **Mikasa: multi-line struct literals and operator-continued lines** no longer
   get a spurious `;`. The tokenizer tracks struct-literal braces (separating
   fields with `,`) and suppresses the statement `;` after a line that ends in a
   binary/infix operator (`a &&` / `x +` / `obj.`). Regression tests:
@@ -91,22 +91,22 @@ CalVer scheme (`0.YY.M`, stamped from the build date).
 ## [v0.26.6] - 2026-06-03
 
 First tagged release. Mikasa is a high-level language that transpiles to Rust,
-shipped as the `cforge` compiler, with a declarative UI front-end (**MUI**) on
+shipped as the `mikasa` compiler, with a declarative UI front-end (**MUI**) on
 top of the mocida toolkit.
 
 ### Added
-- **Copper language front-end** — tokenizer, parser and LSP. Variables
+- **Mikasa language front-end** — tokenizer, parser and LSP. Variables
   (`mut x = 1`), `func` declarations, classes/structs/impl, imports, loops,
   `match` (guards / `_` / `|`), `if let`/`while let`, vec literals, closures,
   the try operator, optional chaining (`obj?.field`), string interpolation
   (`"$name"` / `"${expr}"`), ternary (`cond ? a : b`), generic return types,
   and `unsafe` blocks/functions.
-- **`cforge` compiler** with `run` (transpile + build + run) and `-c`/`--compile`
+- **`mikasa` compiler** with `run` (transpile + build + run) and `-c`/`--compile`
   (emit Rust), plus the bundled `cstd` standard library.
 - **MUI front-end** (`crates/mui-syntax`, `mui-codegen`, `mui-lsp`):
-  - `cforge run x.mui` / `.crm` renders a declarative UI live via the `mui-dev`
+  - `mikasa run x.mui` / `.crm` renders a declarative UI live via the `mui-dev`
     host (no transpile).
-  - `cforge -c [-r] x.mui` lowers the component AST to a self-contained Rust
+  - `mikasa -c [-r] x.mui` lowers the component AST to a self-contained Rust
     crate (`mui-codegen`), optionally building a native binary; `-b` embeds the
     `app.bundle` assets for a single-file executable.
 - **MUI components**: reactive `counter`, `onKeyInput` keyboard handling,

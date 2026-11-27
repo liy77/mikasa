@@ -1,5 +1,5 @@
-//! Terminal styling for cforge — the Rust counterpart of `scripts/_pretty.py`,
-//! so the compiler's output shares the look of the Python tooling: a copper
+//! Terminal styling for mikasa — the Rust counterpart of `scripts/_pretty.py`,
+//! so the compiler's output shares the look of the Python tooling: a mikasa
 //! accent, box-drawn banner, `✔ / ✗ / ▸ / ·` status glyphs, and a spinner for
 //! long-running steps. Everything degrades to plain ASCII when stdout isn't a
 //! TTY or `NO_COLOR` is set.
@@ -14,7 +14,7 @@ use std::time::Duration;
 use colored::Colorize;
 
 /// Mikasa accent (matches `_pretty.py`'s 256-colour 208).
-fn copper(s: &str) -> String {
+fn mikasa_color(s: &str) -> String {
     if color() {
         s.truecolor(255, 135, 0).bold().to_string()
     } else {
@@ -41,11 +41,11 @@ pub fn is_tty() -> bool {
 }
 
 fn unicode() -> bool {
-    // Best-effort: assume UTF-8 on a TTY; cforge already prints emoji elsewhere.
+    // Best-effort: assume UTF-8 on a TTY; mikasa already prints emoji elsewhere.
     std::io::stdout().is_terminal()
 }
 
-/// A boxed banner: title with an optional subtitle, framed in copper.
+/// A boxed banner: title with an optional subtitle, framed in mikasa.
 pub fn banner(title: &str, subtitle: &str) {
     let (tl, tr, bl, br, h, v) = if unicode() {
         ("╭", "╮", "╰", "╯", "─", "│")
@@ -54,22 +54,22 @@ pub fn banner(title: &str, subtitle: &str) {
     };
     let inner = title.len().max(subtitle.len()) + 2;
     let bar = h.repeat(inner);
-    println!("{}", copper(&format!("{tl}{bar}{tr}")));
+    println!("{}", mikasa_color(&format!("{tl}{bar}{tr}")));
     println!(
         "{} {} {}",
-        copper(v),
-        pad(&copper(title), inner - 1),
-        copper(v)
+        mikasa_color(v),
+        pad(&mikasa_color(title), inner - 1),
+        mikasa_color(v)
     );
     if !subtitle.is_empty() {
         println!(
             "{} {} {}",
-            copper(v),
+            mikasa_color(v),
             pad(&dim(subtitle), inner - 1),
-            copper(v)
+            mikasa_color(v)
         );
     }
-    println!("{}", copper(&format!("{bl}{bar}{br}")));
+    println!("{}", mikasa_color(&format!("{bl}{bar}{br}")));
 }
 
 fn pad(s: &str, _width: usize) -> String {
@@ -78,12 +78,12 @@ fn pad(s: &str, _width: usize) -> String {
     s.to_string()
 }
 
-/// The copper arrow glyph, for inline use (e.g. "▸ name v1.2").
+/// The mikasa arrow glyph, for inline use (e.g. "▸ name v1.2").
 pub fn arrow() -> String {
-    copper(if unicode() { "▸" } else { ">" })
+    mikasa_color(if unicode() { "▸" } else { ">" })
 }
 
-/// A section heading (▸ copper).
+/// A section heading (▸ mikasa).
 pub fn head(msg: &str) {
     println!("{} {}", arrow(), msg.bold());
 }
@@ -145,7 +145,7 @@ fn render_tree(node: &TreeNode, prefix: &str) {
         let connector = if last { ell } else { tee };
         let is_dir = !child.children.is_empty();
         let shown = if is_dir {
-            copper(&format!("{name}/"))
+            mikasa_color(&format!("{name}/"))
         } else {
             name.clone()
         };

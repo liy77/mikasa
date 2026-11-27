@@ -1,4 +1,4 @@
-// Copper standard library — written in Copper itself.
+// Mikasa standard library — written in Mikasa itself.
 // Loaded automatically when a program does `import { ... } from cstd`.
 // The compiler wraps everything below in `pub mod cstd { ... }` and
 // rewrites every `fn` into `pub fn` so user `use cstd::{X};` resolves.
@@ -131,7 +131,7 @@ func Vec<String> split(s: &str, sep: &str) {
     return s.split(sep).map(|p| p.to_string()).collect()
 }
 
-// NOTE: param changed from &[String] to Vec<String> — Copper does not support &[T] slice params.
+// NOTE: param changed from &[String] to Vec<String> — Mikasa does not support &[T] slice params.
 func String join(parts: Vec<String>, sep: &str) {
     return parts.join(sep)
 }

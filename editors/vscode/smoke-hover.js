@@ -1,7 +1,7 @@
 const { spawn } = require('child_process');
 const path = require('path');
 
-const lspPath = path.resolve(__dirname, '..', '..', 'target', 'debug', 'copper-lsp.exe');
+const lspPath = path.resolve(__dirname, '..', '..', 'target', 'debug', 'mikasa-lsp.exe');
 const child = spawn(lspPath, [], { stdio: ['pipe', 'pipe', 'pipe'] });
 
 let buf = Buffer.alloc(0);
@@ -56,7 +56,7 @@ function call(method, params) {
   ].join('\n');
   const uri = 'file:///hover.crs';
   send('textDocument/didOpen', {
-    textDocument: { uri, languageId: 'copper', version: 1, text },
+    textDocument: { uri, languageId: 'mikasa', version: 1, text },
   }, false);
 
   async function hov(label, line, character) {
@@ -87,7 +87,7 @@ function call(method, params) {
   ].join('\n');
   const uri2 = 'file:///std-hover.crs';
   send('textDocument/didOpen', {
-    textDocument: { uri: uri2, languageId: 'copper', version: 1, text: text2 },
+    textDocument: { uri: uri2, languageId: 'mikasa', version: 1, text: text2 },
   }, false);
   // Line 1 = "  println!(">>> {} <<<", msg.to_uppercase())"
   //          0         1         2         3         4
@@ -111,7 +111,7 @@ function call(method, params) {
   ].join('\n');
   const uri4 = 'file:///vars.crs';
   send('textDocument/didOpen', {
-    textDocument: { uri: uri4, languageId: 'copper', version: 1, text: text4 },
+    textDocument: { uri: uri4, languageId: 'mikasa', version: 1, text: text4 },
   }, false);
   async function vhov(label, line, character) {
     const r = await call('textDocument/hover', {
@@ -134,7 +134,7 @@ function call(method, params) {
   const text3 = 'mut nums = vec![1, 2, 3]\nnums.push(4)';
   const uri3 = 'file:///vec-hover.crs';
   send('textDocument/didOpen', {
-    textDocument: { uri: uri3, languageId: 'copper', version: 1, text: text3 },
+    textDocument: { uri: uri3, languageId: 'mikasa', version: 1, text: text3 },
   }, false);
   // Line 1 = "nums.push(4)" → push starts at char 5.
   const r3 = await call('textDocument/hover', {

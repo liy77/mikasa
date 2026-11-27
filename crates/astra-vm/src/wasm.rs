@@ -1,7 +1,7 @@
 //! Running imported Rust (`.rs`) inside Astra via WebAssembly.
 //!
 //! The interpreter can't execute Rust directly. Instead of delegating the whole
-//! program to `cforge` (the old `NeedsCforge` path), Astra compiles each
+//! program to `mikasa` (the old `NeedsMikasa` path), Astra compiles each
 //! imported `.rs` to a **`wasm32-unknown-unknown`** module once (cached by
 //! content hash under `~/.astra/cache`), then runs it with an embedded
 //! [`wasmi`] interpreter. Mikasa stays tree-walked (instant); only the Rust

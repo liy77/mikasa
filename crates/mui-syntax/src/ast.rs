@@ -2,7 +2,7 @@
 //!
 //! A document is a set of `view` functions. Each view's body is a tree of
 //! [`Node`]s — elements (mocida widgets) plus reactive glue (`let signal`,
-//! `effect`) and control flow (`if` / `for` / `match`). Embedded Copper —
+//! `effect`) and control flow (`if` / `for` / `match`). Embedded Mikasa —
 //! prop expressions, handler bodies, `${...}` interpolation — is parsed into
 //! [`mikasa_syntax::expr`] trees so the same typed AST powers both the dev
 //! interpreter/JIT and the release codegen.
@@ -22,14 +22,14 @@ pub struct Document {
 }
 
 /// What kind of file an `import` points at, decided by the path's extension.
-/// MUI imports bring component *views* into scope; Copper/Rust imports bring
+/// MUI imports bring component *views* into scope; Mikasa/Rust imports bring
 /// *logic* (functions, types) that the generated crate links in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImportKind {
     /// `.mui` / `.crm` — component views, resolved into the registry.
     Mui,
-    /// `.crs` — Copper source, transpiled into the generated crate as a module.
-    Copper,
+    /// `.crs` / `.mika` — Mikasa source, transpiled into the generated crate as a module.
+    Mikasa,
     /// `.rs` — raw Rust, included into the generated crate as a module.
     Rust,
 }
@@ -46,7 +46,7 @@ impl ImportKind {
         match ext.as_str() {
             "rs" => ImportKind::Rust,
             // `.mika` is the recommended source extension; `.crs` still imports.
-            ext if mikasa_syntax::ext::is_source(ext) => ImportKind::Copper,
+            ext if mikasa_syntax::ext::is_source(ext) => ImportKind::Mikasa,
             _ => ImportKind::Mui, // .mui, .crm, or unspecified
         }
     }
@@ -59,11 +59,11 @@ impl ImportKind {
 }
 
 /// `import { Name, Other } from "path"` — pulls views from another MUI file so
-/// they can be used as elements (`Card(...)`), or functions/types from a Copper
+/// they can be used as elements (`Card(...)`), or functions/types from a Mikasa
 /// (`.crs`) / Rust (`.rs`) file so they can be used in handlers and expressions.
 #[derive(Debug, Clone)]
 pub struct Import {
-    /// Names brought into scope (view names, or Copper/Rust item names).
+    /// Names brought into scope (view names, or Mikasa/Rust item names).
     pub names: Vec<String>,
     /// The module path, as written (e.g. `"./card.mui"`). Resolved relative to
     /// the importing file by the loader.
@@ -74,10 +74,10 @@ pub struct Import {
 }
 
 impl Import {
-    /// The Rust module name a Copper/Rust import is materialized under in the
+    /// The Rust module name a Mikasa/Rust import is materialized under in the
     /// generated crate (`./logic.crs` → `logic`, `../ui/native.rs` → `native`).
     /// Derived from the file stem, sanitized to a valid identifier. Codegen and
-    /// cforge must agree on this, so it lives here.
+    /// mikasa must agree on this, so it lives here.
     pub fn module_name(&self) -> String {
         let stem = std::path::Path::new(&self.path)
             .file_stem()
@@ -140,9 +140,9 @@ pub struct AppConfig {
     pub background: Option<(u8, u8, u8, u8)>,
     /// Name of the view to mount as the root (defaults to the first view).
     pub entry: Option<String>,
-    /// Optional native host crate (sibling directory) that `cforge run` launches
+    /// Optional native host crate (sibling directory) that `mikasa run` launches
     /// instead of the generic `mui-dev` — for a `.mui` that needs a real backend
-    /// (foreign `.rs`/`.crs` imports, effects, threads). E.g. `host: "copper-installer"`.
+    /// (foreign `.rs`/`.crs` imports, effects, threads). E.g. `host: "mikasa-installer"`.
     pub host: Option<String>,
     /// Optional OS window backdrop (`"auto"`/`"off"`/`"mica"`/`"mica-alt"`/
     /// `"acrylic"`/`"acrylic-legacy"`/`"kde-window"`). Window-wide glass effect
@@ -157,6 +157,23 @@ pub struct AppConfig {
     /// `FontFace { family: "Inter", src: "https://…" }`. Applied before the
     /// first paint so `Text(font: "Inter")` resolves like `font-family` in CSS.
     pub fonts: Vec<FontFace>,
+    /// Web listen boot splash: default status label (English `"Loading"` if unset).
+    /// `App() { loadingText: "Carregando" }` overrides it. Stage-specific
+    /// overrides: `loadingStarting`, `loadingDownloading`, `loadingCompiling`,
+    /// `loadingAlmost`, `loadingModules`, `loadingFiles`, `loadingImages`,
+    /// `loadingReady`, `loadingOpening`. Optional `loadingTagline` sits under
+    /// the boot logo (empty = hidden).
+    pub loading_text: Option<String>,
+    pub loading_starting: Option<String>,
+    pub loading_downloading: Option<String>,
+    pub loading_compiling: Option<String>,
+    pub loading_almost: Option<String>,
+    pub loading_modules: Option<String>,
+    pub loading_files: Option<String>,
+    pub loading_images: Option<String>,
+    pub loading_ready: Option<String>,
+    pub loading_opening: Option<String>,
+    pub loading_tagline: Option<String>,
     pub span: Span,
 }
 
@@ -230,13 +247,13 @@ pub enum Node {
         arms: Vec<MatchArm>,
         span: Span,
     },
-    /// A bare Copper expression in node position (rare; e.g. a computed view).
+    /// A bare Mikasa expression in node position (rare; e.g. a computed view).
     Expr(Expr),
 }
 
 #[derive(Debug, Clone)]
 pub struct MatchArm {
-    /// Raw pattern source (parsed into copper patterns in a later pass).
+    /// Raw pattern source (parsed into mikasa patterns in a later pass).
     pub pattern: String,
     pub body: Vec<Node>,
     pub span: Span,
@@ -267,11 +284,11 @@ pub struct Prop {
 
 #[derive(Debug, Clone)]
 pub enum PropValue {
-    /// A lowered Copper expression (numbers, idents, arithmetic, calls, …).
+    /// A lowered Mikasa expression (numbers, idents, arithmetic, calls, …).
     Expr(Expr),
     /// `{ |a| ... }` / `{ ... }` event handler.
     Handler(Handler),
-    /// A MUI literal the Copper grammar doesn't model: a color (`#rrggbb`,
+    /// A MUI literal the Mikasa grammar doesn't model: a color (`#rrggbb`,
     /// `#rrggbbaa`, `rgba(...)`) or an enum access (`FontStyle.Bold`). Kept as
     /// a small typed value so the static runtime can apply it without an
     /// evaluator. The raw source is preserved for diagnostics / codegen.
@@ -294,7 +311,7 @@ pub struct Handler {
     pub body: Block,
     /// Raw source of the handler body (between the braces, after the optional
     /// `|params|`). Kept verbatim so the runtime/codegen can interpret simple
-    /// statements (`count = count + 1`) without a full Copper Block lowering.
+    /// statements (`count = count + 1`) without a full Mikasa Block lowering.
     pub raw: String,
 }
 
@@ -343,6 +360,9 @@ pub enum HandlerAction {
     /// `name = name + delta` / `name = name - delta` (delta defaults to 1 for
     /// `name++` / `name--`). `delta` is signed: `-1` for decrement.
     AddAssign { name: String, delta: i64 },
+    /// `name += otherSignal` / `name -= otherSignal` — live int-signal delta
+    /// (e.g. `clockSec += timeMult` without rebuilding the Timer tree).
+    AddAssignFrom { name: String, from: String, neg: bool },
     /// `name = <int literal>`.
     SetInt { name: String, value: i64 },
     /// `name = "literal"` — set a string signal.
@@ -384,7 +404,7 @@ fn parse_handler_action(raw: &str) -> Option<HandlerAction> {
         }
     }
 
-    // `name += N` / `name -= N`
+    // `name += N` / `name -= N`  OR  `name += otherIdent` / `name -= otherIdent`
     if toks.len() == 3 && is_ident(toks[0]) {
         if let Ok(n) = toks[2].parse::<i64>() {
             if toks[1] == "+=" {
@@ -397,6 +417,22 @@ fn parse_handler_action(raw: &str) -> Option<HandlerAction> {
                 return Some(HandlerAction::AddAssign {
                     name: toks[0].to_string(),
                     delta: -n,
+                });
+            }
+        }
+        if is_ident(toks[2]) {
+            if toks[1] == "+=" {
+                return Some(HandlerAction::AddAssignFrom {
+                    name: toks[0].to_string(),
+                    from: toks[2].to_string(),
+                    neg: false,
+                });
+            }
+            if toks[1] == "-=" {
+                return Some(HandlerAction::AddAssignFrom {
+                    name: toks[0].to_string(),
+                    from: toks[2].to_string(),
+                    neg: true,
                 });
             }
         }

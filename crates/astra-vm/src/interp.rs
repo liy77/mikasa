@@ -1327,7 +1327,7 @@ impl Interpreter {
                     Some(e) => self.eval_expr(e, env)?,
                     None => Value::Unit,
                 };
-                // Copper writes both `mut i = 0` and `i = i + 1` without a
+                // Mikasa writes both `mut i = 0` and `i = i + 1` without a
                 // keyword, and the statement parser cannot tell a fresh
                 // binding from a reassignment. A name that already exists is a
                 // reassignment: update it in place so it isn't shadowed by a

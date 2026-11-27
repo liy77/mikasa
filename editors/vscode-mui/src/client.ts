@@ -18,7 +18,7 @@ import {
 
 const EXE = process.platform === 'win32' ? 'mui-lsp.exe' : 'mui-lsp';
 
-/** Try to locate a `mui-lsp` binary. Mirrors how cforge discovers `mui-dev`. */
+/** Try to locate a `mui-lsp` binary. Mirrors how mikasa discovers `mui-dev`. */
 function locateServer(context: vscode.ExtensionContext): string | undefined {
   // 1) Explicit user setting.
   const configured = vscode.workspace
@@ -34,8 +34,8 @@ function locateServer(context: vscode.ExtensionContext): string | undefined {
   const bundled = path.join(context.extensionPath, 'bin', EXE);
   if (fs.existsSync(bundled)) return bundled;
 
-  // 4) Dev workspace: a built binary under copper-lang/target/.
-  //    The extension lives at copper-lang/editors/vscode-mui, so walk up to the
+  // 4) Dev workspace: a built binary under mikasa repo target/.
+  //    The extension lives at editors/vscode-mui, so walk up to the
   //    repo root and look in target/{release,debug}.
   let dir = context.extensionPath;
   for (let i = 0; i < 6; i++) {
@@ -80,7 +80,7 @@ export async function start(
   const clientOptions: LanguageClientOptions = {
     documentSelector: [
       { scheme: 'file', language: 'mui' },
-      { scheme: 'file', language: 'copper' },
+      { scheme: 'file', language: 'mikasa' },
     ],
     synchronize: {
       fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{mui,mika}'),

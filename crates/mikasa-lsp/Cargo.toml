@@ -2,7 +2,7 @@
 name = "mikasa-lsp"
 version = "0.0.1-pre-alpha"
 edition = "2021"
-description = "Language server for the Copper language."
+description = "Language server for the Mikasa language."
 
 [[bin]]
 name = "mikasa-lsp"

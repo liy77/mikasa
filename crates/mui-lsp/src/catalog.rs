@@ -406,7 +406,7 @@ pub const PROP_VALUES: &[(&str, &[&str])] = &[
     ),
 ];
 
-/// MUI-specific keywords (markup + reactivity), beyond the Copper ones.
+/// MUI-specific keywords (markup + reactivity), beyond the Mikasa ones.
 pub const MUI_KEYWORDS: &[(&str, &str, &str)] = &[
     ("view", "view Name(props) { ... }", "Declares a component. Props are typed parameters; the body is a widget tree."),
     ("App", "App() { name:, width:, height:, mainContent: View }", "App config block: window + bundle identity, and the entry component to mount."),

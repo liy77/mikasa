@@ -1,4 +1,4 @@
-// Copper `crypto` standard library — hashing + encoding.
+// Mikasa `crypto` standard library — hashing + encoding.
 //
 // `import { ... } from crypto`. base64/hex/crc32 are std-only; the SHA family
 // and HMAC pull the small `sha2` / `hmac` crates into the generated

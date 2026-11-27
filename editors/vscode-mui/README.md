@@ -29,7 +29,7 @@ the two share conventions (and the same `mut`/bare bindings — **no `let`**).
   (`size`, `color`, …), an enum (`FontStyle`) or its members, and Mikasa
   keywords / types (`func`, `struct`, `impl`, `signal`, `int`, …).
   - **Mikasa words use the SAME descriptions as the Mikasa extension.** They
-    come from the shared `editors/copper-lexicon.json` — a single JSON read by
+    come from the shared `editors/mikasa-lexicon.json` — a single JSON read by
     both `mikasa-lsp` (embedded via `include_str!`) and this extension (at
     runtime), so the `.crs` and `.mui`/`.crm` hovers can never drift. Edit a
     description there once and both update. (Mocida-only words — `view`,
@@ -76,13 +76,13 @@ The bundled examples (all under `examples/mui/` in the repo root):
 
 ```sh
 npm install        # @types/vscode, @types/node, typescript
-npm run compile    # tsc -> out/  (+ bundles copper-lexicon.json into out/)
+npm run compile    # tsc -> out/  (+ bundles mikasa-lexicon.json into out/)
 npm run package    # builds a mui-<version>.vsix (via @vscode/vsce)
 ```
 
 `npm run package` produces an installable `.vsix`; install it with
 **Extensions: Install from VSIX…** or `code --install-extension mui-*.vsix`.
-The `compile` step copies `editors/copper-lexicon.json` into `out/` so the
+The `compile` step copies `editors/mikasa-lexicon.json` into `out/` so the
 packaged extension shows the exact same Mikasa keyword descriptions as
 `mikasa-lsp` (in the dev host it reads the repo copy directly).
 

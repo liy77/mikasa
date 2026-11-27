@@ -1,4 +1,4 @@
-// Copper `http` standard library — HTTP / HTTPS client.
+// Mikasa `http` standard library — HTTP / HTTPS client.
 //
 // Loaded when a program does `import { ... } from http`. The compiler wraps
 // this file into `pub mod http { ... }` and adds the `ureq` crate (a small,

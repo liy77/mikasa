@@ -1,4 +1,4 @@
-// The full Copper parser is still being incrementally restored from a
+// The full Mikasa parser is still being incrementally restored from a
 // previous stub state; pre-existing untouched code carries a backlog of
 // stylistic clippy warnings. We silence the categories that aren't bugs
 // here so `cargo clippy -- -D warnings` stays green for CI. Tighten this
@@ -17,16 +17,16 @@
     clippy::while_let_loop
 )]
 
-pub mod cforge;
+pub mod internal;
 pub mod utils;
 
 // Re-export the tokenizer module from mikasa-syntax so existing paths
-// (`crate::tokenizer::tokens::Token`, etc.) keep resolving. cforge drives
+// (`crate::tokenizer::tokens::Token`, etc.) keep resolving. mikasa drives
 // the same tokenizer the parser and LSP consume.
 pub use mikasa_syntax::tokenizer;
 
 // The parser now lives in its own crate (`mikasa-parser`). Re-export it at
-// the crate root so `crate::parser::Parser` keeps resolving in cforge.
+// the crate root so `crate::parser::Parser` keeps resolving in mikasa.
 pub use mikasa_parser::parser;
 
 use clap::{Arg, Command as ClapCommand};
@@ -40,6 +40,7 @@ use once_cell::sync::Lazy;
 
 static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
     ClapCommand::new("mikasa")
+        .bin_name("mikasa")
         .arg(Arg::new("input")
             .short('i')
             .long("input")
@@ -133,16 +134,16 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
             .about("List dependencies declared in properties.kson")
         )
         .subcommand(ClapCommand::new("cache")
-            .about("Inspect or clean CForge transpilation and registry caches")
+            .about("Inspect or clean Mikasa transpilation and registry caches")
             .arg(Arg::new("action")
                 .help("status (default) or clean")
                 .value_name("ACTION")
                 .required(false)
                 .index(1))
         )
-        // `cforge build <file>` — a friendly alias for `cforge -c -i <file>`.
-        // Accepts the same flags so `cforge build app.mui --release --clean` works
-        // exactly like `cforge -c -i app.mui --release --clean`.
+        // `mikasa build <file>` — a friendly alias for `mikasa -c -i <file>`.
+        // Accepts the same flags so `mikasa build app.mui --release --clean` works
+        // exactly like `mikasa -c -i app.mui --release --clean`.
         .subcommand(ClapCommand::new("build")
             .about("Compile a file or directory (alias for `-c -i`). Accepts --release, --clean, --bundle, --web, --output, --target.")
             .arg(Arg::new("input")
@@ -184,7 +185,7 @@ static BASE_CMD: Lazy<ClapCommand> = Lazy::new(|| {
                 .action(clap::ArgAction::SetTrue)
                 .help("Write the formatted result to stdout instead of editing files"))
         )
-        // `cforge vm run/build <file>` (alias `virtual`) — execute a .crs through
+        // `mikasa vm run/build <file>` (alias `virtual`) — execute a .crs through
         // the Astra tree-walking interpreter instead of transpiling to Rust. No
         // cargo/rustc needed.
         .subcommand(ClapCommand::new("vm")
@@ -253,7 +254,7 @@ fn run_vm(sub: &str, file: &str) -> i32 {
         let resolved = match loader::resolve_runnable_wasm(p) {
             Ok(x) => x,
             Err(e) => {
-                eprintln!("cforge vm: {e}");
+                eprintln!("mikasa vm: {e}");
                 return 1;
             }
         };
@@ -290,16 +291,16 @@ fn run_vm(sub: &str, file: &str) -> i32 {
                 0
             }
             Err(e) => {
-                eprintln!("cforge vm: could not write {}: {e}", out.display());
+                eprintln!("mikasa vm: could not write {}: {e}", out.display());
                 1
             }
         }
     } else {
-        // Resolve the Copper program + Rust to run via wasm.
+        // Resolve the Mikasa program + Rust to run via wasm.
         let resolved = match loader::resolve_runnable_wasm(p) {
             Ok(x) => x,
             Err(e) => {
-                eprintln!("cforge vm: {e}");
+                eprintln!("mikasa vm: {e}");
                 return 1;
             }
         };
@@ -308,7 +309,7 @@ fn run_vm(sub: &str, file: &str) -> i32 {
         // Wasm already embedded in a `.loy` — no rustc needed.
         for m in &resolved.wasm_modules {
             if let Err(e) = interp.register_wasm_bytes(&m.names, &m.bytes) {
-                eprintln!("cforge vm: embedded wasm failed to load: {e}");
+                eprintln!("mikasa vm: embedded wasm failed to load: {e}");
                 return 1;
             }
         }
@@ -340,7 +341,7 @@ fn run_vm(sub: &str, file: &str) -> i32 {
             Ok(_) => 0,
             Err(e) => {
                 eprintln!(
-                    "cforge vm: runtime error @ {}..{}: {}",
+                    "mikasa vm: runtime error @ {}..{}: {}",
                     e.span.start, e.span.end, e.message
                 );
                 1
@@ -350,11 +351,10 @@ fn run_vm(sub: &str, file: &str) -> i32 {
 }
 
 /// Build date stamped in by `build.rs` at compile time (UTC, `YYYY-MM-DD`).
-const BUILD_DATE: &str = env!("COPPER_BUILD_DATE");
+const BUILD_DATE: &str = env!("MIKASA_BUILD_DATE");
 
-/// CalVer `0.YY.M` derived from the build date by `build.rs` — shared by cforge and copper.
-const CFORGE_VERSION: &str = env!("CFORGE_VERSION");
-const COPPER_VERSION: &str = env!("COPPER_VERSION");
+/// CalVer `0.YY.M` derived from the build date by `build.rs`.
+const MIKASA_VERSION: &str = env!("MIKASA_VERSION");
 /// Short git commit hash stamped in by `build.rs`.
 const GIT_HASH: &str = env!("GIT_COMMIT_HASH");
 
@@ -593,8 +593,8 @@ fn parse_commands() -> ParsedCommands {
         }
     }
 
-    // Cross-compile target can come from the top-level flag (`cforge -c -i x
-    // --target …`) or from the `build` subcommand (`cforge build x --target …`).
+    // Cross-compile target can come from the top-level flag (`mikasa -c -i x
+    // --target …`) or from the `build` subcommand (`mikasa build x --target …`).
     // Record it as a command so main() resolves it the same way for both.
     let target_raw =
         matches
@@ -621,11 +621,7 @@ async fn main() {
     if matches.get_flag("version") {
         println!(
             "mikasa v{} (build {}, commit {})",
-            CFORGE_VERSION, BUILD_DATE, GIT_HASH
-        );
-        println!(
-            "Mikasa v{} (build {}, commit {})",
-            COPPER_VERSION, BUILD_DATE, GIT_HASH
+            MIKASA_VERSION, BUILD_DATE, GIT_HASH
         );
         return;
     }
@@ -634,34 +630,34 @@ async fn main() {
     // These must work with only the mikasa binary on PATH (no rustc/cargo).
     match matches.subcommand() {
         Some(("init", _)) => {
-            cforge::commands::init();
+            internal::commands::init();
             return;
         }
         Some(("install", install_matches)) => {
             match install_matches.get_one::<String>("package") {
-                Some(package) => cforge::commands::install(package).await,
-                None => cforge::commands::install_all().await,
+                Some(package) => internal::commands::install(package).await,
+                None => internal::commands::install_all().await,
             }
             return;
         }
         Some(("remove", rm_matches)) => {
             if let Some(pkg) = rm_matches.get_one::<String>("package") {
-                cforge::commands::remove(pkg);
+                internal::commands::remove(pkg);
             }
             return;
         }
         Some(("list", _)) => {
-            cforge::commands::list();
+            internal::commands::list();
             return;
         }
         Some(("update", _)) => {
-            std::process::exit(cforge::update::run());
+            std::process::exit(internal::update::run());
         }
         Some(("cache", cache_matches)) => {
             let action = cache_matches
                 .get_one::<String>("action")
                 .map(String::as_str);
-            cforge::cache::handle_cache_command(action, Some("./dist"));
+            internal::cache::handle_cache_command(action, Some("./dist"));
             return;
         }
         Some(("format", fmt_matches)) => {
@@ -672,7 +668,7 @@ async fn main() {
                 .unwrap_or_else(|| vec![".".to_string()]);
             let check = fmt_matches.get_flag("check");
             let to_stdout = fmt_matches.get_flag("stdout");
-            std::process::exit(cforge::fmt::format_command(&paths, check, to_stdout));
+            std::process::exit(internal::fmt::format_command(&paths, check, to_stdout));
         }
         Some(("check", cm)) if !cm.get_flag("miri") && !cm.get_flag("no-miri") => {
             let paths: Vec<String> = cm
@@ -680,7 +676,7 @@ async fn main() {
                 .map(|vals| vals.cloned().collect())
                 .unwrap_or_else(|| vec![".".to_string()]);
             let deny = cm.get_flag("deny-warnings");
-            std::process::exit(cforge::check::run_fast_check(&paths, deny));
+            std::process::exit(internal::check::run_fast_check(&paths, deny));
         }
         Some(("vm", vm_matches)) => {
             let (sub, sm) = match vm_matches.subcommand() {
@@ -724,18 +720,20 @@ async fn main() {
         return;
     }
 
-    env::set_var("CFORGE_VERSION", CFORGE_VERSION);
-    env::set_var("COPPER_VERSION", COPPER_VERSION);
-    if env::var("COPPER_PATH").is_err() {
-        env::set_var(
-            "COPPER_PATH",
-            env::current_exe()
-                .unwrap()
-                .parent()
-                .unwrap()
-                .to_str()
-                .unwrap(),
-        );
+    env::set_var("MIKASA_VERSION", MIKASA_VERSION);
+    if env::var("MIKASA_PATH").is_err() {
+        // Derive from this binary when unset.
+        // Installed layout is `$MIKASA_PATH/bin/mikasa` → use the parent of `bin/`.
+        // Dev layout is `target/release/mikasa` → use that directory.
+        if let Ok(exe) = env::current_exe() {
+            let dir = exe.parent().unwrap_or_else(|| path::Path::new("."));
+            let root = if dir.file_name().and_then(|s| s.to_str()) == Some("bin") {
+                dir.parent().unwrap_or(dir)
+            } else {
+                dir
+            };
+            env::set_var("MIKASA_PATH", root.to_string_lossy().as_ref());
+        }
     }
 
     // `mikasa check --miri|--no-miri <file.mika>` — transpile + Rust verifier.
@@ -752,9 +750,9 @@ async fn main() {
                 eprintln!("usage: mikasa check --miri <file.mika> [--no-miri]");
                 std::process::exit(1);
             }
-            let deps = cforge::compile(vec![file], None, Some("./dist".to_string()));
-            cforge::generate_toml(deps).await;
-            std::process::exit(cforge::check::run_miri_check(borrow_only));
+            let deps = internal::compile(vec![file], None, Some("./dist".to_string()));
+            internal::generate_toml(deps).await;
+            std::process::exit(internal::check::run_miri_check(borrow_only));
         }
     }
 
@@ -763,19 +761,15 @@ async fn main() {
     if commands.get_command("version").unwrap().is_valid {
         println!(
             "mikasa v{} (build {}, commit {})",
-            CFORGE_VERSION, BUILD_DATE, GIT_HASH
-        );
-        println!(
-            "Mikasa v{} (build {}, commit {})",
-            COPPER_VERSION, BUILD_DATE, GIT_HASH
+            MIKASA_VERSION, BUILD_DATE, GIT_HASH
         );
         return;
     }
 
     if commands.get_command("verbose").unwrap().is_valid {
-        env::set_var("CFORGE_VERBOSE", "1");
+        env::set_var("MIKASA_VERBOSE", "1");
     } else {
-        env::set_var("CFORGE_VERBOSE", "0");
+        env::set_var("MIKASA_VERBOSE", "0");
     }
 
     let files_cmd = commands.get_command("input");
@@ -806,7 +800,7 @@ async fn main() {
         files
     };
 
-    cforge::print();
+    internal::print();
 
     if commands.get_command("clean").unwrap().is_valid {
         let output_dir = output_dir.clone().unwrap_or_else(|| "./dist/".to_string());
@@ -843,24 +837,24 @@ async fn main() {
     let target_triple: Option<&'static str> = target_raw
         .as_deref()
         .filter(|_| !target_is_web)
-        .map(|t| cforge::resolve_target(t));
+        .map(|t| internal::resolve_target(t));
 
     if let Some(triple) = target_triple {
-        env::set_var("CFORGE_TARGET", triple);
+        env::set_var("MIKASA_TARGET", triple);
     }
     if is_release {
-        env::set_var("CFORGE_RELEASE", "1");
+        env::set_var("MIKASA_RELEASE", "1");
     }
 
     if commands.get_command("compile").unwrap().is_valid {
         // A single MocidaUI file (`.mui`, or a `.mika` with a `view`/`App()`) is
         // a mocida UI: "compiling" it means lowering
-        // the component AST to Rust (mui-codegen) rather than the Copper→Rust
+        // the component AST to Rust (mui-codegen) rather than the Mikasa→Rust
         // transpile. Same `-c` entry point, file extension picks the backend.
         // `--release` additionally `cargo build`s the generated crate; `--bundle`
         // embeds the app.bundle (assets + config) into the binary.
         // `--web` / `--target web` also (or only) emits `<stem>_web/` for browsers.
-        if input_dir.is_none() && files.len() == 1 && cforge::mui::is_mui_file(&files[0]) {
+        if input_dir.is_none() && files.len() == 1 && internal::mui::is_mui_file(&files[0]) {
             // `--web` / `--target web` → emit `<stem>_web/` (browser package).
             // `--web` alone → web only. `--web --release` → web + native release.
             // `--target web` → web only (never native). Plain build keeps native path.
@@ -868,10 +862,10 @@ async fn main() {
             let do_native = !target_is_web && (!want_web || is_release || embed_bundle);
             let mut code = 0;
             if do_web {
-                code = cforge::mui::build_web(&files[0], output_dir.as_deref(), is_release);
+                code = internal::mui::build_web(&files[0], output_dir.as_deref(), is_release);
             }
             if code == 0 && do_native {
-                code = cforge::mui::compile(
+                code = internal::mui::compile(
                     &files[0],
                     output_dir.as_deref(),
                     is_release,
@@ -885,15 +879,15 @@ async fn main() {
         if let Some(ref dir) = input_dir {
             let p = path::Path::new(dir);
             if p.join("crs").is_dir() && p.join("properties.kson").is_file() {
-                match cforge::module_transpile::transpile_crs_project(p) {
+                match internal::module_transpile::transpile_crs_project(p) {
                     Ok(rust_dir) => {
-                        cforge::pretty::ok(&format!(
-                            "Transpiled Copper project → {}",
+                        internal::pretty::ok(&format!(
+                            "Transpiled Mikasa project → {}",
                             rust_dir.display()
                         ));
                     }
                     Err(e) => {
-                        cforge::pretty::fail(&e);
+                        internal::pretty::fail(&e);
                         std::process::exit(1);
                     }
                 }
@@ -902,13 +896,13 @@ async fn main() {
         }
 
         let detected_dependencies =
-            cforge::compile(files.clone(), input_dir.clone(), output_dir.clone());
-        cforge::generate_toml(detected_dependencies).await;
+            internal::compile(files.clone(), input_dir.clone(), output_dir.clone());
+        internal::generate_toml(detected_dependencies).await;
 
         // When --target is set, also cargo-build for that target and copy the
         // binary to dist/. Without --target, -c stops at the Rust source.
         if let Some(triple) = target_triple {
-            cforge::build_for_target(triple, is_release);
+            internal::build_for_target(triple, is_release);
         }
     }
 
@@ -916,24 +910,24 @@ async fn main() {
     if commands.get_command("run").is_some() && commands.get_command("run").unwrap().is_valid {
         // A single MocidaUI file (`.mui`, or a `.mika` with a `view`/`App()`)
         // renders live via the mui-dev host instead of the transpile pipeline.
-        if input_dir.is_none() && files.len() == 1 && cforge::mui::is_mui_file(&files[0]) {
+        if input_dir.is_none() && files.len() == 1 && internal::mui::is_mui_file(&files[0]) {
             let listen_port = commands
                 .get_command("listen")
                 .filter(|c| c.is_valid)
                 .and_then(|c| c.args.first())
                 .and_then(|s| s.parse::<u16>().ok());
             let code = if let Some(port) = listen_port {
-                cforge::mui::run_listen(&files[0], port)
+                internal::mui::run_listen(&files[0], port)
             } else {
-                cforge::mui::run(&files[0])
+                internal::mui::run(&files[0])
             };
             println!();
             std::process::exit(code);
         }
 
-        let detected_dependencies = cforge::compile(files, input_dir, output_dir.clone());
-        cforge::generate_toml(detected_dependencies).await;
-        cforge::run();
+        let detected_dependencies = internal::compile(files, input_dir, output_dir.clone());
+        internal::generate_toml(detected_dependencies).await;
+        internal::run();
     }
 
     println!();

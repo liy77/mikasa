@@ -6,7 +6,7 @@
 //   radius:             round the corners
 //   borderColor: + borderWidth:   draw a frame around it
 //
-// Run it:  cforge run examples/mui/webview/webview.mui
+// Run it:  mikasa run examples/mui/webview/webview.mui
 //   (needs an internet connection + the WebView2 runtime, preinstalled on
 //   current Windows 10/11.)
 

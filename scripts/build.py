@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Build the Mikasa compiler (cforge) into target/release/ without installing it.
+Build the Mikasa compiler (mikasa) into target/release/ without installing it.
 
 Cross-platform replacement for the old build.bat.
 
@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def main():
-    ap = argparse.ArgumentParser(prog="build.py", description="Build cforge (no install).")
+    ap = argparse.ArgumentParser(prog="build.py", description="Build mikasa (no install).")
     ap.add_argument("--debug", action="store_true", help="debug build instead of release")
     args = ap.parse_args()
 

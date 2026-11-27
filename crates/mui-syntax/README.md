@@ -8,8 +8,8 @@ params, and the nested element/children tree (`let` / `if` / `for` / `match` /
 `effect` nodes), with element args and prop expressions lowered into
 [`mikasa-syntax`](../mikasa-syntax) `Expr` trees.
 
-Lexing **reuses Copper's own tokenizer**, so MUI and Copper stay in lockstep:
-embedded Copper expressions (`${...}`, handlers, signal initializers) parse with
+Lexing **reuses Mikasa's own tokenizer**, so MUI and Mikasa stay in lockstep:
+embedded Mikasa expressions (`${...}`, handlers, signal initializers) parse with
 exactly the same rules as a `.crs` file.
 
 ## Consumers
@@ -18,7 +18,7 @@ exactly the same rules as a `.crs` file.
 | --- | --- |
 | [`mui-codegen`](../mui-codegen) | the AST → Rust source (release codegen, M5) |
 | [`mui-lsp`](../mui-lsp) | the AST + import loader → editor features |
-| `mui-dev` / `cforge` | the dev render path (M1) |
+| `mui-dev` / `mikasa` | the dev render path (M1) |
 
 ## Layout
 

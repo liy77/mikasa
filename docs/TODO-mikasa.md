@@ -1,6 +1,6 @@
 # Mikasa — TODO
 
-> Backlog do **transpilador** (`mikasa` / `cforge`), sintaxe, LSP e bridge Rust.
+> Backlog do **transpilador** (`mikasa` / `mikasa`), sintaxe, LSP e bridge Rust.
 > Atualizado: 2026-11-23.
 >
 > Índice geral: [`TODO.md`](./TODO.md) · Astra: [`TODO-astra.md`](./TODO-astra.md)
@@ -52,5 +52,5 @@
 | `mikasa init` / `install` / `upgrade` sem cargo | CLI cargo-free |
 | `import("arquivo.mika")` | include dinâmico de arquivo |
 | `mika_import!("arquivo.mika")` | crate `crates/mika-import` para hosts Rust |
-| Branding Mikasa (bin `mikasa`) | `cforge` permanece como alias/histórico |
+| Branding Mikasa (bin `mikasa`) | `mikasa` permanece como alias/histórico |
 | Suite `tests/mikasa/` + `tests/run_all.py` | linguagem, stdlib, file import, rust wasm |

@@ -1,4 +1,4 @@
-//! tower-lsp `Backend` for the Copper language server.
+//! tower-lsp `Backend` for the Mikasa language server.
 //!
 //! Phase 2 surface (this commit):
 //! * `initialize` / `initialized` / `shutdown`
@@ -48,7 +48,7 @@ impl Backend {
             .map(|e| Diagnostic {
                 range: doc.span_to_range(e.span),
                 severity: Some(DiagnosticSeverity::ERROR),
-                source: Some("copper".to_string()),
+                source: Some("mikasa".to_string()),
                 message: e.message.clone(),
                 ..Default::default()
             })
@@ -74,10 +74,10 @@ impl Backend {
                 diagnostics.push(Diagnostic {
                     range: doc.span_to_range(imp.module_span),
                     severity: Some(DiagnosticSeverity::WARNING),
-                    source: Some("copper".to_string()),
+                    source: Some("mikasa".to_string()),
                     message: format!(
                         "import `{}` not found — not std/cstd, no sibling file, and not in \
-                         properties.kson. Run `cforge install {}` to add it.",
+                         properties.kson. Run `mikasa install {}` to add it.",
                         imp.module, imp.module
                     ),
                     ..Default::default()
@@ -380,7 +380,7 @@ impl LanguageServer for Backend {
             return Ok(Some(Hover {
                 contents: HoverContents::Markup(MarkupContent {
                     kind: MarkupKind::Markdown,
-                    value: format!("```copper\n{}\n```\n\nFrom `cstd`.", f.signature),
+                    value: format!("```mikasa\n{}\n```\n\nFrom `cstd`.", f.signature),
                 }),
                 range: None,
             }));
@@ -399,7 +399,7 @@ impl LanguageServer for Backend {
             .find(|n| matches!(n, AstNode::Function { name, .. } if name == &word))
         {
             let mut value = format!(
-                "```copper\n{}\n```",
+                "```mikasa\n{}\n```",
                 format_signature(name, params, return_type.as_deref())
             );
             // Append the `///` doc comment above the definition, like Rust.
@@ -427,7 +427,7 @@ impl LanguageServer for Backend {
                 _ => None,
             }) {
                 // Constructor lookup: `ClassName::new` → the synthesised
-                // `new` from the Copper-syntax constructor.
+                // `new` from the Mikasa-syntax constructor.
                 if word == "new" {
                     if let Some(ClassMember::Constructor { params, .. }) = members
                         .iter()
@@ -438,7 +438,7 @@ impl LanguageServer for Backend {
                             contents: HoverContents::Markup(MarkupContent {
                                 kind: MarkupKind::Markdown,
                                 value: format!(
-                                    "```copper\n{}\n```\n\nConstructor for `{}` (Copper class syntax → Rust `pub fn new`).",
+                                    "```mikasa\n{}\n```\n\nConstructor for `{}` (Mikasa class syntax → Rust `pub fn new`).",
                                     sig, receiver_type
                                 ),
                             }),
@@ -517,7 +517,7 @@ impl LanguageServer for Backend {
         // we land in the early return above. Defensive note left here.)
 
         // ---- Static member access: `ClassName::<cursor>` ----
-        // Copper's class-syntax constructor `ClassName(args) { ... }`
+        // Mikasa's class-syntax constructor `ClassName(args) { ... }`
         // lowers to `pub fn new(args) -> Self` in Rust, so `ClassName::`
         // should offer `new(...)` plus any user-defined static methods
         // (methods whose first param isn't `self`).
@@ -528,7 +528,7 @@ impl LanguageServer for Backend {
         }
 
         // Keyword completions come from the shared lexicon
-        // (editors/copper-lexicon.json), the same source the hover cheatsheet
+        // (editors/mikasa-lexicon.json), the same source the hover cheatsheet
         // and the MUI/CRM extension use — so they can never drift.
         let mut items: Vec<CompletionItem> = crate::lexicon::keywords()
             .iter()
@@ -560,7 +560,7 @@ impl LanguageServer for Backend {
                         insert_text_format: Some(InsertTextFormat::SNIPPET),
                         documentation: Some(Documentation::MarkupContent(MarkupContent {
                             kind: MarkupKind::Markdown,
-                            value: format!("```copper\n{}\n```", sig),
+                            value: format!("```mikasa\n{}\n```", sig),
                         })),
                         ..Default::default()
                     });
@@ -594,7 +594,7 @@ impl LanguageServer for Backend {
                 insert_text_format: Some(InsertTextFormat::SNIPPET),
                 documentation: Some(Documentation::MarkupContent(MarkupContent {
                     kind: MarkupKind::Markdown,
-                    value: format!("From `cstd`.\n\n```copper\n{}\n```", f.signature),
+                    value: format!("From `cstd`.\n\n```mikasa\n{}\n```", f.signature),
                 })),
                 ..Default::default()
             });
@@ -876,13 +876,13 @@ fn call_context_at(rope: &ropey::Rope, pos: Position) -> Option<(String, u32)> {
 
 fn builtin_info(word: &str) -> Option<String> {
     // Keyword + primitive-type cheatsheet lives in the shared lexicon
-    // (editors/copper-lexicon.json) so the text is identical to what the
+    // (editors/mikasa-lexicon.json) so the text is identical to what the
     // MUI/CRM extension shows for the same words. Edit the JSON, not this fn.
     crate::lexicon::builtin_markdown(word)
 }
 
 // (Keyword completion items are now built from crate::lexicon, which reads the
-// shared editors/copper-lexicon.json — see the completion handler above.)
+// shared editors/mikasa-lexicon.json — see the completion handler above.)
 
 fn format_param(p: &Param) -> String {
     match &p.type_name {
@@ -1071,7 +1071,7 @@ fn receiver_before_colons(rope: &ropey::Rope, pos: Position) -> Option<String> {
     Some(receiver)
 }
 
-/// Static members of `class_name`: `new` (synthesised from a Copper-style
+/// Static members of `class_name`: `new` (synthesised from a Mikasa-style
 /// constructor) plus methods that don't take `self` as their first param.
 /// Returns `None` when no class with that name exists in the file.
 fn static_members_of(doc: &Document, class_name: &str) -> Option<Vec<CompletionItem>> {
@@ -1085,7 +1085,7 @@ fn static_members_of(doc: &Document, class_name: &str) -> Option<Vec<CompletionI
     for m in members {
         match m {
             ClassMember::Constructor { params, .. } => {
-                // The Copper class syntax `ClassName(args) { ... }` lowers
+                // The Mikasa class syntax `ClassName(args) { ... }` lowers
                 // to `pub fn new(args) -> Self` — surface it as `new`.
                 let inner = params
                     .iter()
@@ -1102,7 +1102,7 @@ fn static_members_of(doc: &Document, class_name: &str) -> Option<Vec<CompletionI
                     documentation: Some(Documentation::MarkupContent(MarkupContent {
                         kind: MarkupKind::Markdown,
                         value: format!(
-                            "Constructor for `{}` (Copper class syntax → Rust `pub fn new`).",
+                            "Constructor for `{}` (Mikasa class syntax → Rust `pub fn new`).",
                             class_name
                         ),
                     })),
@@ -1298,7 +1298,7 @@ fn local_binding_hover(doc: &Document, pos: Position, word: &str) -> Option<Hove
     Some(Hover {
         contents: HoverContents::Markup(MarkupContent {
             kind: MarkupKind::Markdown,
-            value: format!("```copper\n{}: {}\n```", header, ty_text),
+            value: format!("```mikasa\n{}: {}\n```", header, ty_text),
         }),
         range: None,
     })
@@ -1313,7 +1313,7 @@ fn hover_for_member(class_name: &str, members: &[ClassMember], member_name: &str
         ClassMember::Field {
             name, type_name, ..
         } => format!(
-            "```copper\n{}: {}\n```\n\nField on `{}`.",
+            "```mikasa\n{}: {}\n```\n\nField on `{}`.",
             name,
             type_name.as_deref().unwrap_or("?"),
             class_name
@@ -1324,12 +1324,12 @@ fn hover_for_member(class_name: &str, members: &[ClassMember], member_name: &str
             return_type,
             ..
         } => format!(
-            "```copper\n{}\n```\n\nMethod on `{}`.",
+            "```mikasa\n{}\n```\n\nMethod on `{}`.",
             format_method_signature(name, params, return_type.as_deref()),
             class_name
         ),
         ClassMember::Constructor { params, .. } => format!(
-            "```copper\n{}\n```\n\nConstructor for `{}`.",
+            "```mikasa\n{}\n```\n\nConstructor for `{}`.",
             format_method_signature(class_name, params, None),
             class_name
         ),
@@ -1595,7 +1595,7 @@ fn infer_variable_type(doc: &Document, name: &str, pos: Position) -> Option<Stri
     }
     let ident = &tail[i..end];
 
-    // Class constructor (Copper class syntax) or `ClassName::new(...)`:
+    // Class constructor (Mikasa class syntax) or `ClassName::new(...)`:
     // if `ident` matches a class declared in this file, the receiver type
     // is that class.
     if doc

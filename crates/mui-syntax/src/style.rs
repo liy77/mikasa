@@ -182,7 +182,7 @@ pub fn eval_dim(e: &Expr, env: &DimEnv) -> Option<f32> {
     }
 }
 
-/// Reactive variant of [`eval_dim`]. Walks a Copper `Expr` against a snapshot
+/// Reactive variant of [`eval_dim`]. Walks a Mikasa `Expr` against a snapshot
 /// of the live signal table ([`ReactiveEnv`]) and returns the resolved numeric
 /// value plus the set of signal names the expression actually read from the
 /// env. The mui-runtime uses the dep list to register invalidation listeners
@@ -273,7 +273,7 @@ pub fn dim_prop(el: &Element, name: &str, env: &DimEnv) -> Option<f32> {
     }
 }
 
-/// Reactive variant of [`dim_prop`]. Walks a Copper `Expr` against a
+/// Reactive variant of [`dim_prop`]. Walks a Mikasa `Expr` against a
 /// [`ReactiveEnv`] snapshot and returns the resolved numeric value. Window/
 /// screen metric refs (`Window.width`, etc.) are intentionally out of scope
 /// here — use the static [`dim_prop`] with a `DimEnv` for those. The
@@ -537,7 +537,7 @@ pub fn box_spacing(el: &Element, base: &str) -> Option<(f32, f32, f32, f32)> {
     box_spacing_reactive(el, base, None)
 }
 
-/// A string-literal prop value. Copper lowers a bare `"text"` either to a
+/// A string-literal prop value. Mikasa lowers a bare `"text"` either to a
 /// `Literal::Str` or to a `format("text")` call, so both forms are accepted.
 /// Interpolated parts (`${expr}`) are dropped — use the runtime's text
 /// rendering for those; this is for static config (`src:`, `shadow:` …).
@@ -821,6 +821,20 @@ mod tests {
         );
         assert_eq!(parse_anchor("top").vertical, Some(VAnchor::Top));
         assert_eq!(parse_anchor("top").horizontal, None);
+        assert_eq!(
+            parse_anchor("topleft"),
+            Anchor {
+                vertical: Some(VAnchor::Top),
+                horizontal: Some(HAnchor::Left)
+            }
+        );
+        assert_eq!(
+            parse_anchor("bottomleft"),
+            Anchor {
+                vertical: Some(VAnchor::Bottom),
+                horizontal: Some(HAnchor::Left)
+            }
+        );
     }
 
     #[test]

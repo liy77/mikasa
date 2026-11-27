@@ -34,17 +34,17 @@ import {
 // is a UI document — `.crm` was retired). Both share the providers.
 const SELECTOR: vscode.DocumentSelector = [
   { scheme: 'file', language: 'mui' },
-  { scheme: 'file', language: 'copper' },
+  { scheme: 'file', language: 'mikasa' },
 ];
 
-const LANG_IDS = new Set(['mui', 'copper']);
+const LANG_IDS = new Set(['mui', 'mikasa']);
 
 let client: LanguageClient | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   // Load Mikasa keyword/type descriptions from the shared lexicon so they
   // match the Mikasa extension exactly. Canonical file lives one level up
-  // (editors/copper-lexicon.json); fall back to the embedded copy if absent
+  // (editors/mikasa-lexicon.json); fall back to the embedded copy if absent
   // (e.g. a standalone-packaged build).
   loadSharedMikasaLexicon(context);
 
@@ -131,16 +131,16 @@ export async function deactivate(): Promise<void> {
 }
 
 /**
- * Read the canonical `editors/copper-lexicon.json` (the single source of truth
- * shared with copper-lsp) and feed it to the catalog. Tries a few locations so
+ * Read the canonical `editors/mikasa-lexicon.json` (the single source of truth
+ * shared with mikasa-lsp) and feed it to the catalog. Tries a few locations so
  * it works both in the dev workspace (F5) and a packaged extension; on any
  * failure the catalog uses its embedded mirror, so this never throws.
  */
 function loadSharedMikasaLexicon(context: vscode.ExtensionContext): void {
   const candidates = [
-    path.join(context.extensionPath, '..', 'copper-lexicon.json'), // editors/ (dev)
-    path.join(context.extensionPath, 'out', 'copper-lexicon.json'), // bundled (.vsix)
-    path.join(context.extensionPath, 'copper-lexicon.json'), // bundled (root)
+    path.join(context.extensionPath, '..', 'mikasa-lexicon.json'), // editors/ (dev)
+    path.join(context.extensionPath, 'out', 'mikasa-lexicon.json'), // bundled (.vsix)
+    path.join(context.extensionPath, 'mikasa-lexicon.json'), // bundled (root)
   ];
   for (const file of candidates) {
     try {
@@ -389,11 +389,11 @@ class MuiHoverProvider implements vscode.HoverProvider {
     }
 
     // 4) Keyword or primitive type — rendered exactly like the Mikasa
-    //    extension's hover: a ```copper signature block + the description.
+    //    extension's hover: a ```mikasa signature block + the description.
     const kw = keywordByLabel(word);
     if (kw) {
       const md = new vscode.MarkdownString();
-      md.appendMarkdown('```copper\n' + kw.detail + '\n```\n\n' + kw.doc);
+      md.appendMarkdown('```mikasa\n' + kw.detail + '\n```\n\n' + kw.doc);
       return new vscode.Hover(md, range);
     }
 

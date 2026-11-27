@@ -1,6 +1,6 @@
 //! Native std modules selectable via `import { ... } from <name>`. Each used
-//! module is now emitted as a SEPARATE local crate (`__copper__/std/<name>/`):
-//! main.rs gets a `use copper_<name> as <name>;` alias (no inlined `pub mod`),
+//! module is now emitted as a SEPARATE local crate (`__mikasa__/std/<name>/`):
+//! main.rs gets a `use mikasa_<name> as <name>;` alias (no inlined `pub mod`),
 //! the module's transpiled lib is recorded in `std_lib_crates()`, and any
 //! crate-backed deps (e.g. `ureq` for http) belong to that module's crate
 //! (`std_module_crate_dependencies`), not the main project.
@@ -41,7 +41,7 @@ impl Out {
 fn net_module_is_a_crate_no_dep() {
     let o = transpile("import { resolve, local_ip } from net\nx = resolve(\"a:80\")\n");
     assert!(
-        o.rust.contains("use copper_net as net;"),
+        o.rust.contains("use mikasa_net as net;"),
         "alias missing: {}",
         o.rust
     );
@@ -74,11 +74,11 @@ fn net_module_is_a_crate_no_dep() {
 fn http_module_is_a_crate_with_ureq_dep() {
     let o = transpile("import { get, get_status } from http\ns = get_status(\"https://x\")\n");
     assert!(
-        o.rust.contains("use copper_http as http;"),
+        o.rust.contains("use mikasa_http as http;"),
         "alias missing: {}",
         o.rust
     );
-    // (cforge adds the `copper_http = { path = ... }` dep from the recorded
+    // (mikasa adds the `mikasa_http = { path = ... }` dep from the recorded
     // lib crate below; the parser emits the alias + records the lib.)
     assert!(
         o.lib("http").is_some(),
@@ -125,7 +125,7 @@ fn both_modules_coexist_as_crates() {
         "import { resolve } from net\nimport { get } from http\nx = resolve(\"a:1\")\ny = get(\"http://x\")\n",
     );
     assert!(
-        o.rust.contains("use copper_net as net;") && o.rust.contains("use copper_http as http;"),
+        o.rust.contains("use mikasa_net as net;") && o.rust.contains("use mikasa_http as http;"),
         "aliases: {}",
         o.rust
     );
@@ -146,7 +146,7 @@ fn both_modules_coexist_as_crates() {
 fn url_module_is_a_crate_no_dep() {
     let o = transpile("import { encode, decode } from url\nx = encode(\"a b\")\n");
     assert!(
-        o.rust.contains("use copper_url as url;"),
+        o.rust.contains("use mikasa_url as url;"),
         "alias: {}",
         o.rust
     );
@@ -164,7 +164,7 @@ fn url_module_is_a_crate_no_dep() {
 fn json_module_crate_has_serde_dep() {
     let o = transpile("import { get, get_int } from json\nx = get(\"{}\", \"a\")\n");
     assert!(
-        o.rust.contains("use copper_json as json;"),
+        o.rust.contains("use mikasa_json as json;"),
         "alias: {}",
         o.rust
     );
@@ -184,7 +184,7 @@ fn json_module_crate_has_serde_dep() {
 fn crypto_module_crate_has_sha2_hmac() {
     let o = transpile("import { sha256, base64_encode } from crypto\nx = sha256(\"a\")\n");
     assert!(
-        o.rust.contains("use copper_crypto as crypto;"),
+        o.rust.contains("use mikasa_crypto as crypto;"),
         "alias: {}",
         o.rust
     );
@@ -221,7 +221,7 @@ fn time_fs_ws_are_std_only_crates() {
         let o = transpile(imp);
         assert!(
             o.rust
-                .contains(&format!("use copper_{mod_name} as {mod_name};")),
+                .contains(&format!("use mikasa_{mod_name} as {mod_name};")),
             "{mod_name} alias missing: {}",
             o.rust
         );

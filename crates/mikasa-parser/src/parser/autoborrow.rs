@@ -1,5 +1,5 @@
 //! High-level auto-borrow, auto-clone, string `+` concatenation, and `for`
-//! preservation pass over the Copper token stream.
+//! preservation pass over the Mikasa token stream.
 //!
 //! Runs in [`super::Parser::new`] after `sugar::rewrite` and `ternary::rewrite`,
 //! before the streaming parser emits Rust source.

@@ -7,16 +7,16 @@ use mikasa_syntax::tokenizer::{
 use std::collections::HashSet;
 use std::vec;
 
-/// The Copper source for the embedded `cstd` standard library, baked into
+/// The Mikasa source for the embedded `cstd` standard library, baked into
 /// the compiler at build time. Updates to `std/cstd.crs` ship with the
 /// next `cargo build`.
 const CSTD_SOURCE: &str = include_str!("../../../../std/cstd.mika");
 
-// Native-Rust helpers for things Copper cannot yet express cleanly
+// Native-Rust helpers for things Mikasa cannot yet express cleanly
 // (a raw `&[T]` parameter). `cfg!(...)` lowers as a macro invocation.
 
 // Additional native std modules, bundled on demand when imported
-// (`import { ... } from net` / `from http`). Each has a Copper-written
+// (`import { ... } from net` / `from http`). Each has a Mikasa-written
 // `.crs` surface plus a native `.rs` of helpers.
 const NET_SOURCE: &str = include_str!("../../../../std/net.mika");
 const HTTP_SOURCE: &str = include_str!("../../../../std/http.mika");
@@ -43,7 +43,7 @@ use mikasa_syntax::{ConsumeVar, ConsumedTrait};
 use result::Result;
 use utils::convert_type;
 
-const COPPER_OPERATORS: [(&str, &str); 2] = [("++", "+= 1"), ("--", "-= 1")];
+const MIKASA_OPERATORS: [(&str, &str); 2] = [("++", "+= 1"), ("--", "-= 1")];
 
 /// True when a `guard`'s `else` body transfers control out of the enclosing
 /// scope. Accepts `return`, `break`, `continue`, and the diverging calls
@@ -163,7 +163,7 @@ pub struct Parser {
     /// `__copt1`, ...) so nested chains don't collide.
     optional_chain_counter: usize,
     /// Set when the token stream contains a `defer`. Triggers emission of the
-    /// `__CopperDefer` guard type, whose `Drop` runs the deferred body.
+    /// `__MikasaDefer` guard type, whose `Drop` runs the deferred body.
     uses_defer: bool,
     /// Set when we see `unsafe func ...`: the `unsafe` is consumed
     /// silently and `parse_function` emits `unsafe fn` instead of `fn`.
@@ -184,9 +184,9 @@ pub struct Parser {
     /// The function header currently being emitted is `async fn` — used when
     /// the name turns out to be `main` so the entry point `.await`s it.
     next_fn_async: bool,
-    /// True from the moment a Copper `func` keyword is consumed until its name
+    /// True from the moment a Mikasa `func` keyword is consumed until its name
     /// identifier is emitted. Used to detect a user-defined `main` and rename
-    /// it to `__copper_main` (see `parse_any`), so it doesn't collide with the
+    /// it to `__mikasa_main` (see `parse_any`), so it doesn't collide with the
     /// auto-generated entry point.
     expect_function_name: bool,
     /// Absolute path of the `.crs` being compiled — used to resolve
@@ -196,7 +196,7 @@ pub struct Parser {
     /// `crate::<path::from::root>` when this is set.
     project_root: Option<std::path::PathBuf>,
     /// True for top-level file compilation; false for inner method-body sub-parsers
-    /// so module-level preludes (e.g. `__CopperVecExt`) are never emitted inside methods.
+    /// so module-level preludes (e.g. `__MikasaVecExt`) are never emitted inside methods.
     emit_prelude: bool,
     /// Unused generic params that should be marked with `phantom T` — printed by mikasa on run/build.
     phantom_hints: Vec<String>,
@@ -484,7 +484,7 @@ impl Parser {
         // *ends* with `.`/operator; this catches the leading-dot form.
         let joined = join_chain_continuations(filtered);
         let stripped = strip_expr_block_tail_semicolons(joined);
-        // Lower high-level Copper sugar (`func -> Ret`, `=>` lambdas/bodies,
+        // Lower high-level Mikasa sugar (`func -> Ret`, `=>` lambdas/bodies,
         // default/named args, `try/catch`, `??` null-coalescing).
         let sugared = sugar::rewrite(stripped);
         // Lower `cond ? then : else` ternaries into `if cond { then } else { else }`
@@ -496,7 +496,7 @@ impl Parser {
         // Apply call-site auto-borrow / auto-clone, `for` preservation, and
         // string `+` concatenation.
         let lowered = autoborrow::rewrite(phantomed);
-        let uses_defer = lowered.iter().any(|t| t.value.contains("__CopperDefer"));
+        let uses_defer = lowered.iter().any(|t| t.value.contains("__MikasaDefer"));
         let uses_phantom = lowered
             .iter()
             .any(|t| t.value.starts_with("_phantom_") || t.value == "PhantomData");
@@ -836,7 +836,7 @@ impl Parser {
         // destructuring, `let _ = ...` discards): the parser cannot tell that
         // `_ =>` is a match arm without seeing the `=>` ahead, so we just
         // refuse to treat `_ = anything` as a regular assignment. The
-        // catch-all `_ = expr` discard is rare in practice and Copper users
+        // catch-all `_ = expr` discard is rare in practice and Mikasa users
         // would write `_ = expr` only inside Rust-shaped match contexts.
         if self.value() == "_" {
             return Consumed::consume(0);
@@ -1323,9 +1323,9 @@ impl Parser {
             return Consumed::consume(1);
         }
 
-        // We're emitting a Copper function's name identifier (armed by
+        // We're emitting a Mikasa function's name identifier (armed by
         // parse_function on `func`). If the user named it `main`, rename the
-        // symbol to `__copper_main` and record its return kind so finalize can
+        // symbol to `__mikasa_main` and record its return kind so finalize can
         // synthesize the real `fn main` entry (and suppress the colliding
         // auto-wrapper). The return type was already captured by the time we
         // reach the name (`func int main` → return_type set on `int`).
@@ -1343,7 +1343,7 @@ impl Parser {
                 };
                 self.result.set_user_main(kind);
                 self.result.set_user_main_async(was_async);
-                self.append("__copper_main", AppendMode::Append);
+                self.append("__mikasa_main", AppendMode::Append);
                 return Consumed::consume(1);
             }
         }
@@ -1435,13 +1435,13 @@ impl Parser {
             self.result.mark_json_usage();
         }
 
-        for (copper, rust) in RUST_MACROS.iter() {
-            if token_value == *copper {
+        for (name, rust) in RUST_MACROS.iter() {
+            if token_value == *name {
                 // Check if next token is already !, if so, don't add another one
                 if let Some(next_token) = self.peek() {
                     if next_token.value == "!" {
                         // Next token is already !, just output the macro name without !
-                        self.append(copper, AppendMode::Append);
+                        self.append(name, AppendMode::Append);
                         return Consumed::consume(1);
                     }
                 }
@@ -1909,7 +1909,7 @@ impl Parser {
                         }
                         let prev = &self.tokens[i - 1];
                         // A `!` immediately before the paren is the explicit
-                        // Rust-macro form (`println!(...)`). Copper also lets
+                        // Rust-macro form (`println!(...)`). Mikasa also lets
                         // you call the known format macros without the bang
                         // (`println("Hi $name")`) — the bang is injected at
                         // emit time by RUST_MACROS, so it isn't in the token
@@ -1920,7 +1920,7 @@ impl Parser {
                         if prev.kind == TokenKind::Operator && prev.value == "!" {
                             return true;
                         }
-                        return RUST_MACROS.iter().any(|(copper, _)| *copper == prev.value);
+                        return RUST_MACROS.iter().any(|(name, _)| *name == prev.value);
                     }
                     depth -= 1;
                 }
@@ -1950,15 +1950,15 @@ impl Parser {
                 let prefix = if is_pub { "pub async fn " } else { "async fn " };
                 self.result.force_append(prefix, false);
                 self.result.is_function = true;
-                self.result.is_copper_function = true;
+                self.result.is_mikasa_function = true;
                 self.result.mark_async_usage();
                 self.next_fn_async = true;
                 self.pending_async_fn = false;
             } else {
                 self.result.enter_function_vis(is_pub);
             }
-            // Mark that we're using Copper syntax
-            self.result.is_copper_function = true;
+            // Mark that we're using Mikasa syntax
+            self.result.is_mikasa_function = true;
             return Consumed::consume(1);
         } else if self.value() == "fn" {
             // For pure Rust syntax, just mark as function but don't add "fn"
@@ -1966,7 +1966,7 @@ impl Parser {
             self.function_start = true;
             self.fn_locals.clear();
             self.result.is_function = true;
-            self.result.is_copper_function = false;
+            self.result.is_mikasa_function = false;
             self.append(&self.value(), AppendMode::AppendWithSpace);
             return Consumed::consume(1);
         }
@@ -1982,8 +1982,8 @@ impl Parser {
         if self.value() == ")" && self.kind() == TokenKind::ParametersEnd {
             if self.result.is_function {
                 self.append(&self.value(), AppendMode::Append);
-                // Only add return type for Copper syntax
-                if self.result.is_copper_function {
+                // Only add return type for Mikasa syntax
+                if self.result.is_mikasa_function {
                     let return_type = if self.result.return_type.is_empty() {
                         "()"
                     } else {
@@ -2040,9 +2040,9 @@ impl Parser {
 
     pub fn parse_operator(&mut self) -> Consumed {
         let mut consumed = 0;
-        for (copper, rust) in COPPER_OPERATORS.iter() {
+        for (mikasa, rust) in MIKASA_OPERATORS.iter() {
             if let Some(next_token) = self.peek() {
-                if (next_token.value.clone() + &self.value()) == *copper {
+                if (next_token.value.clone() + &self.value()) == *mikasa {
                     self.append(rust, AppendMode::Append);
                     consumed += 2;
                     break;
@@ -2105,7 +2105,7 @@ impl Parser {
                     // `http`'s `Response::json()` returns a serde_json::Value;
                     // mark json usage so the main project gets the native
                     // `json`/`JsonValue` alias + serde_json dep and can use the
-                    // returned value as Copper's native json type.
+                    // returned value as Mikasa's native json type.
                     if root == "http" || root == "json" {
                         self.result.mark_json_usage();
                     }
@@ -2113,7 +2113,7 @@ impl Parser {
                     && !module.contains("::")
                 {
                     // A bare `from <crate>` that isn't std/cstd is a candidate
-                    // external dependency. cforge drops it later if it turns out
+                    // external dependency. mikasa drops it later if it turns out
                     // to be a sibling module (a copied `.rs`/`.crs`). Paths with
                     // `::` are local modules (`math::vec2`, `crate::ecs::world`).
                     self.result.mark_external_crate(root);
@@ -2151,7 +2151,7 @@ impl Parser {
         Consumed::consume(consumed)
     }
 
-    /// Turn Copper import targets into Rust `use` paths.
+    /// Turn Mikasa import targets into Rust `use` paths.
     ///
     /// Supported forms:
     /// - `crate::math::vec2` / `super::foo` / `self::bar` (kept)
@@ -2945,7 +2945,7 @@ impl Parser {
             }
         }
 
-        // Build the struct (Copper `class` lowers to a Rust struct + impl).
+        // Build the struct (Mikasa `class` lowers to a Rust struct + impl).
         // Clone/Debug always unless the user already supplied `#[derive(...)]`.
         // Observed fields store as `__name` and expose getter/setter methods.
         let rust_fields: Vec<(String, String, Option<String>, Option<String>)> = fields
@@ -3410,7 +3410,7 @@ impl Parser {
                 continue;
             }
 
-            // Collect the balanced body tokens (keep kinds for Copper→Rust
+            // Collect the balanced body tokens (keep kinds for Mikasa→Rust
             // lowering of `mut` / reassignment inside the method).
             let mut body_toks: Vec<Token> = Vec::new();
             let mut depth = 1;
@@ -4011,7 +4011,7 @@ impl Parser {
 
             // Type generics (optional). As with impl generics, `<`/`>` may
             // arrive as `Operator` tokens; accept both and track depth so
-            // nested generics close correctly. Copper aliases inside the args
+            // nested generics close correctly. Mikasa aliases inside the args
             // (`<int>` -> `<i64>`) are lowered via `convert_type`.
             let mut type_generics = String::new();
             if let Some(tok) = self.select(self.current + consumed) {
@@ -4043,11 +4043,11 @@ impl Parser {
                             }
                         }
                     }
-                    // Lower Copper type aliases inside the generic args without
+                    // Lower Mikasa type aliases inside the generic args without
                     // altering the (trait/type) head: wrap in a dummy head,
                     // convert, then strip it back off.
-                    let lowered = convert_type(&format!("__CopperGeneric{}", type_generics));
-                    if let Some(stripped) = lowered.strip_prefix("__CopperGeneric") {
+                    let lowered = convert_type(&format!("__MikasaGeneric{}", type_generics));
+                    if let Some(stripped) = lowered.strip_prefix("__MikasaGeneric") {
                         type_generics = stripped.to_string();
                     }
                 }
@@ -4122,10 +4122,10 @@ impl Parser {
                                         }
                                     }
                                     let lowered = convert_type(&format!(
-                                        "__CopperGeneric{}",
+                                        "__MikasaGeneric{}",
                                         target_generics
                                     ));
-                                    if let Some(stripped) = lowered.strip_prefix("__CopperGeneric")
+                                    if let Some(stripped) = lowered.strip_prefix("__MikasaGeneric")
                                     {
                                         target_generics = stripped.to_string();
                                     }
@@ -4262,7 +4262,7 @@ impl Parser {
                 || tokens[i].value == "fn"
             {
                 let start_idx = if tokens[i].value == "pub" { i } else { i };
-                let is_copper_func = tokens[start_idx].value == "func"
+                let is_mikasa_func = tokens[start_idx].value == "func"
                     || (tokens[start_idx].value == "pub"
                         && start_idx + 1 < tokens.len()
                         && tokens[start_idx + 1].value == "func");
@@ -4270,8 +4270,8 @@ impl Parser {
 
                 let is_pub = tokens[start_idx].value == "pub";
 
-                if is_copper_func {
-                    // Copper Syntax: [pub] func type name(params)
+                if is_mikasa_func {
+                    // Mikasa Syntax: [pub] func type name(params)
                     if fn_idx + 2 >= tokens.len() {
                         i += 1;
                         continue;
@@ -4620,7 +4620,7 @@ impl Parser {
                                     }
                                 }
 
-                                // Lower Copper type aliases that appear inside
+                                // Lower Mikasa type aliases that appear inside
                                 // the assembled type (`Vec<(String, int)>` ->
                                 // `Vec<(String, i64)>`); the per-token
                                 // `convert_type_with_marking` above only saw the
@@ -5011,8 +5011,8 @@ impl Parser {
         self.result.get_required_dependencies()
     }
 
-    /// `(module_name, lib_source)` for every used std module — cforge writes
-    /// each as a separate local crate under `__copper__/std/<name>/`.
+    /// `(module_name, lib_source)` for every used std module — mikasa writes
+    /// each as a separate local crate under `__mikasa__/std/<name>/`.
     pub fn std_lib_crates(&self) -> &[(String, String)] {
         self.result.std_lib_crates()
     }
@@ -5048,12 +5048,12 @@ impl Parser {
         }
     }
 
-    /// Transpile a Copper-written std module, promote its top-level `fn`s to
+    /// Transpile a Mikasa-written std module, promote its top-level `fn`s to
     /// `pub fn`, and wrap it with the native helper block in
     /// `pub mod <mod_name> { ... }`.
     /// Transpile a std module's `.crs` into the **crate-root** Rust source for
-    /// a standalone library crate (no `pub mod` wrapper). cforge writes this as
-    /// `__copper__/std/<name>/src/lib.rs`. `mod_name` is accepted for symmetry
+    /// a standalone library crate (no `pub mod` wrapper). mikasa writes this as
+    /// `__mikasa__/std/<name>/src/lib.rs`. `mod_name` is accepted for symmetry
     /// with the registry but not embedded (the crate itself is the module).
     fn transpile_std_module_lib(mod_name: &str, crs_source: &str, native: &str) -> String {
         let _ = mod_name;
@@ -5157,10 +5157,10 @@ impl Parser {
 
     /// Transpile + prepend every native std module the program imported.
     fn prepend_used_std_modules(&mut self) {
-        // Each used std module becomes a SEPARATE local crate (cforge writes it
-        // to `__copper__/std/<name>/`). Here we transpile its lib source, hand
-        // it to the result for cforge to emit, and prepend a
-        // `use copper_<name> as <name>;` alias so existing `<name>::fn` /
+        // Each used std module becomes a SEPARATE local crate (mikasa writes it
+        // to `__mikasa__/std/<name>/`). Here we transpile its lib source, hand
+        // it to the result for mikasa to emit, and prepend a
+        // `use mikasa_<name> as <name>;` alias so existing `<name>::fn` /
         // `use <name>::{X}` references resolve against the crate.
         let mut targets: Vec<(String, &'static str, &'static str)> = Vec::new();
         if self.result.cstd_is_used() {
@@ -5178,7 +5178,7 @@ impl Parser {
         for (name, crs, native) in &targets {
             let lib = Self::transpile_std_module_lib(name, crs, native);
             self.result.add_std_lib_crate(name, &lib);
-            aliases.push_str(&format!("use copper_{name} as {name};\n"));
+            aliases.push_str(&format!("use mikasa_{name} as {name};\n"));
         }
         if !aliases.is_empty() {
             self.result.prepend_value(&aliases);
@@ -5207,12 +5207,12 @@ impl Parser {
         ]
         .iter()
         .any(|pat| haystack.contains(pat));
-        if !needed || haystack.contains("trait __CopperVecExt") {
+        if !needed || haystack.contains("trait __MikasaVecExt") {
             return;
         }
         let ext = concat!(
             "#[allow(dead_code)]\n",
-            "trait __CopperVecExt<T: Clone> {\n",
+            "trait __MikasaVecExt<T: Clone> {\n",
             "    fn map<U, F: FnMut(T) -> U>(&self, f: F) -> Vec<U>;\n",
             "    fn filter<F: FnMut(T) -> bool>(&self, f: F) -> Vec<T>;\n",
             "    fn find<F: FnMut(T) -> bool>(&self, f: F) -> Option<T>;\n",
@@ -5225,7 +5225,7 @@ impl Parser {
             "    /// Display-friendly list text for `$vec` / `${vec.show()}` interpolation.\n",
             "    fn show(&self) -> String where T: std::fmt::Display;\n",
             "}\n",
-            "impl<T: Clone> __CopperVecExt<T> for [T] {\n",
+            "impl<T: Clone> __MikasaVecExt<T> for [T] {\n",
             "    fn map<U, F: FnMut(T) -> U>(&self, mut f: F) -> Vec<U> { self.iter().cloned().map(|x| f(x)).collect() }\n",
             "    fn filter<F: FnMut(T) -> bool>(&self, mut f: F) -> Vec<T> { self.iter().cloned().filter(|x| f(x.clone())).collect() }\n",
             "    fn find<F: FnMut(T) -> bool>(&self, mut f: F) -> Option<T> { self.iter().cloned().find(|x| f(x.clone())) }\n",
@@ -5330,8 +5330,8 @@ impl Parser {
         let guard = concat!(
             "#[allow(dead_code)]\n",
             "fn identity<T>(x: T) -> T { x }\n",
-            "struct __CopperDefer(*mut dyn FnMut());\n",
-            "impl Drop for __CopperDefer {\n",
+            "struct __MikasaDefer(*mut dyn FnMut());\n",
+            "impl Drop for __MikasaDefer {\n",
             "    fn drop(&mut self) { unsafe { (*self.0)(); } }\n",
             "}\n\n",
         );

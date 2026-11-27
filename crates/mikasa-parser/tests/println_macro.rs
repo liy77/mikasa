@@ -1,6 +1,6 @@
 //! Transpile-level regression tests for bang-less `println(...)` calls.
 //!
-//! Rust's print macros need a format string as the first argument. Copper
+//! Rust's print macros need a format string as the first argument. Mikasa
 //! lets you write `println(x)` / `println("Hi $name")` without the bang; the
 //! transpiler must produce valid Rust:
 //!   * a non-string first arg gets a `"{}"` (one per top-level arg) injected,

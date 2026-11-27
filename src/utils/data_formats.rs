@@ -129,7 +129,7 @@ pub mod xml {
         reader.config_mut().trim_text(true);
 
         let mut root = XmlElement {
-            name: "copper-xml-reader".to_string(),
+            name: "mikasa-xml-reader".to_string(),
             attributes: HashMap::new(),
             text: String::new(),
             children: vec![],
@@ -186,7 +186,7 @@ pub mod xml {
                     if let Some(mut cur) = current_element.take() {
                         cur.children.push(element);
                         current_element = Some(cur);
-                    } else if root.name == "copper-xml-reader"
+                    } else if root.name == "mikasa-xml-reader"
                         && root.children.is_empty()
                         && root.text.is_empty()
                     {

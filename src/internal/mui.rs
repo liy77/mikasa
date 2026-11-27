@@ -1,12 +1,12 @@
-//! MUI integration for cforge.
+//! MUI integration for mikasa.
 //!
 //! MocidaUI files describe a mocida UI (see `mocida/mui/ARCHITECTURE.md`).
 //! A `.mui` is markup-only. A `.mika` that declares a `view` or an `App()` is
 //! a MocidaUI document too — `.mika` is the one extension for both logic and
 //! UI. `.crm` is retired and only kept so old files still open.
 //! In **dev** they're rendered live by the `mui-dev` host (M1: static render;
-//! mocida C library + bindgen into every cforge build and break the portable
-//! Linux/macOS CI. Instead, mirroring how `run()` shells out to `cargo`, cforge
+//! mocida C library + bindgen into every mikasa build and break the portable
+//! Linux/macOS CI. Instead, mirroring how `run()` shells out to `cargo`, mikasa
 //! **invokes the `mui-dev` binary** in the neighbouring `mocida-rs` workspace.
 //!
 //! Resolution order for the renderer:
@@ -24,7 +24,7 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 
-/// True if `file` is a MocidaUI document cforge should render rather than
+/// True if `file` is a MocidaUI document mikasa should render rather than
 /// transpile: a `.mui`, the retired `.crm`, or a `.mika` that declares a
 /// `view` or an `App()`.
 pub fn is_mui_file(file: &str) -> bool {
@@ -44,13 +44,13 @@ pub fn is_mui_file(file: &str) -> bool {
     false
 }
 
-/// **M5 — release codegen**, the `.mui`/`.crm` side of `cforge -c`. Lower the
+/// **M5 — release codegen**, the `.mui`/`.crm` side of `mikasa -c`. Lower the
 /// component AST to a self-contained Rust project under `<output>/mui/` (a
 /// `main.rs` that builds the mocida tree via `mocida-rs`, plus a `Cargo.toml`)
 /// and print the generated source. When `do_build` (i.e. `-c -r`/`--release`),
 /// also `cargo build` it into a native binary. Returns the exit code.
 ///
-/// This mirrors `cforge -c foo.crs` (which transpiles Copper → Rust): same
+/// This mirrors `mikasa -c foo.crs` (which transpiles Mikasa → Rust): same
 /// `--compile` entry point, the file extension picks the backend. Unlike
 /// `run()` (the dev runtime), this *produces code you can read and ship*. The
 /// generated crate depends on `mocida` by path (discovered next to the
@@ -157,7 +157,7 @@ pub fn compile(file: &str, output_dir: Option<&str>, do_build: bool, embed: bool
         return 1;
     }
 
-    // Materialize Copper (`.crs`) and Rust (`.rs`) imports as sibling modules of
+    // Materialize Mikasa (`.crs`) and Rust (`.rs`) imports as sibling modules of
     // main.rs, so the `mod`/`use` lines mui-codegen emitted resolve and the
     // imported functions/types are linked into the build.
     materialize_foreign_imports(file, doc, &src_dir);
@@ -171,7 +171,7 @@ pub fn compile(file: &str, output_dir: Option<&str>, do_build: bool, embed: bool
                 "{}",
                 "❌ Could not locate the `mocida-rs` workspace for the `mocida` dependency.".red()
             );
-            eprintln!("   Set MOCIDA_RS_DIR, or place copper-lang and mocida side by side.");
+            eprintln!("   Set MOCIDA_RS_DIR, or place mikasa and mocida side by side.");
             return 1;
         }
     };
@@ -186,7 +186,7 @@ pub fn compile(file: &str, output_dir: Option<&str>, do_build: bool, embed: bool
     // Report the generated file (the code itself stays on disk — printing the
     // whole thing to the terminal just buries the actual status). Use -V to
     // dump it for a quick look.
-    crate::cforge::pretty::ok(&format!("Generated {}", main_rs.display()));
+    crate::internal::pretty::ok(&format!("Generated {}", main_rs.display()));
     {
         // Show the generated crate as a tree (paths relative to dist/mui/).
         let mut files: Vec<String> = vec!["Cargo.toml".to_string(), "src/main.rs".to_string()];
@@ -198,9 +198,9 @@ pub fn compile(file: &str, output_dir: Option<&str>, do_build: bool, embed: bool
         files.extend(staged.iter().cloned());
         files.sort();
         files.dedup();
-        crate::cforge::pretty::tree("dist/mui", &files);
+        crate::internal::pretty::tree("dist/mui", &files);
     }
-    if std::env::var("CFORGE_VERBOSE").as_deref() == Ok("1") {
+    if std::env::var("MIKASA_VERBOSE").as_deref() == Ok("1") {
         println!("{}", "─".repeat(60).dimmed());
         print!("{code}");
         println!("{}", "─".repeat(60).dimmed());
@@ -219,15 +219,15 @@ pub fn compile(file: &str, output_dir: Option<&str>, do_build: bool, embed: bool
 
     // `-c -r`: build the generated crate into an optimized native binary.
     println!();
-    crate::cforge::pretty::head("Building the generated crate (release)");
+    crate::internal::pretty::head("Building the generated crate (release)");
     let mut cmd = Command::new("cargo");
     cmd.arg("build").arg("--release").current_dir(&out_root);
     // Point mocida-sys at the C source headers + built lib so it doesn't bind
     // against a stale installed copy (the cause of "cannot find function in sys").
     if let Some(ws) = find_mocida_rs() {
-        crate::cforge::apply_mocida_env(&mut cmd, &ws);
+        crate::internal::apply_mocida_env(&mut cmd, &ws);
     }
-    let (ok, _out) = crate::cforge::cargo_with_spinner(
+    let (ok, _out) = crate::internal::cargo_with_spinner(
         cmd,
         "compiling (release)",
         &format!("Built {}/target/release/", out_root.display()),
@@ -257,7 +257,7 @@ pub fn compile(file: &str, output_dir: Option<&str>, do_build: bool, embed: bool
 ///
 /// When a `.mui` declares `App() { host: "..." }`, the host crate (which already
 /// embeds its own `.mui` + assets) *is* the working program — its reducer and
-/// tick-loop can't be reproduced by static AST lowering. So `cforge -c` on such a
+/// tick-loop can't be reproduced by static AST lowering. So `mikasa -c` on such a
 /// file builds that crate instead of generating Rust. With `-r`/`--release` it
 /// compiles the host to release and stages a self-contained bundle (exe + the
 /// native DLLs mocida needs) under `<output>/mui/`. Returns the exit code.
@@ -268,7 +268,7 @@ fn compile_host(
     output_dir: Option<&str>,
     do_build: bool,
 ) -> i32 {
-    crate::cforge::pretty::head("Embedded host build");
+    crate::internal::pretty::head("Embedded host build");
     println!(
         "📦 {} declares host {} — building that crate (it embeds the .mui + assets).",
         Path::new(file)
@@ -290,10 +290,10 @@ fn compile_host(
         return 0;
     }
 
-    // `-c -r`: build the host crate in release. If the host is a Copper package
+    // `-c -r`: build the host crate in release. If the host is a Mikasa package
     // (`properties.kson` without `Cargo.toml`), transpile it into `dist/rust` first.
     let cargo_dir = if !dir.join("Cargo.toml").is_file() && dir.join("properties.kson").is_file() {
-        crate::cforge::ensure_copper_dep_built(dir);
+        crate::internal::ensure_mikasa_dep_built(dir);
         dir.join("dist").join("rust")
     } else {
         dir.to_path_buf()
@@ -302,9 +302,9 @@ fn compile_host(
     let mut cmd = Command::new("cargo");
     cmd.arg("build").arg("--release").current_dir(&cargo_dir);
     if let Some(ws) = find_mocida_rs() {
-        crate::cforge::apply_mocida_env(&mut cmd, &ws);
+        crate::internal::apply_mocida_env(&mut cmd, &ws);
     }
-    let (ok, _) = crate::cforge::cargo_with_spinner(
+    let (ok, _) = crate::internal::cargo_with_spinner(
         cmd,
         &format!("building {host} (release)"),
         &format!("Built {host}"),
@@ -359,16 +359,16 @@ fn compile_host(
         }
     }
 
-    crate::cforge::pretty::ok(&format!(
+    crate::internal::pretty::ok(&format!(
         "Self-contained host binary: {}",
         dest_exe.display()
     ));
     0
 }
 
-/// Write each Copper (`.crs`) / Rust (`.rs`) import as a `<module>.rs` file next
-/// to the generated `main.rs`. Copper sources are transpiled to Rust via the
-/// cforge pipeline (and their top-level items made `pub` so the `use module::*`
+/// Write each Mikasa (`.crs`) / Rust (`.rs`) import as a `<module>.rs` file next
+/// to the generated `main.rs`. Mikasa sources are transpiled to Rust via the
+/// mikasa pipeline (and their top-level items made `pub` so the `use module::*`
 /// in main.rs can see them); Rust sources are copied verbatim. The module name
 /// matches `Import::module_name`, which mui-codegen used for the `mod` lines.
 fn materialize_foreign_imports(file: &str, doc: &mui_syntax::ast::Document, src_dir: &Path) {
@@ -399,13 +399,13 @@ fn materialize_foreign_imports(file: &str, doc: &mui_syntax::ast::Document, src_
             }
         };
         let (rust, lang) = match imp.kind {
-            ImportKind::Copper => (transpile_copper_module(&content), "Mikasa"),
+            ImportKind::Mikasa => (transpile_mikasa_module(&content), "Mikasa"),
             ImportKind::Rust => (content, "Rust"),
             ImportKind::Mui => unreachable!(),
         };
         let header = format!(
-            "// Generated by cforge from the {lang} import `{}`.\n\
-             // Edit the source file, not this — re-run `cforge -c` to regenerate.\n",
+            "// Generated by mikasa from the {lang} import `{}`.\n\
+             // Edit the source file, not this — re-run `mikasa -c` to regenerate.\n",
             imp.path
         );
         let out = src_dir.join(format!("{module}.rs"));
@@ -418,12 +418,12 @@ fn materialize_foreign_imports(file: &str, doc: &mui_syntax::ast::Document, src_
     }
 }
 
-/// Transpile a Copper (`.crs`) library file to Rust for use as a module, reusing
-/// the cforge pipeline. Top-level `fn`/`struct`/`enum`/`trait` are promoted to
+/// Transpile a Mikasa (`.crs`) library file to Rust for use as a module, reusing
+/// the mikasa pipeline. Top-level `fn`/`struct`/`enum`/`trait` are promoted to
 /// `pub` so a `use module::*;` re-exports them (mirrors how `cstd` is injected);
 /// the unconditional `fn main()` the parser emits is left private so it isn't
 /// re-exported.
-fn transpile_copper_module(source: &str) -> String {
+fn transpile_mikasa_module(source: &str) -> String {
     mikasa_parser::promote_top_level_pub(&mikasa_parser::transpile_source(source))
 }
 
@@ -508,9 +508,9 @@ fn render_cargo_toml(title: &str, mocida_path: &Path) -> String {
     };
     let mocida = mocida_path.to_string_lossy().replace('\\', "/");
     format!(
-        "# Generated by cforge for a MUI release build.\n\
+        "# Generated by mikasa for a MUI release build.\n\
          # The empty [workspace] table detaches this crate from any parent\n\
-         # workspace (e.g. copper-lang's), so `cargo build` here is standalone.\n\
+         # workspace (e.g. mikasa's), so `cargo build` here is standalone.\n\
          [workspace]\n\n\
          [package]\n\
          name = \"{pkg}\"\n\
@@ -530,7 +530,7 @@ fn render_cargo_toml(title: &str, mocida_path: &Path) -> String {
 /// `index.html`, the entry + import graph, and fonts/media referenced by the
 /// document. `release` prefers the release wasm build when available.
 ///
-/// Example: `cforge build app.mui --web --release` → `dist/app_web/`.
+/// Example: `mikasa build app.mui --web --release` → `dist/app_web/`.
 pub fn build_web(file: &str, output_dir: Option<&str>, release: bool) -> i32 {
     let stem = Path::new(file)
         .file_stem()
@@ -539,7 +539,7 @@ pub fn build_web(file: &str, output_dir: Option<&str>, release: bool) -> i32 {
     let pkg_name = format!("{stem}_web");
     let out = PathBuf::from(output_dir.unwrap_or("./dist")).join(&pkg_name);
 
-    crate::cforge::pretty::head(&format!(
+    crate::internal::pretty::head(&format!(
         "Web package ({})",
         if release { "release" } else { "debug" }
     ));
@@ -575,8 +575,8 @@ pub fn build_web(file: &str, output_dir: Option<&str>, release: bool) -> i32 {
             }
             // Tiny local preview helper (not required for deployment).
             write_web_serve_helper(&out, &pkg_name);
-            crate::cforge::pretty::ok(&format!("Web package: {}", out.display()));
-            crate::cforge::pretty::tree(
+            crate::internal::pretty::ok(&format!("Web package: {}", out.display()));
+            crate::internal::pretty::tree(
                 &pkg_name,
                 &[
                     "index.html".into(),
@@ -601,13 +601,13 @@ pub fn build_web(file: &str, output_dir: Option<&str>, release: bool) -> i32 {
 }
 
 /// Serve a `.mui` / `.crm` as a browser site via the prebuilt Emscripten
-/// `mui-dev` host (`cforge run --listen[=PORT] app.mui`).
+/// `mui-dev` host (`mikasa run --listen[=PORT] app.mui`).
 ///
 /// Fully automated: stages the wasm shell, the entry + `import` graph, fonts /
 /// media referenced by the `.mui`, then **always** emits canonical
 /// `boot.js` + `index.html` + `sw.js` (no hand-maintained host / JS / Python).
 pub fn run_listen(file: &str, port: u16) -> i32 {
-    let stage = std::env::temp_dir().join(format!("cforge-mui-listen-{}", std::process::id()));
+    let stage = std::env::temp_dir().join(format!("mikasa-mui-listen-{}", std::process::id()));
     if let Err(e) = std::fs::create_dir_all(&stage) {
         eprintln!("❌ Could not create listen stage dir: {e}");
         return 1;
@@ -685,7 +685,7 @@ fn prepare_web_package(
         }
     }
     // Wasm-only hosts omit brand/media. Fill from the project shell next to the
-    // entry .mui (e.g. site/www) so listen works with plain `cforge run --listen`.
+    // entry .mui (e.g. site/www) so listen works with plain `mikasa run --listen`.
     let shell = project_web_shell(entry_path);
     if !out.join("logo.png").is_file() {
         if let Some(logo) = shell.as_ref().map(|s| s.join("logo.png")).filter(|p| p.is_file()) {
@@ -763,8 +763,8 @@ fn prepare_web_package(
     }
     // Brand mark — NavBar retries every frame while this is missing.
     push_unique(&mut early, "/logo.png".to_string());
-    let title = mui_app_title(&abs);
-    write_listen_host(out, &stamp, &title, &font_vfs, &early)?;
+    let boot = mui_app_boot_meta(&abs);
+    write_listen_host(out, &stamp, &boot, &font_vfs, &early)?;
 
     vlog(&format!("web host = {}", web.display()));
     vlog(&format!("build_id = {}  built_at = {}", stamp.id, stamp.built_at_iso));
@@ -772,16 +772,16 @@ fn prepare_web_package(
 }
 
 fn write_web_serve_helper(out: &Path, pkg_name: &str) {
-    // Auto-emitted by cforge — never hand-edited. Prefer `cforge run --listen`
+    // Auto-emitted by mikasa — never hand-edited. Prefer `mikasa run --listen`
     // for day-to-day; this is only a static preview of the built package.
     let script = format!(
         "#!/usr/bin/env python3\n\
-         # Generated by cforge build --web — do not edit.\n\
+         # Generated by mikasa build --web — do not edit.\n\
          import os\n\
          from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler\n\
          os.chdir(os.path.dirname(os.path.abspath(__file__)) or '.')\n\
          print('Serving {pkg} at http://127.0.0.1:3000/ (Ctrl-C to stop)')\n\
-         print('Tip: day-to-day use `cforge run --listen your.mui` instead.')\n\
+         print('Tip: day-to-day use `mikasa run --listen your.mui` instead.')\n\
          ThreadingHTTPServer(('0.0.0.0', 3000), SimpleHTTPRequestHandler).serve_forever()\n",
         pkg = pkg_name
     );
@@ -855,7 +855,7 @@ fn stage_mui_import_graph(entry: &Path, stage: &Path) -> Result<StagedMui, Strin
         let Some(vfs) = vfs_path(&root, &src_canon) else {
             continue;
         };
-        // Only ship MUI/CRM sources into the browser VFS (Copper/Rust imports
+        // Only ship MUI/CRM sources into the browser VFS (Mikasa/Rust imports
         // are native-host concerns and are skipped with a warning).
         let ext = src_canon
             .extension()
@@ -1022,16 +1022,28 @@ fn js_string_array(paths: &[String]) -> String {
 fn write_listen_host(
     stage: &Path,
     stamp: &BuildStamp,
-    app_title: &str,
+    meta: &ListenBootMeta,
     fonts: &[String],
     early: &[String],
 ) -> Result<(), String> {
-    let title = if app_title.trim().is_empty() {
+    let title = if meta.title.trim().is_empty() {
         "MUI"
     } else {
-        app_title.trim()
+        meta.title.trim()
     };
     let title_esc = title
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;");
+    let loading_esc = meta
+        .loading
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;");
+    let tagline_esc = meta
+        .tagline
         .replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
@@ -1042,7 +1054,8 @@ fn write_listen_host(
         .replace("__BUILD_ID__", asset_ver)
         .replace("__BUILT_AT__", &stamp.built_at_iso)
         .replace("__EARLY_FILES__", &js_string_array(early))
-        .replace("__FONT_FILES__", &js_string_array(fonts));
+        .replace("__FONT_FILES__", &js_string_array(fonts))
+        .replace("__BOOT_LABELS__", &meta.labels_json);
     let gate = LISTEN_BUILD_GATE_JS
         .replace("__BUILD_ID__", asset_ver)
         .replace("__BUILT_AT__", &stamp.built_at_iso);
@@ -1050,7 +1063,9 @@ fn write_listen_host(
         .replace("__ASSET_VER__", asset_ver)
         .replace("__BUILD_ID__", asset_ver)
         .replace("__BUILT_AT__", &stamp.built_at_iso)
-        .replace("__APP_TITLE__", &title_esc);
+        .replace("__APP_TITLE__", &title_esc)
+        .replace("__BOOT_LOADING__", &loading_esc)
+        .replace("__BOOT_TAGLINE__", &tagline_esc);
     let sw = LISTEN_SW_JS
         .replace("__ASSET_VER__", asset_ver)
         .replace("__BUILD_ID__", asset_ver)
@@ -1067,17 +1082,74 @@ fn write_listen_host(
     Ok(())
 }
 
-/// `App() { title: "..." }` → browser `<title>` / a11y label.
-fn mui_app_title(file: &str) -> String {
+struct ListenBootMeta {
+    title: String,
+    /// Initial `#boot-label` text (English `"Loading"` unless `App.loadingText`).
+    loading: String,
+    /// Optional line under the boot logo (`App.loadingTagline`); empty hides it.
+    tagline: String,
+    /// JSON object merged into `BOOT_LABELS` in `boot.js` (may be `{}`).
+    labels_json: String,
+}
+
+/// `App() { title / loadingText / … }` → browser title + boot splash labels.
+fn mui_app_boot_meta(file: &str) -> ListenBootMeta {
+    let fallback = ListenBootMeta {
+        title: "MUI".into(),
+        loading: "Loading".into(),
+        tagline: String::new(),
+        labels_json: "{}".into(),
+    };
     let src = match std::fs::read_to_string(file) {
         Ok(s) => s,
-        Err(_) => return "MUI".into(),
+        Err(_) => return fallback,
     };
-    mui_syntax::parse(&src)
-        .app
-        .and_then(|a| a.title)
+    let Some(app) = mui_syntax::parse(&src).app else {
+        return fallback;
+    };
+    let title = app
+        .title
         .filter(|t| !t.trim().is_empty())
-        .unwrap_or_else(|| "MUI".into())
+        .or_else(|| app.name.clone().filter(|t| !t.trim().is_empty()))
+        .unwrap_or_else(|| "MUI".into());
+    let loading = app
+        .loading_text
+        .as_deref()
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .unwrap_or("Loading")
+        .to_string();
+    let tagline = app
+        .loading_tagline
+        .as_deref()
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .unwrap_or("")
+        .to_string();
+    let mut labels = serde_json::Map::new();
+    let mut put = |key: &str, val: &Option<String>| {
+        if let Some(v) = val.as_ref().map(|s| s.trim()).filter(|s| !s.is_empty()) {
+            labels.insert(key.to_string(), serde_json::Value::String(v.to_string()));
+        }
+    };
+    put("loading", &app.loading_text);
+    put("starting", &app.loading_starting);
+    put("downloading", &app.loading_downloading);
+    put("compiling", &app.loading_compiling);
+    put("almost", &app.loading_almost);
+    put("modules", &app.loading_modules);
+    put("files", &app.loading_files);
+    put("images", &app.loading_images);
+    put("ready", &app.loading_ready);
+    put("opening", &app.loading_opening);
+    let labels_json =
+        serde_json::to_string(&serde_json::Value::Object(labels)).unwrap_or_else(|_| "{}".into());
+    ListenBootMeta {
+        title,
+        loading,
+        tagline,
+        labels_json,
+    }
 }
 
 /// Scan `.mui` sources for `FontFace(..., "path")`, `Image("path"...)`,
@@ -1101,6 +1173,11 @@ fn collect_mui_asset_refs(sources: &[PathBuf]) -> (Vec<String>, Vec<String>, Vec
         r#"ZoomImage\s*\(\s*src:\s*"([^"]+\.(?:png|jpe?g|webp|gif|svg))"\s*"#,
     )
     .expect("zoom regex");
+    // One-shot WAVs: Audio("…"), tickSound / tockSound / clickSound / sound: "…"
+    let audio_re = regex::Regex::new(
+        r#"(?:Audio\s*\(\s*|tickSound\s*:\s*|tockSound\s*:\s*|tacSound\s*:\s*|clickSound\s*:\s*|sound\s*:\s*)"([^"]+\.wav)"#,
+    )
+    .expect("audio regex");
     let mut fonts: Vec<String> = Vec::new();
     let mut early_media: Vec<String> = Vec::new();
     let mut lazy_media: Vec<String> = Vec::new();
@@ -1119,7 +1196,13 @@ fn collect_mui_asset_refs(sources: &[PathBuf]) -> (Vec<String>, Vec<String>, Vec
         }
         for cap in image_re.captures_iter(&text) {
             let path = normalize_asset_vfs(&cap[1]);
-            if is_entry {
+            // Most room BGs are lazy (weak-net boot). Keep only the prologue
+            // pair (house + plaza) early when the entry references them.
+            let is_room_bg = path.contains("/backgrounds/");
+            let is_boot_bg = path.ends_with("/bg_house.jpg") || path.ends_with("/bg_plaza.jpg");
+            if is_room_bg && !(is_boot_bg && is_entry) {
+                push_unique(&mut lazy_media, path);
+            } else if is_entry || (is_room_bg && is_boot_bg) {
                 push_unique(&mut early_media, path);
             } else {
                 push_unique(&mut lazy_media, path);
@@ -1133,6 +1216,40 @@ fn collect_mui_asset_refs(sources: &[PathBuf]) -> (Vec<String>, Vec<String>, Vec
         for cap in zoom_re.captures_iter(&text) {
             let path = normalize_asset_vfs(&cap[1]);
             push_unique(&mut lazy_media, path);
+        }
+        for cap in audio_re.captures_iter(&text) {
+            let path = normalize_asset_vfs(&cap[1]);
+            // Early: WAVs must be in MEMFS before Timer/Audio play — there is
+            // no on-demand HTTP→MEMFS fallback for UISound (unlike Image).
+            if is_entry {
+                push_unique(&mut early_media, path);
+            } else {
+                push_unique(&mut lazy_media, path);
+            }
+        }
+    }
+    // Boot may cap earlyMedia length — WAVs + door cutscene first (instant SFX
+    // / RE door), then everything else. Door frames used to land after BGs and
+    // get sliced off → HTTP hitch mid-animation on weak nets.
+    {
+        let mut wavs: Vec<String> = Vec::new();
+        let mut doors: Vec<String> = Vec::new();
+        let mut rest: Vec<String> = Vec::new();
+        for p in early_media.drain(..) {
+            if p.rsplit('.').next().is_some_and(|e| e.eq_ignore_ascii_case("wav")) {
+                push_unique(&mut wavs, p);
+            } else if p.contains("/door_frames/") || p.contains("/door_") {
+                push_unique(&mut doors, p);
+            } else {
+                push_unique(&mut rest, p);
+            }
+        }
+        early_media = wavs;
+        for p in doors {
+            push_unique(&mut early_media, p);
+        }
+        for p in rest {
+            push_unique(&mut early_media, p);
         }
     }
     if fonts.is_empty() {
@@ -1264,7 +1381,7 @@ fn stage_listen_media(
 
 /// Prefer a *rich* site host (wasm + logo/media) next to the entry `.mui`.
 /// Bare mocida-rs `target/wasm32-…` dirs are last-resort — they lack logo.png
-/// and `media/`, which made `cforge run --listen` hang on a black boot bar.
+/// and `media/`, which made `mikasa run --listen` hang on a black boot bar.
 fn find_mui_web_dir(prefer_release: bool, entry: Option<&Path>) -> Option<PathBuf> {
     if let Ok(dir) = std::env::var("MUI_WEB_DIR") {
         let p = PathBuf::from(dir);
@@ -1399,11 +1516,31 @@ fn web_dir_rich(dir: &Path) -> bool {
 }
 
 /// Map a request URL to a path relative to the listen stage. Allows the wasm
-/// shell, `manifest.json`, `/app.mui`, and any nested `.mui` / `.crm` from the
-/// staged import graph. Rejects `..` and unknown extensions.
+/// shell, `manifest.json`, `/app.mui`, and any nested `.mui` / `.mika` / `.crm`
+/// from the staged import graph. Rejects `..` and unknown extensions.
+///
+/// Accepts origin-form (`/mui_dev.wasm`) and absolute-form
+/// (`http://host:port/mui_dev.wasm`) request targets — some mobile stacks and
+/// proxies send the latter; treating it as opaque 404 caused
+/// `both async and sync fetching of wasm failed`.
 fn listen_rel_path(url_path: &str) -> Option<String> {
-    let path = url_path.split('?').next().unwrap_or("/");
-    if path.contains('\0') || path.contains('\\') || path.split('/').any(|s| s == "..") {
+    let raw = url_path.split('?').next().unwrap_or("/");
+    if raw.contains('\0') || raw.contains('\\') {
+        return None;
+    }
+    // Normalize absolute-form / scheme-relative targets down to a path.
+    let path = if let Some(rest) = raw
+        .strip_prefix("http://")
+        .or_else(|| raw.strip_prefix("https://"))
+        .or_else(|| raw.strip_prefix("//"))
+    {
+        rest.find('/')
+            .map(|j| &rest[j..])
+            .unwrap_or("/")
+    } else {
+        raw
+    };
+    if path.split('/').any(|s| s == "..") {
         return None;
     }
     let rel = match path {
@@ -1432,6 +1569,10 @@ fn listen_rel_path(url_path: &str) -> Option<String> {
                 ext.as_str(),
                 "mui" | "mika" | "crm" | "json" | "png" | "jpg" | "jpeg" | "webp" | "gif" | "svg"
                     | "ttf" | "otf" | "woff" | "woff2" | "js" | "wasm" | "data" | "html"
+                    // One-shot SFX (Timer tickSound / Audio) — without these the
+                    // listen server 404'd WAVs even when staged in earlyMedia,
+                    // so typewriter clicks never reached MEMFS.
+                    | "wav" | "mp3" | "ogg" | "oga" | "m4a"
             ) {
                 trimmed.to_string()
             } else {
@@ -1444,7 +1585,7 @@ fn listen_rel_path(url_path: &str) -> Option<String> {
 }
 
 fn serve_mui_listen(root: &Path, port: u16) -> i32 {
-    use std::io::Read;
+    use std::io::Write;
     use std::net::TcpListener;
     use std::sync::Arc;
 
@@ -1460,12 +1601,13 @@ fn serve_mui_listen(root: &Path, port: u16) -> i32 {
         let Ok(mut stream) = stream else { continue };
         let root = Arc::clone(&root);
         std::thread::spawn(move || {
-            let mut buf = [0u8; 4096];
-            let n = match stream.read(&mut buf) {
-                Ok(n) if n > 0 => n,
-                _ => return,
+            // Read the full header block (not just the first 4 KiB packet) so
+            // mobile browsers with large Cookie / Client-Hints headers still
+            // get a valid request-line parse.
+            let req = match read_http_headers(&mut stream) {
+                Some(r) => r,
+                None => return,
             };
-            let req = String::from_utf8_lossy(&buf[..n]);
             let path = req
                 .lines()
                 .next()
@@ -1520,14 +1662,44 @@ fn serve_mui_listen(root: &Path, port: u16) -> i32 {
                 "otf" => "font/otf",
                 "woff" => "font/woff",
                 "woff2" => "font/woff2",
+                "wav" => "audio/wav",
+                "mp3" => "audio/mpeg",
+                "ogg" | "oga" => "audio/ogg",
+                "m4a" => "audio/mp4",
                 "mui" | "mika" | "crm" => "text/plain; charset=utf-8",
                 _ => "application/octet-stream",
             };
             let cache = listen_cache_control(&rel);
             let _ = write_listen_response(&mut stream, 200, ctype, cache, &data);
+            let _ = stream.flush();
         });
     }
     0
+}
+
+/// Read bytes until `\r\n\r\n` (end of HTTP headers) or a hard size cap.
+fn read_http_headers(stream: &mut impl std::io::Read) -> Option<String> {
+    let mut buf: Vec<u8> = Vec::with_capacity(4096);
+    let mut chunk = [0u8; 2048];
+    loop {
+        let n = match std::io::Read::read(stream, &mut chunk) {
+            Ok(0) => break,
+            Ok(n) => n,
+            Err(_) => return None,
+        };
+        buf.extend_from_slice(&chunk[..n]);
+        if buf.windows(4).any(|w| w == b"\r\n\r\n") {
+            break;
+        }
+        // Cap so a client can't force unbounded buffering.
+        if buf.len() > 64 * 1024 {
+            break;
+        }
+    }
+    if buf.is_empty() {
+        return None;
+    }
+    Some(String::from_utf8_lossy(&buf).into_owned())
 }
 
 /// Versioned heavy assets can live in the browser / SW cache forever; shell
@@ -1570,12 +1742,18 @@ fn write_listen_response(
         404 => "Not Found",
         _ => "Error",
     };
+    // CORS + CORP: `<link rel=preload crossorigin>` and Safari wasm streaming
+    // need ACAO even on same-origin preloads; without it instantiateStreaming
+    // fails and the sync XHR fallback throws
+    // "both async and sync fetching of wasm failed".
     write!(
         stream,
         "HTTP/1.1 {status} {reason}\r\n\
          Content-Type: {content_type}\r\n\
          Content-Length: {}\r\n\
          Cache-Control: {cache_control}\r\n\
+         Access-Control-Allow-Origin: *\r\n\
+         Cross-Origin-Resource-Policy: cross-origin\r\n\
          Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self'; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'\r\n\
          Connection: close\r\n\
          \r\n",
@@ -1592,9 +1770,9 @@ pub fn run(file: &str) -> i32 {
         .map(|p| strip_unc(&p))
         .unwrap_or_else(|_| file.to_string());
 
-    // A `.mui` can declare a native host crate (`App() { host: "copper-installer" }`)
+    // A `.mui` can declare a native host crate (`App() { host: "mikasa-installer" }`)
     // — a sibling crate that links its real backend (foreign imports, effects,
-    // threads). Run that instead of the generic mui-dev, so `cforge run` shows
+    // threads). Run that instead of the generic mui-dev, so `mikasa run` shows
     // the fully-working app (backend + reactive UI).
     if let Some(host) = mui_app_host(file) {
         if let Some(code) = run_native_host(&abs, &host) {
@@ -1650,7 +1828,7 @@ pub fn run(file: &str) -> i32 {
     );
     eprintln!(
         "   Set MUI_DEV_BIN to a built mui-dev executable, or place the\n   \
-         copper-lang and mocida repos side by side (…/copper-lang, …/mocida)."
+         mikasa and mocida repos side by side (…/mikasa, …/mocida)."
     );
     1
 }
@@ -1713,7 +1891,7 @@ fn spawn_host(bin: &str, file: &str) -> i32 {
 /// so cargo's verbose output is hidden; only the actual app gets inherited stdio.
 fn cargo_run_host(dir: &Path, file: &str) -> i32 {
     let cargo_dir = if !dir.join("Cargo.toml").is_file() && dir.join("properties.kson").is_file() {
-        crate::cforge::ensure_copper_dep_built(dir);
+        crate::internal::ensure_mikasa_dep_built(dir);
         dir.join("dist").join("rust")
     } else {
         dir.to_path_buf()
@@ -1731,9 +1909,9 @@ fn cargo_run_host(dir: &Path, file: &str) -> i32 {
         .arg("--release")
         .current_dir(&cargo_dir);
     if let Some(ws) = find_mocida_rs() {
-        crate::cforge::apply_mocida_env(&mut build_cmd, &ws);
+        crate::internal::apply_mocida_env(&mut build_cmd, &ws);
     }
-    let (ok, _) = crate::cforge::cargo_with_spinner(
+    let (ok, _) = crate::internal::cargo_with_spinner(
         build_cmd,
         &format!("building {host_name}"),
         &format!("Built {host_name}"),
@@ -1754,7 +1932,7 @@ fn cargo_run_host(dir: &Path, file: &str) -> i32 {
 /// Spawn a `mui-dev` executable on `file`, inheriting stdio so its logs and
 /// the mocida window come through. Returns the exit code.
 ///
-/// Hot-reload depends on this process staying alive after `cforge run`
+/// Hot-reload depends on this process staying alive after `mikasa run`
 /// returns from its `Command::status()` call (the mui-dev child runs the
 /// per-frame tick callback that swaps the tree on file changes). On
 /// macOS/Linux we also have to put the mocida lib dir on the loader
@@ -1810,7 +1988,7 @@ fn cargo_run_mui_dev(workspace: &Path, file: &str) -> i32 {
         .stderr(std::process::Stdio::inherit());
     // Point mocida-sys at the C source headers + built lib (cross-platform), so
     // a first-time mui-dev build doesn't bind against a stale installed mocida.
-    crate::cforge::apply_mocida_env(&mut cmd, workspace);
+    crate::internal::apply_mocida_env(&mut cmd, workspace);
     // On macOS/Linux the mui-dev binary links the *dynamic* libmocida via
     // `@rpath`/soname but has no rpath baked in, so put the mocida lib dir on
     // the OS loader path for the run (Windows stages DLLs beside the exe).
@@ -1835,13 +2013,13 @@ fn cargo_run_mui_dev(workspace: &Path, file: &str) -> i32 {
 }
 
 /// True if the workspace actually contains a buildable `mui-dev` host crate
-/// (a `mui-dev/Cargo.toml` member). When false, `cforge run` can't render live
+/// (a `mui-dev/Cargo.toml` member). When false, `mikasa run` can't render live
 /// and falls back to the codegen build+run path.
 fn workspace_has_mui_dev(workspace: &Path) -> bool {
     workspace.join("mui-dev").join("Cargo.toml").is_file()
 }
 
-/// Fallback for `cforge run <file>.mui` when no live `mui-dev` host exists:
+/// Fallback for `mikasa run <file>.mika` when no live `mui-dev` host exists:
 /// run the codegen path (generate Rust → native release build) and then launch
 /// the produced binary, with the mocida shared lib on the OS loader path so the
 /// dynamic `libmocida` (+ SDL3) resolve at startup. Returns the binary's exit
@@ -2011,7 +2189,7 @@ fn prebuilt_mui_dev(workspace: &Path) -> Option<PathBuf> {
 }
 
 /// Locate the `mocida-rs` Cargo workspace. Checks `MOCIDA_RS_DIR`, then a few
-/// layouts relative to cforge's install dir and the current directory.
+/// layouts relative to mikasa's install dir and the current directory.
 fn find_mocida_rs() -> Option<PathBuf> {
     if let Ok(dir) = std::env::var("MOCIDA_RS_DIR") {
         let p = PathBuf::from(dir);
@@ -2021,8 +2199,8 @@ fn find_mocida_rs() -> Option<PathBuf> {
     }
 
     let mut roots: Vec<PathBuf> = Vec::new();
-    // The cforge install / build dir (COPPER_PATH) and its ancestors.
-    if let Ok(cp) = std::env::var("COPPER_PATH") {
+    // The mikasa install / build dir (MIKASA_PATH) and its ancestors.
+    if let Ok(cp) = std::env::var("MIKASA_PATH") {
         roots.push(PathBuf::from(cp));
     }
     if let Ok(cwd) = std::env::current_dir() {
@@ -2068,7 +2246,7 @@ fn find_mocida_rs() -> Option<PathBuf> {
 /// declares the `mocida-sys` member. (The codegen path only needs the `mocida`
 /// crate; the live-render path additionally wants `mui-dev`, but that member is
 /// not always present — validating on `mui-dev` wrongly rejected real
-/// workspaces and blocked `cforge -c` too.)
+/// workspaces and blocked `mikasa -c` too.)
 fn is_mocida_rs(dir: &Path) -> bool {
     let manifest = dir.join("Cargo.toml");
     match std::fs::read_to_string(&manifest) {
@@ -2100,7 +2278,7 @@ fn strip_unc(p: &Path) -> String {
 }
 
 fn vlog(msg: &str) {
-    if std::env::var("CFORGE_VERBOSE").as_deref() == Ok("1") {
+    if std::env::var("MIKASA_VERBOSE").as_deref() == Ok("1") {
         println!("   {} {}", "mui:".dimmed(), msg.dimmed());
     }
 }

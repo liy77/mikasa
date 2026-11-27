@@ -1,4 +1,4 @@
-/* Mocidad listen / site service worker — emitted by cforge.
+/* Mocidad listen / site service worker — emitted by mikasa.
    Cache-first for heavy immutable assets (?v=BUILD_ID); network-first for
    HTML / build-id / gate. Placeholders: __ASSET_VER__ / __BUILD_ID__. */
 
@@ -80,8 +80,8 @@ function isHeavy(url) {
 
 function isShell(url) {
   return url.pathname === "/" ||
-    /\/index\.html$|\/build-gate\.js$|\/build-id\.json$|\/app\.mui$|\/manifest\.json$|\/sw\.js$/i.test(url.pathname) ||
-    /\.mui$/i.test(url.pathname);
+    /\/index\.html$|\/build-gate\.js$|\/build-id\.json$|\/app\.mui$|\/main\.mika$|\/manifest\.json$|\/sw\.js$/i.test(url.pathname) ||
+    /\.(mui|mika|crm)$/i.test(url.pathname);
 }
 
 function matchCached(req, url) {
@@ -135,9 +135,22 @@ self.addEventListener("fetch", function (event) {
   if (!isHeavy(url)) return;
 
   /* Images: ignoreSearch so warmFetch(?v=BUILD) answers emscripten_fetch
-     without a query. Wasm/js/fonts MUST match the current BUILD_ID — a stale
-     wasm here caused ASM_CONSTS / missing Image fixes after every rebuild. */
+     without a query. Wasm/js: network-first — a stale/truncated Cache Storage
+     entry was aborting boot with "both async and sync fetching of wasm failed"
+     on mobile (instantiateStreaming + sync XHR both fail). */
   var isImage = /\.(png|jpe?g|webp|gif|svg)(\?|$)/i.test(url.pathname);
+  var isWasmOrJs = /\.(wasm|js)(\?|$)/i.test(url.pathname)
+    || /mui_dev\.wasm|mui-dev\.js|boot\.js/i.test(url.pathname);
+  if (isWasmOrJs) {
+    event.respondWith(
+      fetchAndCache(req).catch(function () {
+        return matchCached(req, url).then(function (hit) {
+          return hit || Response.error();
+        });
+      })
+    );
+    return;
+  }
   event.respondWith(
     (isImage ? matchCached(req, url) : caches.match(req).then(function (hit) {
       return hit || caches.match(url.href);
@@ -145,7 +158,6 @@ self.addEventListener("fetch", function (event) {
       if (hit) {
         var verOk = url.search.indexOf("v=" + VER) >= 0;
         if (!verOk) {
-          /* Stale entry (wrong or missing ?v=) — pull fresh, don't serve old wasm. */
           return fetchAndCache(req);
         }
         return hit;

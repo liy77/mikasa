@@ -3,7 +3,7 @@ const path = require('path');
 
 const lspPath =
   process.argv[2] ||
-  path.resolve(__dirname, '..', '..', 'target', 'debug', 'copper-lsp.exe');
+  path.resolve(__dirname, '..', '..', 'target', 'debug', 'mikasa-lsp.exe');
 
 const child = spawn(lspPath, [], { stdio: ['pipe', 'pipe', 'pipe'] });
 let buf = Buffer.alloc(0);
@@ -79,7 +79,7 @@ function call(method, params) {
   ].join('\n');
   const uri = 'file:///class.crs';
   send('textDocument/didOpen', {
-    textDocument: { uri, languageId: 'copper', version: 1, text },
+    textDocument: { uri, languageId: 'mikasa', version: 1, text },
   }, false);
 
   await new Promise((r) => setTimeout(r, 200));
@@ -106,7 +106,7 @@ function call(method, params) {
   const text2 = 'class Greeter {\n  Greeter(name: String) { self.name = name }\n}\n\nGreeter::';
   const uri2 = 'file:///static.crs';
   send('textDocument/didOpen', {
-    textDocument: { uri: uri2, languageId: 'copper', version: 1, text: text2 },
+    textDocument: { uri: uri2, languageId: 'mikasa', version: 1, text: text2 },
   }, false);
   const r = await call('textDocument/completion', {
     textDocument: { uri: uri2 },
@@ -123,7 +123,7 @@ function call(method, params) {
   const text3 = 'mut name = "brian"\nname.';
   const uri3 = 'file:///stdmethods.crs';
   send('textDocument/didOpen', {
-    textDocument: { uri: uri3, languageId: 'copper', version: 1, text: text3 },
+    textDocument: { uri: uri3, languageId: 'mikasa', version: 1, text: text3 },
   }, false);
   const r3 = await call('textDocument/completion', {
     textDocument: { uri: uri3 },
@@ -142,7 +142,7 @@ function call(method, params) {
   const text4 = 'mut nums = vec![1, 2, 3]\nnums.';
   const uri4 = 'file:///vec.crs';
   send('textDocument/didOpen', {
-    textDocument: { uri: uri4, languageId: 'copper', version: 1, text: text4 },
+    textDocument: { uri: uri4, languageId: 'mikasa', version: 1, text: text4 },
   }, false);
   const r4 = await call('textDocument/completion', {
     textDocument: { uri: uri4 },

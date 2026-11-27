@@ -1,11 +1,11 @@
 # CLAUDE.md
 
-Context for AI assistants on **copper-lang** — traps, invariants, conventions.
+Context for AI assistants on **mikasa** (repo may still be named copper-lang) — traps, invariants, conventions.
 
-> **Copper is now Mikasa, and Alloy is now Astra.** The rename is branding:
+> **Mikasa is now Mikasa, and Alloy is now Astra.** The rename is branding:
 > docs, window titles, and logos say Mikasa / Astra. The toolchain binary is
-> `mikasa` (formerly `cforge`). The interpreter binary is `astra` (formerly
-> `alloy`); crate names (`copper-*`, `astra-vm`) and module paths stay as they
+> `mikasa` (formerly `mikasa`). The interpreter binary is `astra` (formerly
+> `alloy`); crate names (`mikasa-*`, `astra-vm`) and module paths stay as they
 > are — do not rename them further to match the brand.
 >
 > Extensions (`crates/mikasa-syntax/src/ext.rs`): `.mika` source, `.ast`
@@ -19,7 +19,7 @@ Context for AI assistants on **copper-lang** — traps, invariants, conventions.
 
 ## What this project is
 
-Mikasa (formerly Copper) transpiles to Rust. Binary: `mikasa`. Pipeline:
+Mikasa (formerly Mikasa) transpiles to Rust. Binary: `mikasa`. Pipeline:
 `.crs` → tokenizer → token rewrites → parser → Rust source → `cargo build`.
 
 **Second engine: Astra** (formerly Alloy; `crates/astra-vm`, binary `astra`) — tree-walking interpreter
@@ -30,7 +30,7 @@ Design specs: `docs/superpowers/specs/2026-06-22-astra-vm-design.md`.
 
 ```
 crates/
-  mikasa-syntax/    tokenizer + AST (shared by cforge, astra, LSPs)
+  mikasa-syntax/    tokenizer + AST (shared by mikasa, astra, LSPs)
   mikasa-parser/    streaming transpiler parser
   astra-vm/         Astra interpreter lib + `astra` CLI
                     src/{value,env,error,interp,bytecode,loader,stdlib,stdlib_ext,wasm,intrinsics}.rs
@@ -38,9 +38,9 @@ crates/
   mui-syntax/       MocidaUI parser (.mui, and .mika files with a view)
   mui-codegen/      MUI → Rust codegen (M5)
   mui-lsp/          MUI language server
-src/                cforge entrypoint + re-exports from crates (historical; real code is in crates/)
+src/                mikasa entrypoint + re-exports from crates (historical; real code is in crates/)
 astra-gui/          Dual-mode astra GUI host (MUI; own workspace; links mocida)
-std/cstd.mika        Mikasa stdlib — single source for both cforge and astra
+std/cstd.mika        Mikasa stdlib — single source for both mikasa and astra
 docs/superpowers/specs/   Design specs (astra-vm, bytecode, gui, check-miri, wasm-interop, mui-codegen)
 docs/TODO.md        Backlog index → TODO-mikasa.md / TODO-astra.md
 ```
@@ -48,8 +48,8 @@ docs/TODO.md        Backlog index → TODO-mikasa.md / TODO-astra.md
 ## MocidaUI files (`.mui`, and `.mika` with a `view`)
 
 Two verbs:
-- **`cforge run foo.mui`** — dev render (M1): shells out to `mui-dev` (never links mocida directly). Resolution: `MUI_DEV_BIN` env → `mocida-rs/target/` → `cargo run -p mui-dev` (found via `MOCIDA_RS_DIR` or sibling `mocida/mocida-rs`).
-- **`cforge -c [-r] [-b] foo.mui`** — codegen (M5): lowers AST via `mui-codegen` to a self-contained cargo project in `<output>/mui/`. `-r` builds native binary; `-b` embeds `app.bundle` assets via `include_bytes!`. `mui-codegen` has no mocida dependency (cforge stays portable).
+- **`mikasa run foo.mui`** — dev render (M1): shells out to `mui-dev` (never links mocida directly). Resolution: `MUI_DEV_BIN` env → `mocida-rs/target/` → `cargo run -p mui-dev` (found via `MOCIDA_RS_DIR` or sibling `mocida/mocida-rs`).
+- **`mikasa -c [-r] [-b] foo.mui`** — codegen (M5): lowers AST via `mui-codegen` to a self-contained cargo project in `<output>/mui/`. `-r` builds native binary; `-b` embeds `app.bundle` assets via `include_bytes!`. `mui-codegen` has no mocida dependency (mikasa stays portable).
 
 Handlers + live reactivity are emitted as comments/placeholders — M3/M4 evaluator work pending.
 
@@ -60,7 +60,7 @@ Handlers + live reactivity are emitted as comments/placeholders — M3/M4 evalua
 - `astra build file.crs [-o out.loy]` — portable artifact.
 - `astra run app.loy` — run artifact (auto-detected by magic `ASTRABC\0`).
 - `astra check file.crs [--no-miri]` — verify via real rustc + Miri.
-- `cforge vm run/build` / `cforge check` — same VM via cforge.
+- `mikasa vm run/build` / `mikasa check` — same VM via mikasa.
 
 **`.loy` format** (`crates/astra-vm/src/bytecode.rs`):
 `magic b"ASTRABC\0"` + `fmt_ver: u16 LE` + bincode(astra_ver) + bincode(payload).
@@ -73,7 +73,7 @@ v1 = `Vec<Item>` (AST). v2 = `Vec<Item>` + `Vec<WasmModule { names, bytes }>` (w
 | `fs`, `time`, `url`, `net`, `ws`, `json`, `crypto`, `http` | Native Rust in `stdlib.rs` / `stdlib_ext.rs` |
 | `cstd` | Interpreted from `std/cstd.mika` (merged); 4 native exceptions: `run`, `list_dir`, `append_file`, `rand_int` (`CSTD_NATIVE`) |
 | `math` (sibling `.crs`) | Parsed + merged recursively; bundled into `.loy` |
-| `foo` (sibling `.rs`) | Compiled to wasm32 once (cached in `~/.astra/cache` by hash), run via `wasmi`. Prototype ABI: `i64`/`bool`, requires `#[no_mangle] pub extern "C"`. Plain `pub fn` → `LoadOutcome::NeedsCforge`. |
+| `foo` (sibling `.rs`) | Compiled to wasm32 once (cached in `~/.astra/cache` by hash), run via `wasmi`. Prototype ABI: `i64`/`bool`, requires `#[no_mangle] pub extern "C"`. Plain `pub fn` → `LoadOutcome::NeedsMikasa`. |
 
 **Key decision — don't fork rustc:** embedding Miri = shipping a nightly compiler (100s MB). Rejected. See `2026-06-22-astra-check-miri-design.md`.
 
@@ -116,9 +116,9 @@ v1 = `Vec<Item>` (AST). v2 = `Vec<Item>` + `Vec<WasmModule { names, bytes }>` (w
 
 ### Versioning & build
 
-- **`build.rs` uses `rerun-if-changed=.cforge-build-date-trigger`** (a non-existent path) to force rebuild every cargo invocation. Don't "fix" it to `rerun-if-changed=build.rs` — the date would freeze.
+- **`build.rs` uses `rerun-if-changed=.mikasa-build-date-trigger`** (a non-existent path) to force rebuild every cargo invocation. Don't "fix" it to `rerun-if-changed=build.rs` — the date would freeze.
 - `with_build_date` only stamps the date for versions containing `alpha`/`beta`/`rc`.
-- `scripts/install.py` deletes `target/release/cforge(.exe)` before `cargo build --release` to force a fresh link.
+- `scripts/install.py` deletes `target/release/mikasa(.exe)` before `cargo build --release` to force a fresh link.
 
 ### Scripts
 
@@ -145,8 +145,8 @@ Required env vars: `MOCIDA_INCLUDE_DIR`, `MOCIDA_LIB_DIR`, `MOCIDA_LIB_NAME=moci
 1. **Where does it live?** Tokenizer = atomic syntactic forms (`?.`, `$ident`). Token rewrite = macro-like context-local rewrites (`ternary.rs`). Parser dispatch = emission that needs result state.
 2. **New TokenKind:** add to `kind.rs`, emit in tokenizer, add dispatch arm in `parser/mod.rs`, add to `is_chain_breaker`, add `examples/mikasa/<feature>.crs`.
 3. **Token rewrite:** `Vec<Token>` → `Vec<Token>`, iterate-until-fixed-point, synthetic tokens via `Token::new(..., generated: true)`, wire into `Parser::new` after whitespace filter.
-4. **Regression suite:** `for f in examples/mikasa/*.crs; do ./target/debug/cforge run "$f"; done`
-5. **Preserve `cforge --version`** output after touching `build.rs` or `main.rs`.
+4. **Regression suite:** `for f in examples/mikasa/*.crs; do ./target/debug/mikasa run "$f"; done`
+5. **Preserve `mikasa --version`** output after touching `build.rs` or `main.rs`.
 
 ## What NOT to change without asking
 
@@ -154,7 +154,7 @@ Required env vars: `MOCIDA_INCLUDE_DIR`, `MOCIDA_LIB_DIR`, `MOCIDA_LIB_NAME=moci
 - `main.mika` location → `mikasa run` defaults to `./main.mika`.
 - `match`-block separator switch in `line_break_token` → makes arms use `,` not `;`.
 - Stacked `if`s in `symbol_token` → see tokenizer invariants.
-- `cforge_tokenizer_debug.log` → keep gitignored, not a feature.
+- `mikasa_tokenizer_debug.log` → keep gitignored, not a feature.
 - Don't push/force-push/open PRs without explicit ask.
 
 ## cstd standard library
@@ -173,7 +173,7 @@ Required env vars: `MOCIDA_INCLUDE_DIR`, `MOCIDA_LIB_DIR`, `MOCIDA_LIB_NAME=moci
 
 ## Standard-library policy
 
-**`std/*.crs` is written in Mikasa, not Rust.** `std/*_native.rs` is deprecated — do not add new native files. When Copper can't express something yet, fix the transpiler. A `.crs` may use Rust-native spellings, fully-qualified paths, method chains, generics, `format!` specifiers — those all transpile through.
+**`std/*.crs` is written in Mikasa, not Rust.** `std/*_native.rs` is deprecated — do not add new native files. When Mikasa can't express something yet, fix the transpiler. A `.crs` may use Rust-native spellings, fully-qualified paths, method chains, generics, `format!` specifiers — those all transpile through.
 
 ## `unsafe` support
 
@@ -190,7 +190,7 @@ Required env vars: `MOCIDA_INCLUDE_DIR`, `MOCIDA_LIB_DIR`, `MOCIDA_LIB_NAME=moci
 - **Type aliases** (`type Foo = Bar<T>`) don't lower inside `static`/`as` casts.
 
 **Astra:**
-- **No static borrow/ownership checking** — dynamic `Rc<RefCell>`; pointer aliasing doesn't propagate. Use `cforge` or `astra check` for real borrow-checking.
+- **No static borrow/ownership checking** — dynamic `Rc<RefCell>`; pointer aliasing doesn't propagate. Use `mikasa` or `astra check` for real borrow-checking.
 - **`&&`/`||` are not short-circuit** — both operands pre-evaluated before `eval_binary`.
 - **Wasm ABI is prototype-only** — `i64`/`bool` + `extern "C"` only. Strings/structs = next phase.
 - **`.loy` v2** bundles wasm from imported `.rs`; self-contained, no rustc needed at run time.

@@ -6,11 +6,11 @@ Every script in scripts/ (except the self-contained uninstaller, which has
 to run after being copied away from this module) imports these helpers so
 the install / build / cleanup / diagnose output all share one look:
 
-    from _pretty import banner, head, step, info, ok, warn, fail, c, COPPER
+    from _pretty import banner, head, step, info, ok, warn, fail, c, MIKASA
 
-The palette is copper-themed (256-colour orange accent) and degrades to
-plain text when stdout is not a TTY or NO_COLOR is set. Box/glyph characters
-fall back to ASCII when the console can't encode UTF-8.
+The palette uses a 256-colour orange accent and degrades to plain text when
+stdout is not a TTY or NO_COLOR is set. Box/glyph characters fall back to
+ASCII when the console can't encode UTF-8.
 """
 
 import os
@@ -49,7 +49,7 @@ _COLOR = _supports_color()
 _UNI = _supports_unicode()
 
 # --- palette ------------------------------------------------------------
-COPPER = "38;5;208"   # warm copper orange — the brand accent
+MIKASA = "38;5;208"   # warm orange — the brand accent
 DIM = "38;5;245"      # muted grey for secondary text
 GREEN = "32"
 YELLOW = "33"
@@ -73,7 +73,7 @@ def c(text, code):
 
 # --- structured output --------------------------------------------------
 def banner(title, subtitle=None):
-    """A rounded box header in the copper accent colour."""
+    """A rounded box header in the Mikasa accent colour."""
     line = f"  {title}"
     if subtitle:
         line += f"  {G_BULLET}  {subtitle}"
@@ -81,15 +81,15 @@ def banner(title, subtitle=None):
     top = G_TL + G_H * width + G_TR
     bot = G_BL + G_H * width + G_BR
     print()
-    print(c(top, COPPER))
-    print(c(G_V, COPPER) + c(line.ljust(width), f"{COPPER};{BOLD}") + c(G_V, COPPER))
-    print(c(bot, COPPER))
+    print(c(top, MIKASA))
+    print(c(G_V, MIKASA) + c(line.ljust(width), f"{MIKASA};{BOLD}") + c(G_V, MIKASA))
+    print(c(bot, MIKASA))
     print()
 
 
 def head(msg):
-    """A section header — copper arrow + bold text."""
-    print(c(f"\n{G_ARROW} {msg}", f"{COPPER};{BOLD}"))
+    """A section header — Mikasa arrow + bold text."""
+    print(c(f"\n{G_ARROW} {msg}", f"{MIKASA};{BOLD}"))
 
 
 def step(msg):
@@ -111,7 +111,3 @@ def warn(msg):
 
 def fail(msg):
     print(c(f"  {G_FAIL} {msg}", RED))
-
-
-def rule():
-    print(c("  " + G_H * 38, DIM))

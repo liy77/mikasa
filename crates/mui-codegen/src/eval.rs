@@ -1,4 +1,4 @@
-//! Build-time transpiler: lowers a Copper control-flow `Expr` into a Rust
+//! Build-time transpiler: lowers a Mikasa control-flow `Expr` into a Rust
 //! expression string, emitted inside the view fn so it re-evaluates against
 //! live signal values each rebuild. Reactivity is whole-view rebuild, not
 //! const-folding — nothing here is evaluated at codegen time.

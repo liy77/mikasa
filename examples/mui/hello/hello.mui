@@ -10,6 +10,6 @@
 view Hello(name: string = "world") {
   Stack(orientation: vertical, gap: 12, padding: 24) {
     Text("Hello, ${name}!", size: 28, color: #0f172a, weight: bold)
-    Text("Built with mocida + copper.", size: 14, color: #64748b)
+    Text("Built with mocida + mikasa.", size: 14, color: #64748b)
   }
 }

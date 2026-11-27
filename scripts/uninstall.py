@@ -6,13 +6,13 @@ This file is copied into the install directory by install.py, so it must NOT
 import the shared _pretty module (it runs far from scripts/). It re-detects
 the install scope the same way the installer chose it:
 
-    admin / root  -> global  (C:\\Program Files\\Copper  |  /usr/local/lib/copper)
-    normal user   -> local   (%USERPROFILE%\\.copper      |  $HOME/.copper)
+    admin / root  -> global  (C:\\Program Files\\Mikasa  |  /usr/local/lib/mikasa)
+    normal user   -> local   (%USERPROFILE%\\.mikasa      |  $HOME/.mikasa)
 
-It then removes the install tree, drops COPPER_PATH/bin from PATH, and clears
-the COPPER_PATH variable. On Windows the PATH edit is done through the registry
-(filtering the literal %COPPER_PATH%\\bin marker); on Unix it strips the managed
-block from /etc/profile.d/copper.sh, fish conf.d, or your shell rc files.
+It then removes the install tree, drops MIKASA_PATH/bin from PATH, and clears
+the MIKASA_PATH variable. On Windows the PATH edit is done through the registry
+(filtering the literal %MIKASA_PATH%\\bin marker); on Unix it strips the managed
+block from /etc/profile.d/mikasa.sh, fish conf.d, or your shell rc files.
 
 Usage:
     python uninstall.py
@@ -28,10 +28,10 @@ from pathlib import Path
 
 SYS = platform.system()
 
-BLOCK_BEGIN = "# >>> COPPER PATH (copper-lang) >>>"
-BLOCK_END = "# <<< COPPER PATH <<<"
-FISH_BLOCK_BEGIN = "# >>> COPPER PATH (copper-lang, fish) >>>"
-FISH_BLOCK_END = "# <<< COPPER PATH (copper-lang, fish) <<<"
+BLOCK_BEGIN = "# >>> MIKASA PATH >>>"
+BLOCK_END = "# <<< MIKASA PATH <<<"
+FISH_BLOCK_BEGIN = "# >>> MIKASA PATH (fish) >>>"
+FISH_BLOCK_END = "# <<< MIKASA PATH (fish) <<<"
 
 # --- minimal styling (standalone copy of _pretty's essentials) ----------
 for _stream in (sys.stdout, sys.stderr):
@@ -44,7 +44,7 @@ _COLOR = (not os.environ.get("NO_COLOR")) and sys.stdout.isatty()
 if _COLOR and SYS == "Windows":
     os.system("")
 _UNI = "utf" in ((getattr(sys.stdout, "encoding", "") or "").lower())
-COPPER, GREEN, YELLOW, RED, DIM = "38;5;208", "32", "33", "31", "38;5;245"
+MIKASA, GREEN, YELLOW, RED, DIM = "38;5;208", "32", "33", "31", "38;5;245"
 _TL, _TR, _BL, _BR, _H, _V = ("╭", "╮", "╰", "╯", "─", "│") if _UNI else ("+", "+", "+", "+", "-", "|")
 _AR, _BU, _OK, _NO = ("▸", "·", "✔", "✗") if _UNI else (">", "-", "+", "x")
 
@@ -56,12 +56,12 @@ def _c(t, code):
 def banner(title, subtitle=None):
     line = f"  {title}" + (f"  {_BU}  {subtitle}" if subtitle else "")
     width = max(len(line) + 2, 40)
-    print("\n" + _c(_TL + _H * width + _TR, COPPER))
-    print(_c(_V, COPPER) + _c(line.ljust(width), f"{COPPER};1") + _c(_V, COPPER))
-    print(_c(_BL + _H * width + _BR, COPPER) + "\n")
+    print("\n" + _c(_TL + _H * width + _TR, MIKASA))
+    print(_c(_V, MIKASA) + _c(line.ljust(width), f"{MIKASA};1") + _c(_V, MIKASA))
+    print(_c(_BL + _H * width + _BR, MIKASA) + "\n")
 
 
-def head(m): print(_c(f"\n{_AR} {m}", f"{COPPER};1"))
+def head(m): print(_c(f"\n{_AR} {m}", f"{MIKASA};1"))
 def info(m): print(_c(f"  {_BU} {m}", "37"))
 def ok(m):   print(_c(f"  {_OK} {m}", GREEN))
 def warn(m): print(_c(f"  ! {m}", YELLOW))
@@ -86,9 +86,9 @@ def resolve_scope(force):
         fail("Global uninstall needs administrator / root privileges. Re-run elevated.")
         sys.exit(1)
     if SYS == "Windows":
-        install_dir = Path(r"C:\Program Files\Copper") if glob else Path(os.environ["USERPROFILE"]) / ".copper"
+        install_dir = Path(r"C:\Program Files\Mikasa") if glob else Path(os.environ["USERPROFILE"]) / ".mikasa"
     else:
-        install_dir = Path("/usr/local/lib/copper") if glob else Path.home() / ".copper"
+        install_dir = Path("/usr/local/lib/mikasa") if glob else Path.home() / ".mikasa"
     return ("global" if glob else "local"), install_dir
 
 
@@ -117,28 +117,28 @@ def remove_tree(install_dir):
 def clean_path_windows(scope):
     import winreg
 
-    head("Removing %COPPER_PATH%\\bin from PATH")
+    head("Removing %MIKASA_PATH%\\bin from PATH")
     if scope == "global":
         root, subkey = winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
     else:
         root, subkey = winreg.HKEY_CURRENT_USER, "Environment"
 
-    expanded = os.path.expandvars(r"%COPPER_PATH%\bin")
+    expanded = os.path.expandvars(r"%MIKASA_PATH%\bin")
     with winreg.OpenKey(root, subkey, 0, winreg.KEY_READ | winreg.KEY_WRITE) as key:
         try:
             cur, typ = winreg.QueryValueEx(key, "PATH")
-            kept = [p for p in cur.split(";") if p and p != r"%COPPER_PATH%\bin" and p != expanded]
+            kept = [p for p in cur.split(";") if p and p != r"%MIKASA_PATH%\bin" and p != expanded]
             winreg.SetValueEx(key, "PATH", 0, typ, ";".join(kept))
             ok("PATH cleaned.")
         except FileNotFoundError:
             info("No PATH value to clean.")
 
-        head("Removing COPPER_PATH variable")
+        head("Removing MIKASA_PATH variable")
         try:
-            winreg.DeleteValue(key, "COPPER_PATH")
-            ok("COPPER_PATH removed.")
+            winreg.DeleteValue(key, "MIKASA_PATH")
+            ok("MIKASA_PATH removed.")
         except FileNotFoundError:
-            info("COPPER_PATH was already absent.")
+            info("MIKASA_PATH was already absent.")
     _broadcast_setting_change()
 
 
@@ -151,16 +151,16 @@ def _broadcast_setting_change():
 
 
 def clean_path_unix(scope):
-    head("Removing COPPER_PATH from your shell environment")
+    head("Removing MIKASA_PATH from your shell environment")
     if scope == "global":
-        profile = Path("/etc/profile.d/copper.sh")
+        profile = Path("/etc/profile.d/mikasa.sh")
         if profile.exists():
             profile.unlink()
             ok(f"Removed {profile}")
         else:
             info(f"{profile} not found.")
 
-        fish_profile = Path("/etc/fish/conf.d/copper.fish")
+        fish_profile = Path("/etc/fish/conf.d/mikasa.fish")
         if fish_profile.exists():
             text = fish_profile.read_text(encoding="utf-8")
             if FISH_BLOCK_BEGIN in text and FISH_BLOCK_END in text:
@@ -172,6 +172,15 @@ def clean_path_unix(scope):
             info(f"{fish_profile} not found.")
         return
 
+    legacy_begins = {
+        BLOCK_BEGIN,
+        "# >>> COPPER PATH (copper-lang) >>>",
+    }
+    legacy_ends = {
+        BLOCK_END,
+        "# <<< COPPER PATH <<<",
+    }
+
     for name in (".zshrc", ".bashrc", ".profile"):
         f = Path.home() / name
         if not f.exists():
@@ -179,10 +188,11 @@ def clean_path_unix(scope):
         lines = f.read_text(encoding="utf-8").splitlines(keepends=True)
         out, skip = [], False
         for ln in lines:
-            if ln.strip() == BLOCK_BEGIN:
+            stripped = ln.strip()
+            if stripped in legacy_begins:
                 skip = True
                 continue
-            if ln.strip() == BLOCK_END:
+            if stripped in legacy_ends:
                 skip = False
                 continue
             if not skip:
@@ -191,8 +201,14 @@ def clean_path_unix(scope):
             f.write_text("".join(out), encoding="utf-8")
             ok(f"Cleaned {f}")
 
-    fish_profile = Path.home() / ".config" / "fish" / "conf.d" / "copper.fish"
-    if fish_profile.exists():
+    for fish_name in ("mikasa.fish", "copper.fish"):
+        fish_profile = Path.home() / ".config" / "fish" / "conf.d" / fish_name
+        if not fish_profile.exists():
+            continue
+        if fish_name == "copper.fish":
+            fish_profile.unlink()
+            ok(f"Removed {fish_profile}")
+            continue
         text = fish_profile.read_text(encoding="utf-8")
         if FISH_BLOCK_BEGIN in text and FISH_BLOCK_END in text:
             fish_profile.unlink()
@@ -217,6 +233,19 @@ def main():
         clean_path_windows(scope)
     else:
         clean_path_unix(scope)
+
+    # Also drop the pre-rename install tree if it is still around.
+    legacy_home = (
+        Path(os.environ.get("USERPROFILE", str(Path.home()))) / ".copper"
+        if SYS == "Windows"
+        else Path.home() / ".copper"
+    )
+    if legacy_home.exists() and legacy_home.resolve() != install_dir.resolve():
+        try:
+            shutil.rmtree(legacy_home)
+            ok(f"Removed legacy install dir {legacy_home}")
+        except Exception as e:
+            warn(f"Could not remove legacy {legacy_home}: {e}")
 
     banner("Mikasa uninstalled")
     info("Open a new terminal so the PATH change takes effect.")

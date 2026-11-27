@@ -2,7 +2,7 @@
 name = "mui-syntax"
 version = "0.0.1-pre-alpha"
 edition = "2021"
-description = "Parser + component AST for MUI (.mui / .crm), the mocida UI markup language. Embedded Copper expressions reuse mikasa-syntax."
+description = "Parser + component AST for MUI (.mui / .crm), the mocida UI markup language. Embedded Mikasa expressions reuse mikasa-syntax."
 
 [dependencies]
 mikasa-syntax = { path = "../mikasa-syntax" }

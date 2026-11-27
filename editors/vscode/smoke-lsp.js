@@ -1,14 +1,14 @@
-// Smoke test the copper-lsp binary directly via JSON-RPC over stdio.
+// Smoke test the mikasa-lsp binary directly via JSON-RPC over stdio.
 // Sends `initialize` + `initialized` + `didOpen`, prints diagnostics, exits.
 //
-// Usage: node smoke-lsp.js [path-to-copper-lsp.exe]
+// Usage: node smoke-lsp.js [path-to-mikasa-lsp.exe]
 
 const { spawn } = require('child_process');
 const path = require('path');
 
 const lspPath =
   process.argv[2] ||
-  path.resolve(__dirname, '..', '..', 'target', 'release', 'copper-lsp.exe');
+  path.resolve(__dirname, '..', '..', 'target', 'release', 'mikasa-lsp.exe');
 
 const child = spawn(lspPath, [], { stdio: ['pipe', 'pipe', 'pipe'] });
 
@@ -84,7 +84,7 @@ function call(method, params) {
     {
       textDocument: {
         uri,
-        languageId: 'copper',
+        languageId: 'mikasa',
         version: 1,
         text,
       },

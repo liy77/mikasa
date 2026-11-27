@@ -28,5 +28,5 @@ src/
 
 ## Running
 
-The binary is `mui-lsp`. The installer ships it into `$COPPER_PATH/bin`. Point
+The binary is `mui-lsp`. The installer ships it into `$MIKASA_PATH/bin`. Point
 your LSP client at the `mui-lsp` executable for `.mui` / `.crm` files.

@@ -40,7 +40,7 @@ fn counter_mui_parses() {
 
 #[test]
 fn app_crm_parses() {
-    // `.crm` mixes Copper items (struct / impl / func) ahead of the view; the
+    // `.crm` mixes Mikasa items (struct / impl / func) ahead of the view; the
     // structural pass skips them and still recovers the `App` view cleanly.
     parse_ok("crm/app.crm");
 }

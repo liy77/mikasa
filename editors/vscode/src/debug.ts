@@ -29,7 +29,7 @@ export function registerDebugger(context: vscode.ExtensionContext): void {
 
 async function launch(stopOnEntry: boolean): Promise<void> {
   const editor = vscode.window.activeTextEditor;
-  if (!editor || editor.document.languageId !== 'copper') {
+  if (!editor || editor.document.languageId !== 'mikasa') {
     vscode.window.showWarningMessage('Mikasa: open a .mika file first.');
     return;
   }

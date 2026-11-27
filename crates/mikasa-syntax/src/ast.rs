@@ -1,4 +1,4 @@
-//! Copper AST.
+//! Mikasa AST.
 //!
 //! Built from a token stream by [`parse`]. The builder is **recoverable**:
 //! syntactic errors land in [`ParsedFile::errors`] but the builder keeps
@@ -1227,7 +1227,7 @@ mod tests {
 
     #[test]
     fn parses_function() {
-        // Copper functions always carry an explicit return type: `func void name(...) {}`.
+        // Mikasa functions always carry an explicit return type: `func void name(...) {}`.
         let p = parse("func void name() {}\n");
         assert_eq!(p.errors.len(), 0, "errors: {:?}", p.errors);
         assert_eq!(p.nodes.len(), 1);

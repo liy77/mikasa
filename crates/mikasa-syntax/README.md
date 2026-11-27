@@ -1,16 +1,16 @@
 # mikasa-syntax
 
-> Tokenizer + AST for the [Copper](../../README.md) language.
+> Tokenizer + AST for the [Mikasa](../../README.md) language.
 
-The **shared front-end** of the Copper toolchain. Every consumer that needs to
-understand Copper source starts here:
+The **shared front-end** of the Mikasa toolchain. Every consumer that needs to
+understand Mikasa source starts here:
 
 | Consumer | What it uses |
 | --- | --- |
-| `cforge` (via `mikasa-parser`) | the **token stream** — walked directly to emit Rust |
+| `mikasa` (via `mikasa-parser`) | the **token stream** — walked directly to emit Rust |
 | `mikasa-lsp` | the **AST** — for diagnostics, hover, completion |
 | `astra` (`astra-vm`) | the **AST with parsed bodies** — walked by the interpreter |
-| `mui-syntax` | the **tokenizer** — embedded Copper expressions in `.mui` |
+| `mui-syntax` | the **tokenizer** — embedded Mikasa expressions in `.mui` |
 
 Because all paths share this crate, the language never drifts between the
 transpiler, the interpreter, and the editor.
@@ -40,4 +40,4 @@ src/
 
 - Serde derives live on the AST types so Astra can serialize a `Program` into its
   portable `.loy` artifact.
-- No dependency on `cforge`, `mocida`, or any runtime — pure, portable, CI-safe.
+- No dependency on `mikasa`, `mocida`, or any runtime — pure, portable, CI-safe.

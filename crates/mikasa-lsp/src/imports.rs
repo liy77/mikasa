@@ -1,6 +1,6 @@
 //! Import resolution for diagnostics + hover.
 //!
-//! Copper's `import { Name } from module` can point at the standard library
+//! Mikasa's `import { Name } from module` can point at the standard library
 //! (`std`/`cstd`/…), a sibling source file (a local `.crs`/`.rs`/`.mui` module),
 //! or an external crate declared in `properties.kson`. This module parses the
 //! import lines (with byte spans, so the LSP can place diagnostics), and
@@ -21,9 +21,9 @@ pub struct ImportRef {
 
 /// What an import's module resolves to.
 pub enum Resolution {
-    /// Rust/Copper standard library (`std`, `core`, `alloc`, `crate`, …).
+    /// Rust/Mikasa standard library (`std`, `core`, `alloc`, `crate`, …).
     Stdlib,
-    /// Copper's bundled standard library.
+    /// Mikasa's bundled standard library.
     Cstd,
     /// A sibling source file (the given file name).
     Local(String),
@@ -43,7 +43,7 @@ impl Resolution {
         match self {
             Resolution::Stdlib => format!("**`{module}`** — standard library module."),
             Resolution::Cstd => {
-                format!("**`{module}`** — Copper's bundled standard library (`cstd`).")
+                format!("**`{module}`** — Mikasa's bundled standard library (`cstd`).")
             }
             Resolution::Local(file) => {
                 format!("**`{module}`** — local module (`{file}`).")
@@ -53,14 +53,14 @@ impl Resolution {
             }
             Resolution::Unknown => format!(
                 "**`{module}`** — ⚠️ not found. Not std/cstd, no sibling file, and not in \
-                 properties.kson. Run `cforge install {module}` to add it."
+                 properties.kson. Run `mikasa install {module}` to add it."
             ),
         }
     }
 }
 
 /// Parse every `import … from <module>` line in `text`. Single-line imports
-/// (Copper's only form) with byte spans for the module and each imported name.
+/// (Mikasa's only form) with byte spans for the module and each imported name.
 pub fn parse_imports(text: &str) -> Vec<ImportRef> {
     let mut out = Vec::new();
     let mut offset = 0usize; // byte offset of the current line's start

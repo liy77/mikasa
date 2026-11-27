@@ -12,8 +12,8 @@ plus a `main()` that opens a window with the entry view.
 ## The two MUI verbs
 
 ```
-cforge run foo.mui      → dev render        (M1, mui-dev walks the AST live)
-cforge -c [-r] foo.mui  → generate code     (M5, this crate) [+ native build]
+mikasa run foo.mui      → dev render        (M1, mui-dev walks the AST live)
+mikasa -c [-r] foo.mui  → generate code     (M5, this crate) [+ native build]
 ```
 
 `-c` writes the Rust crate; `-r` also `cargo build --release`s it into a native
@@ -22,7 +22,7 @@ binary.
 ## Pure AST → text
 
 This crate has **no dependency on `mocida` or the runtime**, so it builds
-anywhere (portable CI) and `cforge` can call it without dragging in the C
+anywhere (portable CI) and `mikasa` can call it without dragging in the C
 library. Only the *generated* code depends on `mocida` — and it's meant to be
 read, reviewed, and built.
 

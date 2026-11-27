@@ -2,14 +2,14 @@
 """
 Build & run a MUI file (`.mui` / `.crm`) the way that actually works today.
 
-`cforge run foo.mui` uses the *live* M1 render host (`mui-dev`), which is not
+`mikasa run foo.mui` uses the *live* M1 render host (`mui-dev`), which is not
 present in the mocida-rs workspace — so it fails with "Could not locate the
 `mocida-rs` workspace that provides `mui-dev`". This script takes the **codegen
 path (M5)** instead: it lowers the MUI file to a real Rust crate (via
 `mui-codegen`), native-builds it against the sibling `mocida` crate, and runs
 the resulting binary.
 
-It also wires up `MOCIDA_RS_DIR` automatically when copper-lang and mocida sit
+It also wires up `MOCIDA_RS_DIR` automatically when mikasa and mocida sit
 side by side, so codegen can find the `mocida` path dependency.
 
 Usage:
@@ -37,10 +37,10 @@ ROOT = Path(__file__).resolve().parent.parent
 MUI_EXTS = {".mui", ".crm"}
 
 
-def find_cforge():
+def find_mikasa():
     """Prefer a release build, fall back to debug. None if neither exists."""
     for profile in ("release", "debug"):
-        p = ROOT / "target" / profile / f"cforge{EXE}"
+        p = ROOT / "target" / profile / f"mikasa{EXE}"
         if p.exists():
             return p
     return None
@@ -48,7 +48,7 @@ def find_cforge():
 
 def find_mocida_rs():
     """MOCIDA_RS_DIR env, else common side-by-side layouts. Validated by the
-    `mocida-sys` marker (same check cforge's locator uses)."""
+    `mocida-sys` marker (same check mikasa's locator uses)."""
     def looks_like(d):
         try:
             return "mocida-sys" in (d / "Cargo.toml").read_text(encoding="utf-8")
@@ -132,9 +132,9 @@ def main():
         fail(f"Not a MUI file (.mui/.crm): {src}")
         sys.exit(1)
 
-    cforge = find_cforge()
-    if not cforge:
-        fail("cforge not built. Run: python scripts/build.py  (or cargo build)")
+    mikasa = find_mikasa()
+    if not mikasa:
+        fail("mikasa not built. Run: python scripts/build.py  (or cargo build)")
         sys.exit(1)
     if not shutil.which("cargo"):
         fail("Cargo/Rust not on PATH (https://rustup.rs/).")
@@ -147,7 +147,7 @@ def main():
         info(f"mocida-rs: {mocida}")
     else:
         warn("mocida-rs workspace not found; codegen may fail to resolve `mocida`.")
-        warn("Set MOCIDA_RS_DIR, or place copper-lang and mocida side by side.")
+        warn("Set MOCIDA_RS_DIR, or place mikasa and mocida side by side.")
 
     # mocida-sys needs the C SDK (headers + prebuilt lib). Honor anything the
     # user already exported; otherwise auto-detect a staged SDK and prefer the
@@ -170,7 +170,7 @@ def main():
 
     # 1. Codegen + native build (the M5 path). -r unless --debug-build.
     head(f"Lowering {src.name} to Rust + native build")
-    cmd = [str(cforge), "-c", "-i", str(src), "-o", args.output]
+    cmd = [str(mikasa), "-c", "-i", str(src), "-o", args.output]
     if not args.debug_build:
         cmd.append("-r")
     if args.bundle:
@@ -186,7 +186,7 @@ def main():
         sys.exit(1)
 
     if args.debug_build:
-        # `cforge -c` without -r only writes source; build it ourselves.
+        # `mikasa -c` without -r only writes source; build it ourselves.
         head("Building crate (debug)")
         if subprocess.run(["cargo", "build"], cwd=str(out_crate), env=env).returncode != 0:
             fail("cargo build failed.")

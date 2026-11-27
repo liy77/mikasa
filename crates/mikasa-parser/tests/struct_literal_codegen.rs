@@ -26,7 +26,7 @@ fn transpile(src: &str) -> String {
 /// on success, `Err(stderr)` on a compile error, and `Ok(())` (skip) if
 /// `rustc` cannot be found.
 fn rustc_compiles(rust_src: &str, stem: &str) -> Result<(), String> {
-    let dir = std::env::temp_dir().join(format!("copper_slc_{stem}"));
+    let dir = std::env::temp_dir().join(format!("mikasa_slc_{stem}"));
     let _ = std::fs::create_dir_all(&dir);
     let src_path = dir.join("main.rs");
     let out_path = dir.join("out_bin");

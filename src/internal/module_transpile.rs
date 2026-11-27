@@ -1,18 +1,18 @@
-//! Multi-module Copper (`crs/**/*.crs`) transpiler, post-processor, and asset/template
-//! embedder built directly into `cforge`.
+//! Multi-module Mikasa (`crs/**/*.crs`) transpiler, post-processor, and asset/template
+//! embedder built directly into `mikasa`.
 //!
 //! Eliminates the need for per-crate `build.rs` files, `Cargo.toml` manifests,
-//! or `src/*.rs` stubs in Copper projects such as `mocidad-engine`,
+//! or `src/*.rs` stubs in Mikasa projects such as `mocidad-engine`,
 //! `engine/native-host`, and `mocidad-launcher`.
 
 #![allow(unused_variables, clippy::all)]
 
-use crate::cforge::cache::{hash_source, write_if_changed, TranspileCache, TranspileEntry};
+use crate::internal::cache::{hash_source, write_if_changed, TranspileCache, TranspileEntry};
 use crate::parser::parse;
 use crate::tokenizer::tokenizer::Tokenizer;
 use std::path::{Path, PathBuf};
 
-/// Transpile an entire Copper project directory (`<project_dir>/crs/**/*.crs`,
+/// Transpile an entire Mikasa project directory (`<project_dir>/crs/**/*.crs`,
 /// plus optional `<project_dir>/mocidad_logic.crs`, `../app.bundle`, and `../templates`)
 /// into `<project_dir>/dist/rust/src/`, and generate `<project_dir>/dist/rust/Cargo.toml`
 /// from `<project_dir>/properties.kson`.
@@ -36,7 +36,7 @@ pub fn transpile_crs_project(project_dir: &Path) -> Result<PathBuf, String> {
 
     let compiler_ver = format!(
         "{}-{}",
-        crate::cforge::VERSION,
+        crate::internal::VERSION,
         hash_source(
             include_str!("module_transpile.rs"),
             include_str!("../../crates/mikasa-parser/src/parser/mod.rs"),
@@ -193,11 +193,11 @@ pub fn transpile_crs_project(project_dir: &Path) -> Result<PathBuf, String> {
     }
     let prop_path = project_dir.join("properties.kson");
     if prop_path.is_file() {
-        let (_, json) = crate::cforge::kson::read_properties(prop_path.to_str().unwrap());
+        let (_, json) = crate::internal::kson::read_properties(prop_path.to_str().unwrap());
         let toml = match tokio::runtime::Handle::try_current() {
             Ok(handle) => tokio::task::block_in_place(|| {
                 handle
-                    .block_on(crate::cforge::properties::Properties::from_kson_in_dir(
+                    .block_on(crate::internal::properties::Properties::from_kson_in_dir(
                         &json,
                         &project_dir,
                     ))
@@ -205,7 +205,7 @@ pub fn transpile_crs_project(project_dir: &Path) -> Result<PathBuf, String> {
             }),
             Err(_) => {
                 let rt = tokio::runtime::Runtime::new().unwrap();
-                rt.block_on(crate::cforge::properties::Properties::from_kson_in_dir(
+                rt.block_on(crate::internal::properties::Properties::from_kson_in_dir(
                     &json,
                     &project_dir,
                 ))
@@ -451,7 +451,7 @@ fn convert_crs_host_to_rust(src: &str) -> String {
             continue;
         }
 
-        // Convert Copper variable declarations (`mut x = ...`, `x: Type = ...`)
+        // Convert Mikasa variable declarations (`mut x = ...`, `x: Type = ...`)
         if let Some(converted) = try_convert_var_decl_line(indent, trimmed) {
             out.push(converted);
             continue;
@@ -786,9 +786,9 @@ mod tests {
 }
 "#;
 
-fn pre_fix_copper(rust: &str) -> String {
+fn pre_fix_mikasa(rust: &str) -> String {
     let mut s = rust.to_string();
-    // `crate const X` → `const X` (Copper uses `crate` visibility)
+    // `crate const X` → `const X` (Mikasa uses `crate` visibility)
     s = s.replace("crate const ", "const ");
     s = s.replace("crate static ", "static ");
     s = s.replace("crate fn ", "fn ");
@@ -798,7 +798,7 @@ fn pre_fix_copper(rust: &str) -> String {
     s = s.replace("\ncrate\n", "\n");
     s = s.replace("\ncrate;", "\n");
     s = s.replace("\nreturn crate;", "\n");
-    // Copper includes `std` as an import item from `import { ... } from std::X`
+    // Mikasa includes `std` as an import item from `import { ... } from std::X`
     // e.g. `use ::collections::{BTreeMap, HashMap, std}` → remove `, std` from the braces
     s = s.replace(", std}", "}");
     s = s.replace(", std,", ",");
@@ -822,8 +822,8 @@ pub fn transpile(module: &str, src: &str) -> String {
     let tokens = tokenizer.tokenize();
     let mut rust = parse(tokens);
 
-    // Pre-fix: clean up Copper artifacts before hoisting
-    rust = pre_fix_copper(&rust);
+    // Pre-fix: clean up Mikasa artifacts before hoisting
+    rust = pre_fix_mikasa(&rust);
     rust = hoist_from_main(&rust);
     rust = strip_empty_main(&rust);
     rust = fix_lifetimes(&rust);
@@ -831,13 +831,13 @@ pub fn transpile(module: &str, src: &str) -> String {
     rust = inject_aliases(module, &rust);
     rust = promote_pub(&rust);
     rust = promote_struct_fields(&rust);
-    rust = post_fix_copper_bugs(&rust);
+    rust = post_fix_mikasa_bugs(&rust);
     rust = promote_all_fns(&rust);
     rust = cleanup_blank_lines(&rust);
     rust
 }
 
-/// Drop only Copper's trailing empty `fn main() {}` or `pub fn main() {}` stub,
+/// Drop only Mikasa's trailing empty `fn main() {}` or `pub fn main() {}` stub,
 /// keeping a real `main` (e.g. demo binary) that the `.crs` defined.
 fn strip_empty_main(rust: &str) -> String {
     let mut s = rust.trim_end().to_string();
@@ -889,9 +889,9 @@ fn strip_empty_main(rust: &str) -> String {
     s
 }
 
-fn post_fix_copper_bugs(rust: &str) -> String {
+fn post_fix_mikasa_bugs(rust: &str) -> String {
     let mut s = rust.to_string();
-    // Copper inserts `let` after `self.` for field assignments: `self.let field = val`
+    // Mikasa inserts `let` after `self.` for field assignments: `self.let field = val`
     s = fix_self_let_assigns(&s);
     s = s.replace("let let ", "let ");
     s = s.replace(":let ", ": ");
@@ -911,7 +911,7 @@ fn post_fix_copper_bugs(rust: &str) -> String {
     s = s.replace("pub app.", "app.");
     s = s.replace("pub renderer.", "renderer.");
     s = s.replace("pub static ", "static ");
-    // Copper inserts `let` inside Ok/Err/Some patterns
+    // Mikasa inserts `let` inside Ok/Err/Some patterns
     s = s.replace("Ok(let mut ", "Ok(mut ");
     s = s.replace("Ok(let ", "Ok(");
     s = s.replace("Err(let mut ", "Err(mut ");
@@ -921,20 +921,20 @@ fn post_fix_copper_bugs(rust: &str) -> String {
     // Broken slice syntax
     s = s.replace("&[, String]", "&[String]");
     s = s.replace("&[String)", "&[String]");
-    // Copper glues `&mut Type` → `&mutType` in some positions
+    // Mikasa glues `&mut Type` → `&mutType` in some positions
     s = fix_mut_refs(&s);
 
     s = s.replace("&[, ", "&[");
-    // Copper turns expression-tail `value` into `value;` which yields `()` —
+    // Mikasa turns expression-tail `value` into `value;` which yields `()` —
     // rewrite `;\n…}` to drop the semicolon when it looks like a tail expr.
     s = fix_tail_expr_semicolons(&s);
-    // Typed assigns Copper emits without let: `names:Vec<String>=`
+    // Typed assigns Mikasa emits without let: `names:Vec<String>=`
     s = s.replace("names:Vec<String>=", "let names: Vec<String> = ");
     // let-else missing `let`: `Some(x)=... else` / `Ok(x)=... else`
     s = fix_missing_let_else(&s);
     // Struct field `main: Defaults {` mangled to `let main: Defaults; {`
     s = fix_typed_field_init(&s);
-    // Lone `;` lines (from Copper comment stripping) break vec!/array literals
+    // Lone `;` lines (from Mikasa comment stripping) break vec!/array literals
     s = strip_lone_semicolons(&s);
     s = fix_typed_lets(&s);
     s = strip_junk_main(&s);
@@ -991,20 +991,20 @@ fn post_fix_copper_bugs(rust: &str) -> String {
         "None => None,\r\n            }}",
         "None => None,\r\n            };",
     );
-    // Copper emits `use ::module` instead of `use crate::module`
+    // Mikasa emits `use ::module` instead of `use crate::module`
     s = fix_bare_use_paths(&s);
-    // Copper sometimes emits `return crate;` or standalone `crate;`
+    // Mikasa sometimes emits `return crate;` or standalone `crate;`
     s = s.replace("\nreturn crate;}", "\n}");
     s = s.replace("\ncrate;\n", "\n");
     s = s.replace("return crate;}", "}");
-    // Copper prefixes hoisted items with `crate` visibility: `crate const X = ...`
+    // Mikasa prefixes hoisted items with `crate` visibility: `crate const X = ...`
     // Rust doesn't support bare `crate` visibility — use nothing (pub already handled)
     s = s.replace("\ncrate const ", "\nconst ");
     s = s.replace("\ncrate static ", "\nstatic ");
     s = s.replace("\ncrate fn ", "\nfn ");
     s = s.replace("\ncrate type ", "\ntype ");
     s = s.replace("\ncrate use ", "\nuse ");
-    // Copper corrupts raw string literals with regex patterns
+    // Mikasa corrupts raw string literals with regex patterns
     s = fix_corrupted_raw_strings(&s);
     s
 }
@@ -1061,7 +1061,7 @@ fn strip_lone_semicolons(rust: &str) -> String {
 /// preceding expression becomes the block value / is fixed by adding return.
 /// Safer approach: turn `EXPR;` immediately before `}` into `return EXPR;`.
 fn fix_typed_lets(rust: &str) -> String {
-    // `name: Type = expr` → `let name: Type = expr` (Copper drops `let`)
+    // `name: Type = expr` → `let name: Type = expr` (Mikasa drops `let`)
     let mut out = String::with_capacity(rust.len() + 64);
     for line in rust.lines() {
         let t = line.trim_start();
@@ -1825,7 +1825,7 @@ fn fix_tail_expr_semicolons(rust: &str) -> String {
 
 fn strip_return_before_match_arms(rust: &str) -> String {
     // Only strip `return` glued onto match *patterns*: `return Some(x)=>{`, `return None=>`.
-    // Keep this ASCII/byte-safe — Copper headers can contain multi-byte junk.
+    // Keep this ASCII/byte-safe — Mikasa headers can contain multi-byte junk.
     let mut s = rust.to_string();
     for (pat, repl) in [
         ("return None=>{", "None=>{"),
@@ -2197,7 +2197,7 @@ fn fix_lifetimes(rust: &str) -> String {
     let mut s = rust.replace("&'staticstr", "&'static str");
     s = s.replace("& 'static str", "&'static str");
     s = s.replace("&'static,", "&'static ");
-    // Copper glues `&'aValue` / `<'aValue` — split lifetime from type name.
+    // Mikasa glues `&'aValue` / `<'aValue` — split lifetime from type name.
     s = fix_lifetime_type_glue(&s);
     s
 }
@@ -2247,7 +2247,7 @@ fn fix_lifetime_type_glue(rust: &str) -> String {
 }
 
 fn inject_aliases(module: &str, rust: &str) -> String {
-    let mut prelude = String::from("// Generated from Copper — do not edit.\n");
+    let mut prelude = String::from("// Generated from Mikasa — do not edit.\n");
     prelude.push_str("type StaticStr = &'static str;\n");
     match module {
         // mocidad-engine modules
@@ -2733,7 +2733,7 @@ fn promote_pub(rust: &str) -> String {
     out
 }
 
-/// Copper drops `pub` on struct fields; restore it for the public host API.
+/// Mikasa drops `pub` on struct fields; restore it for the public host API.
 fn promote_struct_fields(rust: &str) -> String {
     let mut out = String::with_capacity(rust.len() + 64);
     let mut rest = rust;
@@ -2881,7 +2881,7 @@ fn is_struct_field_line(trimmed: &str) -> bool {
 
 fn promote_all_fns(rust: &str) -> String {
     let mut s = rust.to_string();
-    // Compact Copper output: promote items glued mid-line.
+    // Compact Mikasa output: promote items glued mid-line.
     s = s.replace(" fn ", " pub fn ");
     s = s.replace("{fn ", "{ pub fn ");
     s = s.replace("\nfn ", "\npub fn ");
@@ -2989,9 +2989,9 @@ fn cleanup_blank_lines(rust: &str) -> String {
 }
 
 /// Fix `self.let field = value` → `self.field = value`.
-/// Copper's bare-assign insertion sometimes inserts `let` after `self.`.
+/// Mikasa's bare-assign insertion sometimes inserts `let` after `self.`.
 fn fix_self_let_assigns(rust: &str) -> String {
-    // Copper inserts `let` after any `identifier.` for field assignments:
+    // Mikasa inserts `let` after any `identifier.` for field assignments:
     //   self.let field = val  →  self.field = val
     //   a.let name = new     →  a.name = new
     //   t.let show = v       →  t.show = v
@@ -3020,12 +3020,12 @@ fn fix_self_let_assigns(rust: &str) -> String {
 }
 
 /// Fix `use ::module::` → `use crate::module::` or `use std::module::`.
-/// Copper emits bare `use ::tree::` instead of `use crate::tree::`.
+/// Mikasa emits bare `use ::tree::` instead of `use crate::tree::`.
 /// Standard library modules (collections, rc, cell, etc.) go to `std::`.
 /// Handles both line-start and mid-line occurrences (e.g. after `;`).
 fn fix_bare_use_paths(rust: &str) -> String {
     let mut s = rust.to_string();
-    // Known std modules that Copper emits as `use ::X`
+    // Known std modules that Mikasa emits as `use ::X`
     let std_mods = [
         "collections",
         "rc",
@@ -3106,17 +3106,17 @@ fn fix_bare_use_paths(rust: &str) -> String {
     out
 }
 
-/// Fix corrupted raw string literals where Copper splits `w * 2.0` across
+/// Fix corrupted raw string literals where Mikasa splits `w * 2.0` across
 /// a raw string boundary, producing `w__regex__::Regex::new(r" 2.0)`.
 fn fix_corrupted_raw_strings(rust: &str) -> String {
-    // This is a known Copper bug: when a `.crs` file contains multiplication
+    // This is a known Mikasa bug: when a `.crs` file contains multiplication
     // like `w * 2.0` near a raw-string pattern, the transpiler garbles it.
     // We fix the specific known cases here.
     let mut s = rust.to_string();
     // Fix the camera_limits corruption in world.rs
     if s.contains("w__regex__") {
-        // The original Copper source has: axis(x, l, r, w * 2.0), axis(y, t, b, h * 2.0)
-        // but Copper garbles it. Find and replace the specific pattern.
+        // The original Mikasa source has: axis(x, l, r, w * 2.0), axis(y, t, b, h * 2.0)
+        // but Mikasa garbles it. Find and replace the specific pattern.
         s = s.replace(
             "w__regex__::Regex::new(r\" 2.0), axis(y, t, b, h \").unwrap()2.0)",
             "w * 2.0), axis(y, t, b, h * 2.0)",

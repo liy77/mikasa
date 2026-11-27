@@ -1,4 +1,4 @@
-//! The Copper **lexicon** — the single source of truth for the language's
+//! The Mikasa **lexicon** — the single source of truth for the language's
 //! lexical facts: type aliases and operator sets.
 //!
 //! Why this module exists
@@ -6,7 +6,7 @@
 //! These facts were previously duplicated: the type-alias table lived in
 //! `mikasa-parser/src/parser/utils.rs`, and the operator category arrays lived
 //! as private `const`s inside the tokenizer. Anything that re-implements a
-//! slice of Copper (the LSP, the new typed expression AST in [`crate::expr`],
+//! slice of Mikasa (the LSP, the new typed expression AST in [`crate::expr`],
 //! the MUI parser) had to copy them and would silently drift.
 //!
 //! Now there is ONE definition. The tokenizer, the transpiler's `convert_type`,
@@ -15,15 +15,15 @@
 //! asserts the expression parser recognises every operator listed here.
 
 // ===========================================================================
-// Type aliases  (Copper spelling -> Rust spelling)
+// Type aliases  (Mikasa spelling -> Rust spelling)
 // ===========================================================================
 
-/// Copper's built-in type aliases, in the exact order the transpiler applies
+/// Mikasa's built-in type aliases, in the exact order the transpiler applies
 /// them. The first match wins (there are no overlaps, so order is cosmetic).
 ///
 /// This is the authoritative table — `mikasa-parser`'s `convert_type` and the
 /// typed AST's [`crate::expr::Type`] resolution both read it.
-pub const COPPER_TYPES: &[(&str, &str)] = &[
+pub const MIKASA_TYPES: &[(&str, &str)] = &[
     ("int", "i64"),
     ("float", "f64"),
     ("uint", "u64"),
@@ -44,7 +44,7 @@ pub const COPPER_TYPES: &[(&str, &str)] = &[
     ("toml", "TomlValue"),
 ];
 
-/// Resolve a Copper type spelling to its Rust spelling, honouring the trailing
+/// Resolve a Mikasa type spelling to its Rust spelling, honouring the trailing
 /// `?` optional suffix (`int?` -> `Option<i64>`) and trailing `!` fallible
 /// suffix (`int!` -> `Result<i64, Box<dyn std::error::Error>>`). Handles tuple
 /// types recursively: `(int, str)` → `(i64, String)`. Pure and allocation-light;
@@ -70,15 +70,15 @@ pub fn convert_type(value: &str) -> String {
         format!("({})", converted.join(", "))
     } else if base.ends_with('>') && base.contains('<') {
         // Generic type — convert the head alias and recurse into each arg so
-        // Copper aliases inside `<...>` are lowered too:
+        // Mikasa aliases inside `<...>` are lowered too:
         // `Rc<RefCell<int>>` -> `Rc<RefCell<i64>>`, `Vec<string>` -> `Vec<String>`,
         // `Reflected<int>` -> `Reflected<i64>`.
         let lt = base.find('<').unwrap();
         let head = base[..lt].trim();
         let inner = &base[lt + 1..base.len() - 1];
         let mut head_kind = head.to_string();
-        for (copper, rust) in COPPER_TYPES {
-            if head == *copper {
+        for (mikasa, rust) in MIKASA_TYPES {
+            if head == *mikasa {
                 head_kind = (*rust).to_string();
                 break;
             }
@@ -91,8 +91,8 @@ pub fn convert_type(value: &str) -> String {
         format!("{}<{}>", head_kind, args.join(", "))
     } else {
         let mut kind = base.to_string();
-        for (copper, rust) in COPPER_TYPES {
-            if base == *copper {
+        for (mikasa, rust) in MIKASA_TYPES {
+            if base == *mikasa {
                 kind = (*rust).to_string();
                 break;
             }

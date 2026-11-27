@@ -8,7 +8,7 @@ use regex::Regex;
 /// Remove `/* ... */` block comments from `source`, leaving everything else
 /// (including embedded newlines) intact so subsequent tokenization keeps the
 /// same line numbers. Block comments inside string literals are preserved.
-/// Block comments do not nest in Copper, mirroring Rust's older rules — the
+/// Block comments do not nest in Mikasa, mirroring Rust's older rules — the
 /// first `*/` ends the comment.
 fn strip_block_comments(source: &str) -> String {
     let mut out = String::with_capacity(source.len());
@@ -208,7 +208,7 @@ const RUST_KEYWORDS: &[&str] = &[
     "try",
 ];
 
-const COPPER_KEYWORDS: &[&str] = &[
+const MIKASA_KEYWORDS: &[&str] = &[
     // Function Definition and Implementation Keywords
     "func", "$init", "$child", // Module Handling Keywords
     "import", "from", // Class Keywords
@@ -261,7 +261,7 @@ pub struct Tokenizer {
     /// body.
     match_paren_depth: i32,
     location_data_compensations: Vec<usize>,
-    /// Collected tokenizer errors. The CLI driver (`cforge`) checks this
+    /// Collected tokenizer errors. The CLI driver (`mikasa`) checks this
     /// and exits non-zero; the LSP reads them as diagnostics. Either way,
     /// `tokenize()` itself never aborts the process — that would kill the
     /// language server on the first malformed edit.
@@ -648,7 +648,7 @@ impl Tokenizer {
             }
         }
 
-        // Copper attributes symbol
+        // Mikasa attributes symbol
         if self.current_char() == '$' {
             value.push(self.current_char());
             self.next_char();
@@ -936,7 +936,7 @@ impl Tokenizer {
                 };
             } else if self.seen_import && self.last_significant_is_from() {
                 // `import { X } from "./math/vec2.crs"` — treat the string as the
-                // module path (quotes stripped). Parser/cforge normalize to
+                // module path (quotes stripped). Parser/mikasa normalize to
                 // `crate::math::vec2`.
                 let raw = value.trim_matches('"').to_string();
                 self.token(TokenKind::ModulePath, raw);
@@ -1108,7 +1108,7 @@ impl Tokenizer {
 
             if BOOL.contains(&value.as_str()) {
                 kind = TokenKind::Keyword;
-            } else if COPPER_KEYWORDS.contains(&value.as_str())
+            } else if MIKASA_KEYWORDS.contains(&value.as_str())
                 // `from` is contextual: it is only the import keyword while an
                 // import statement is in progress. Anywhere else (`From` trait,
                 // `X::from`, `.from(`, a variable named `from`) it must fall
@@ -1191,7 +1191,7 @@ impl Tokenizer {
                 // Without this the void `main` (and any void function) would
                 // be mislabeled as a return type, leaving the function nameless
                 // (`fn (...)`). Emit it as a plain Identifier — the parser's
-                // name handling (incl. the `main` → `__copper_main` rename)
+                // name handling (incl. the `main` → `__mikasa_main` rename)
                 // then applies.
                 self.seen_func = false;
                 kind = TokenKind::Identifier;
@@ -1552,7 +1552,7 @@ impl Tokenizer {
     }
 
     pub fn error(&mut self, message: &str) {
-        // Collect errors instead of aborting the process. The cforge CLI
+        // Collect errors instead of aborting the process. The mikasa CLI
         // surfaces these and exits; the LSP turns them into diagnostics.
         let (line, column, _) = self.get_line_and_column(self.chunk_column);
         let formatted = format!("{}\nLine: {}:{}", message, line + 1, column + 1);

@@ -1,4 +1,4 @@
-// Copper `ws` standard library — minimal WebSocket client.
+// Mikasa `ws` standard library — minimal WebSocket client.
 //
 // `import { ... } from ws`. Pure Rust std (no dependencies): the RFC 6455
 // handshake (Sec-WebSocket-Key / -Accept via inline SHA-1 + base64) and
@@ -273,7 +273,7 @@ func String parse_text_frame(buf: &[u8]) {
 
 // Connect, send one text `message`, read one text reply, close. "" on error.
 // The connect + handshake + socket read are inlined here (the helper that
-// would otherwise return a live TcpStream cannot be a Copper return type).
+// would otherwise return a live TcpStream cannot be a Mikasa return type).
 func String request(url: &str, message: &str) {
     mut parsed = parse_ws_url(url)
     if !parsed.0 {

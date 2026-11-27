@@ -1,8 +1,8 @@
-//! Copper parser: the transpiler's emit pass.
+//! Mikasa parser: the transpiler's emit pass.
 //!
 //! Consumes the token stream produced by `mikasa-syntax`'s tokenizer and
 //! walks it, emitting Rust source into a `result::Result` buffer. This is
-//! the half of the pipeline `cforge` drives; the LSP uses `mikasa-syntax`'s
+//! the half of the pipeline `mikasa` drives; the LSP uses `mikasa-syntax`'s
 //! AST instead and never touches this crate.
 
 // Pre-existing untouched code carries a backlog of stylistic clippy
@@ -27,14 +27,14 @@
 
 pub mod parser;
 
-// Re-export at the crate root so `cforge` can write `mikasa_parser::Parser`
+// Re-export at the crate root so `mikasa` can write `mikasa_parser::Parser`
 // and the parser's public surface stays flat.
 pub use parser::Parser;
 
 use mikasa_syntax::tokenizer::tokenizer::Tokenizer;
 use std::path::{Path, PathBuf};
 
-/// Tokenize + transpile Mikasa/Copper source to Rust.
+/// Tokenize + transpile Mikasa/Mikasa source to Rust.
 pub fn transpile_source(src: &str) -> String {
     transpile_source_with_paths(src, None, None)
 }

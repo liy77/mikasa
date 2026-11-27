@@ -284,7 +284,7 @@ export interface KeywordDef {
 
 // MUI/Mocida-specific words that are NOT Mikasa keywords — the markup + the
 // reactivity primitives. Mikasa's own keywords (func, mut, if, struct, impl,
-// import, …) and primitive types are loaded from the SHARED copper-lexicon.json
+// import, …) and primitive types are loaded from the SHARED mikasa-lexicon.json
 // at activation (see loadMikasaLexicon) so their text is identical to the
 // Mikasa extension and can never drift.
 export const MUI_KEYWORDS: KeywordDef[] = [
@@ -300,8 +300,8 @@ export const MUI_KEYWORDS: KeywordDef[] = [
 
 // Filled in by loadMikasaLexicon() at activation. Until then they're empty, so
 // hover/completion simply fall back to the MUI-only set.
-export let COPPER_KEYWORDS: KeywordDef[] = [];
-export let COPPER_TYPES: KeywordDef[] = [];
+export let MIKASA_KEYWORDS: KeywordDef[] = [];
+export let MIKASA_TYPES: KeywordDef[] = [];
 
 /**
  * Combined keyword list (MUI extras + Mikasa keywords) used by completion.
@@ -310,36 +310,36 @@ export let COPPER_TYPES: KeywordDef[] = [];
  */
 export function allKeywords(): KeywordDef[] {
   const seen = new Set(MUI_KEYWORDS.map((k) => k.label));
-  return [...MUI_KEYWORDS, ...COPPER_KEYWORDS.filter((k) => !seen.has(k.label))];
+  return [...MUI_KEYWORDS, ...MIKASA_KEYWORDS.filter((k) => !seen.has(k.label))];
 }
 
 /**
  * Load the shared Mikasa lexicon (keywords + primitive types) and populate
- * COPPER_KEYWORDS / COPPER_TYPES. `raw` is the parsed JSON. Falls back to the
+ * MIKASA_KEYWORDS / MIKASA_TYPES. `raw` is the parsed JSON. Falls back to the
  * embedded copy when the canonical file isn't available (e.g. packaged vsix).
  */
 export function loadMikasaLexicon(raw?: unknown): void {
-  const data = (raw ?? EMBEDDED_COPPER_LEXICON) as {
+  const data = (raw ?? EMBEDDED_MIKASA_LEXICON) as {
     keywords?: KeywordDef[];
     types?: KeywordDef[];
   };
-  COPPER_KEYWORDS = (data.keywords ?? []).map((k) => ({
+  MIKASA_KEYWORDS = (data.keywords ?? []).map((k) => ({
     label: (k as any).name ?? k.label,
     detail: k.detail,
     doc: k.doc,
   }));
-  COPPER_TYPES = (data.types ?? []).map((t) => ({
+  MIKASA_TYPES = (data.types ?? []).map((t) => ({
     label: (t as any).name ?? t.label,
     detail: t.detail,
     doc: t.doc,
   }));
 }
 
-// Embedded mirror of editors/copper-lexicon.json — the fallback used when the
+// Embedded mirror of editors/mikasa-lexicon.json — the fallback used when the
 // canonical file can't be read. Keep IN SYNC with that file (and with
-// copper-lsp's builtin_info). The canonical file is the source of truth; this
+// mikasa-lsp's builtin_info). The canonical file is the source of truth; this
 // copy only exists so a standalone-packaged extension still has the text.
-const EMBEDDED_COPPER_LEXICON = {
+const EMBEDDED_MIKASA_LEXICON = {
   keywords: [
     { name: 'func', detail: 'func RetType name(params)', doc: 'Declares a function.' },
     { name: 'mut', detail: 'mut name = value', doc: 'Declares a mutable variable.' },
@@ -387,7 +387,7 @@ export function isKnownProp(widget: WidgetDef | undefined, name: string): boolea
 export function keywordByLabel(label: string): KeywordDef | undefined {
   return (
     MUI_KEYWORDS.find((k) => k.label === label) ??
-    COPPER_KEYWORDS.find((k) => k.label === label) ??
-    COPPER_TYPES.find((k) => k.label === label)
+    MIKASA_KEYWORDS.find((k) => k.label === label) ??
+    MIKASA_TYPES.find((k) => k.label === label)
   );
 }

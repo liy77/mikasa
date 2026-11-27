@@ -5,14 +5,14 @@ use std::{
 
 /// The return-kind of a user-defined `main` function, used by `finalize` to
 /// generate the real `fn main` entry point that calls the renamed
-/// `__copper_main`.
+/// `__mikasa_main`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReturnKind {
     /// User `main` returns an integer type (i64/i32/…): the real entry calls
-    /// `std::process::exit(__copper_main() as i32)`.
+    /// `std::process::exit(__mikasa_main() as i32)`.
     Int,
     /// User `main` returns unit / void: the real entry just calls
-    /// `__copper_main();`.
+    /// `__mikasa_main();`.
     Unit,
 }
 
@@ -24,7 +24,7 @@ pub struct Result {
     pub(crate) is_function: bool,
     pub(crate) is_class: bool,
     pub(crate) is_inside_function: bool,
-    pub(crate) is_copper_function: bool,
+    pub(crate) is_mikasa_function: bool,
     pub(crate) uses_json: bool,
     pub(crate) uses_xml: bool,
     pub(crate) uses_toml: bool,
@@ -34,7 +34,7 @@ pub struct Result {
     pub(crate) uses_keypath: bool,
     /// Any `async func` / `.await` / async builtin — pulls in tokio + async main.
     pub(crate) uses_async: bool,
-    /// User wrote `async func main` — entry must `.await` `__copper_main`.
+    /// User wrote `async func main` — entry must `.await` `__mikasa_main`.
     pub(crate) user_main_async: bool,
     pub(crate) cstd_used: bool,
     /// Native std modules (other than cstd) pulled in via
@@ -42,12 +42,12 @@ pub struct Result {
     /// bundled as `pub mod <name> { ... }` and may inject crate deps.
     pub(crate) used_std_modules: std::collections::BTreeSet<String>,
     /// External crates pulled in by `import { … } from <crate>` (anything that
-    /// isn't `std`/`cstd`/a local module). cforge resolves their versions and
+    /// isn't `std`/`cstd`/a local module). mikasa resolves their versions and
     /// adds them to the generated Cargo.toml — after filtering out names that
     /// are actually sibling modules.
     pub(crate) external_crates: Vec<String>,
-    /// Every Copper struct parsed, as `(struct_name, field_names)`, recorded so
-    /// that — when the `reflect` module is imported — cforge can append an
+    /// Every Mikasa struct parsed, as `(struct_name, field_names)`, recorded so
+    /// that — when the `reflect` module is imported — mikasa can append an
     /// `impl reflect::Reflect for <Struct>` at end-of-output (after the struct
     /// definitions). Generic structs are not recorded (their impl would need
     /// generic bounds — out of MVP scope).
@@ -56,12 +56,12 @@ pub struct Result {
     /// `from_json` inherent methods at end-of-output.
     pub(crate) codable_types: Vec<String>,
     /// Transpiled Rust source (crate-root lib) for each used std module, as
-    /// `(module_name, lib_source)`. cforge writes each as a separate local
-    /// crate under `__copper__/std/<name>/` and path-depends on it, instead of
+    /// `(module_name, lib_source)`. mikasa writes each as a separate local
+    /// crate under `__mikasa__/std/<name>/` and path-depends on it, instead of
     /// inlining a `pub mod` into main.rs.
     pub(crate) std_lib_crates: Vec<(String, String)>,
     /// Set when the user defines their own `func main()`. The function is
-    /// emitted under the renamed symbol `__copper_main`, and `finalize` uses
+    /// emitted under the renamed symbol `__mikasa_main`, and `finalize` uses
     /// this to synthesize the real `fn main` entry point (and to suppress the
     /// auto-generated `fn main` wrapper that would otherwise collide).
     pub(crate) user_main: Option<ReturnKind>,
@@ -82,7 +82,7 @@ impl Result {
             is_function: false,
             is_class: false,
             is_inside_function: false,
-            is_copper_function: false,
+            is_mikasa_function: false,
             uses_json: false,
             uses_xml: false,
             uses_toml: false,
@@ -100,8 +100,8 @@ impl Result {
         }
     }
 
-    /// Record a used std module's transpiled lib source so cforge can write it
-    /// as a separate local crate (`__copper__/std/<name>/`).
+    /// Record a used std module's transpiled lib source so mikasa can write it
+    /// as a separate local crate (`__mikasa__/std/<name>/`).
     pub fn add_std_lib_crate(&mut self, name: &str, lib_source: &str) {
         if !self.std_lib_crates.iter().any(|(n, _)| n == name) {
             self.std_lib_crates
@@ -114,14 +114,14 @@ impl Result {
         &self.std_lib_crates
     }
 
-    /// Prepend raw text (e.g. `use copper_http as http;` aliases) to the
+    /// Prepend raw text (e.g. `use mikasa_http as http;` aliases) to the
     /// generated Rust, ahead of everything else.
     pub fn prepend_value(&mut self, text: &str) {
         self.value = format!("{}{}", text, self.value);
     }
 
     /// Record that the user defined their own `main` (renamed to
-    /// `__copper_main` on emit), with the given return kind.
+    /// `__mikasa_main` on emit), with the given return kind.
     pub fn set_user_main(&mut self, kind: ReturnKind) {
         self.user_main = Some(kind);
     }
@@ -137,7 +137,7 @@ impl Result {
         self.uses_async = true;
     }
 
-    /// Record a Copper struct (name + ordered field names) for reflect codegen.
+    /// Record a Mikasa struct (name + ordered field names) for reflect codegen.
     pub fn record_reflect_struct(&mut self, name: &str, fields: Vec<String>) {
         self.reflect_structs.push((name.to_string(), fields));
     }
@@ -166,7 +166,7 @@ impl Result {
                 name
             ));
             // Each field reflects via `to_value()` — implemented for scalars,
-            // `Vec<T>`, `Option<T>`, and (auto-derived) every Copper struct —
+            // `Vec<T>`, `Option<T>`, and (auto-derived) every Mikasa struct —
             // so a nested struct field recurses as `Value::Object(...)`. The
             // fully-qualified call avoids needing the trait in scope.
             for field in fields {
@@ -210,7 +210,7 @@ impl Result {
         let top_level_nonempty = body.chars().any(|c| !c.is_whitespace() && c != ';');
 
         match self.user_main {
-            // The user wrote their own `main` (emitted as `__copper_main`).
+            // The user wrote their own `main` (emitted as `__mikasa_main`).
             // Generate the single real `fn main` entry that calls it, and do
             // NOT emit the auto-wrapper (it would create a duplicate `fn main`).
             Some(kind) => {
@@ -228,24 +228,24 @@ impl Result {
                     // Tokio runtime is implicit — never require `tokio::` in source.
                     match (kind, self.user_main_async) {
                         (ReturnKind::Int, true) => {
-                            "\n\n#[tokio::main]\nasync fn main() { std::process::exit(__copper_main().await as i32); }"
+                            "\n\n#[tokio::main]\nasync fn main() { std::process::exit(__mikasa_main().await as i32); }"
                         }
                         (ReturnKind::Unit, true) => {
-                            "\n\n#[tokio::main]\nasync fn main() { __copper_main().await; }"
+                            "\n\n#[tokio::main]\nasync fn main() { __mikasa_main().await; }"
                         }
                         (ReturnKind::Int, false) => {
-                            "\n\n#[tokio::main]\nasync fn main() { std::process::exit(__copper_main() as i32); }"
+                            "\n\n#[tokio::main]\nasync fn main() { std::process::exit(__mikasa_main() as i32); }"
                         }
                         (ReturnKind::Unit, false) => {
-                            "\n\n#[tokio::main]\nasync fn main() { __copper_main(); }"
+                            "\n\n#[tokio::main]\nasync fn main() { __mikasa_main(); }"
                         }
                     }
                 } else {
                     match kind {
                         ReturnKind::Int => {
-                            "\n\nfn main() { std::process::exit(__copper_main() as i32); }"
+                            "\n\nfn main() { std::process::exit(__mikasa_main() as i32); }"
                         }
-                        ReturnKind::Unit => "\n\nfn main() { __copper_main(); }",
+                        ReturnKind::Unit => "\n\nfn main() { __mikasa_main(); }",
                     }
                 };
                 self.force_append(entry, false);
@@ -346,7 +346,7 @@ impl Result {
             + "__"
             + value
             + "__"
-            + "; // Imported by CForge for implementations\n"
+            + "; // Imported by Mikasa for implementations\n"
             + &self.value;
     }
 
@@ -415,7 +415,7 @@ impl Result {
 
         if !aliases.is_empty() || self.uses_codable || self.uses_async {
             let full_aliases = format!(
-                "// Native data type aliases for Copper\n{}\n{}\n",
+                "// Native data type aliases for Mikasa\n{}\n{}\n",
                 imports, aliases
             );
             self.value = full_aliases + &self.value;
@@ -512,9 +512,9 @@ impl Result {
     pub fn get_required_dependencies(&self) -> Vec<String> {
         // Dependencies for the MAIN project's Cargo.toml. Crate-backed std
         // MODULES (http/json/crypto) no longer add their crates here — each is
-        // a separate local crate under `__copper__/std/<name>/` that carries
+        // a separate local crate under `__mikasa__/std/<name>/` that carries
         // its own deps (see `std_module_crate_deps`); the main project just
-        // path-depends on `copper_<name>` (added by cforge). What remains here
+        // path-depends on `mikasa_<name>` (added by mikasa). What remains here
         // is the inline DATA-TYPE crates (the `json`/`toml` value types used
         // directly in main, not via a module) plus the user's external crates.
         const SERDE_JSON: &str = "serde_json@1";

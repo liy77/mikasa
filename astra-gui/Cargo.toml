@@ -1,15 +1,15 @@
 # astra-gui — native host crate for the Astra GUI.
 #
-# NOT a member of the copper-lang workspace (it links mocida, which the portable
+# NOT a member of the mikasa workspace (it links mocida, which the portable
 # crates must not). Build it explicitly:
 #   cargo build --release --manifest-path astra-gui/Cargo.toml
 # Requires MOCIDA_INCLUDE_DIR / MOCIDA_LIB_DIR (see mocida-sys build.rs).
 #
 # Paths assume the mocida-rs workspace sits as a sibling:
-#   <root>/copper-lang/        (this repo)
+#   <root>/mikasa/        (this repo)
 #   <root>/mocida/mocida-rs/   (mocida runtime)
 
-# Standalone workspace root (this crate is excluded from the copper-lang
+# Standalone workspace root (this crate is excluded from the mikasa
 # workspace because it links mocida, which the portable crates must not).
 [workspace]
 

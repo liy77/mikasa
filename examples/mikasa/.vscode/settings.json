@@ -1,4 +1,4 @@
 {
-  "copper.serverPath": "${workspaceFolder}/../target/debug/copper-lsp.exe",
-  "copper.trace.server": "messages"
+  "mikasa.serverPath": "${workspaceFolder}/../target/debug/mikasa-lsp.exe",
+  "mikasa.trace.server": "messages"
 }

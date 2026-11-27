@@ -1,7 +1,7 @@
-// Copper `time` standard library — clocks, sleeping, timestamps.
+// Mikasa `time` standard library — clocks, sleeping, timestamps.
 //
 // `import { ... } from time`. Pure Rust std, no dependencies. Authored in
-// Copper (self-hosting std lib); bundled as `pub mod time { ... }`.
+// Mikasa (self-hosting std lib); bundled as `pub mod time { ... }`.
 //
 //   time::now_ms()        -> Unix time in milliseconds (i64)
 //   time::now_secs()      -> Unix time in seconds (i64)

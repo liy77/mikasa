@@ -7,7 +7,7 @@
 //! [`crate::stdlib_ext`].
 //!
 //! `cstd` is **not** reimplemented here — it's interpreted from `std/cstd.crs`
-//! (the single source of truth, shared with cforge; see `loader::merge_cstd`).
+//! (the single source of truth, shared with mikasa; see `loader::merge_cstd`).
 //! Only the four functions whose bodies the interpreter can't walk (`run`,
 //! `list_dir`, `append_file`, `rand_int`) keep a native implementation in
 //! [`cstd`].
@@ -26,11 +26,11 @@ pub fn dispatch(
     span: Span,
 ) -> Option<Result<Value, RuntimeError>> {
     // `cstd` is special: its logic lives in `std/cstd.crs` (the single source,
-    // shared with cforge) and is merged + interpreted by the loader. Only the
+    // shared with mikasa) and is merged + interpreted by the loader. Only the
     // handful of functions whose bodies use Rust-std builder/iterator chains the
     // interpreter cannot execute (`run`, `list_dir`, `append_file`, `rand_int`)
     // are implemented natively here; everything else returns `None` so the
-    // dispatcher falls through to the interpreted Copper definition.
+    // dispatcher falls through to the interpreted Mikasa definition.
     if mikasa_syntax::ext::is_stdlib(module) {
         return cstd(name, args, span);
     }
@@ -84,7 +84,7 @@ fn vec_of_strings(items: Vec<String>) -> Value {
 fn cstd(name: &str, args: &[Value], span: Span) -> Option<Result<Value, RuntimeError>> {
     // Only the functions whose `std/cstd.crs` bodies use Rust-std builder /
     // iterator chains the interpreter can't walk live here. Everything else is
-    // `None` → resolved from the merged Copper source (single source of truth).
+    // `None` → resolved from the merged Mikasa source (single source of truth).
     let r = match name {
         // `std::process::Command::new("sh").args(["-c", cmd]).output()`
         "run" => {

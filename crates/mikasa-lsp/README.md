@@ -1,9 +1,9 @@
 # mikasa-lsp
 
-> Language server for the [Copper](../../README.md) language (`.crs`).
+> Language server for the [Mikasa](../../README.md) language (`.crs`).
 
 A [Language Server Protocol](https://microsoft.github.io/language-server-protocol/)
-implementation (JSON-RPC over stdio) that gives editors live feedback on Copper
+implementation (JSON-RPC over stdio) that gives editors live feedback on Mikasa
 source. Built on [`mikasa-syntax`](../mikasa-syntax)'s **AST** — the same parser
 the interpreter uses — so the editor never drifts from the compiler.
 
@@ -23,12 +23,12 @@ src/
 ├── docs.rs              hover/documentation content
 ├── imports.rs           import resolution
 ├── lexicon.rs           keyword/type catalog for completion
-├── rust_prelude.rs      Rust prelude symbols surfaced to Copper
+├── rust_prelude.rs      Rust prelude symbols surfaced to Mikasa
 └── stdlib_methods.rs    builtin method catalog
 ```
 
 ## Running
 
-The binary is `mikasa-lsp`. The installer ships it into `$COPPER_PATH/bin`, where
+The binary is `mikasa-lsp`. The installer ships it into `$MIKASA_PATH/bin`, where
 editor integrations (e.g. Mocidad) resolve it. Point your LSP client at the
 `mikasa-lsp` executable for `.crs` files.

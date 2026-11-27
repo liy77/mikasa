@@ -15,7 +15,7 @@ use std::process::Command;
 use mikasa_syntax::program::{self, Item};
 use mikasa_syntax::ast::Span;
 
-use crate::cforge::pretty;
+use crate::internal::pretty;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Severity {
@@ -116,7 +116,7 @@ fn check_file(path: &str, diags: &mut Vec<Diag>) {
         });
     }
 
-    let is_mui = crate::cforge::mui::is_mui_file(path);
+    let is_mui = crate::internal::mui::is_mui_file(path);
     if is_mui {
         check_mui(path, &src, diags);
         return;

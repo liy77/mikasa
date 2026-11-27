@@ -5,7 +5,7 @@
 //!   **merged** into the program (recursive, with cycle guard).
 //! - `import { f } from mod` with a sibling `mod.rs` → collected as
 //!   [`RsImport`] for the wasm bridge (plain `pub fn` or `extern "C"`). The
-//!   legacy [`LoadOutcome::NeedsCforge`] path remains for callers that don't
+//!   legacy [`LoadOutcome::NeedsMikasa`] path remains for callers that don't
 //!   collect Rust imports.
 
 use crate::bytecode;
@@ -13,7 +13,7 @@ use mikasa_syntax::program::{parse_program, ImportKind, Item, Program};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-/// The `cstd` module source — the single source of truth, shared with cforge.
+/// The `cstd` module source — the single source of truth, shared with mikasa.
 /// Bundled so Astra interprets the *same* code instead of duplicating it.
 const CSTD_SRC: &str = include_str!("../../../std/cstd.mika");
 
@@ -25,18 +25,18 @@ const CSTD_NATIVE: &[&str] = &["run", "list_dir", "append_file", "rand_int"];
 pub enum LoadOutcome {
     /// Program ready to interpret (local imports merged; native stdlib).
     Program(Program),
-    /// There is a `.rs` import (module `name`, file `path`): use cforge.
-    NeedsCforge { module: String, rs_path: PathBuf },
+    /// There is a `.rs` import (module `name`, file `path`): use mikasa.
+    NeedsMikasa { module: String, rs_path: PathBuf },
 }
 
 /// An `import { a, b } from foo` resolved to a sibling `foo.rs` — to be run via
-/// embedded wasm (see [`crate::wasm`]) instead of delegating to cforge.
+/// embedded wasm (see [`crate::wasm`]) instead of delegating to mikasa.
 pub struct RsImport {
     pub names: Vec<String>,
     pub rs_path: PathBuf,
 }
 
-/// The fully-resolved input to run: the (Copper) program, plus the Rust to run
+/// The fully-resolved input to run: the (Mikasa) program, plus the Rust to run
 /// via wasm — either as `.rs` files still to compile ([`RsImport`]) or as
 /// already-compiled modules embedded in a `.loy` ([`bytecode::WasmModule`]).
 pub struct Resolved {
@@ -45,7 +45,7 @@ pub struct Resolved {
     pub wasm_modules: Vec<bytecode::WasmModule>,
 }
 
-/// Like [`resolve_source`], but instead of bailing to `NeedsCforge` at the first
+/// Like [`resolve_source`], but instead of bailing to `NeedsMikasa` at the first
 /// `.rs` import, it **collects** the Rust imports so the caller can run them via
 /// embedded wasm. For a `.loy`, surfaces the embedded wasm modules directly.
 pub fn resolve_runnable_wasm(path: &Path) -> Result<Resolved, String> {
@@ -137,7 +137,7 @@ pub fn resolve_source(src: &str, path: &Path) -> Result<LoadOutcome, String> {
 }
 
 /// Appends `items` to `out`, resolving local imports. Returns
-/// `Some(NeedsCforge)` if it encounters a `.rs`.
+/// `Some(NeedsMikasa)` if it encounters a `.rs`.
 fn collect(
     items: Vec<Item>,
     base: &Path,
@@ -188,7 +188,7 @@ fn collect(
             }
 
             if is_stdlib(module) {
-                // `cstd` is interpreted from its Copper source (single source of
+                // `cstd` is interpreted from its Mikasa source (single source of
                 // truth) — merge the imported functions so the interpreter runs
                 // them. The few native-only ones (CSTD_NATIVE) resolve through
                 // the stdlib dispatch instead and are skipped here.
@@ -234,7 +234,7 @@ fn collect(
                             continue;
                         }
                         _ => {
-                            return Ok(Some(LoadOutcome::NeedsCforge {
+                            return Ok(Some(LoadOutcome::NeedsMikasa {
                                 module: module.to_string(),
                                 rs_path: rs.clone(),
                             }));

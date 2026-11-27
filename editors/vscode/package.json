@@ -3,7 +3,7 @@
   "displayName": "Mikasa",
   "description": "Language support for Mikasa (.mika, .crs) — syntax highlight, diagnostics, completion, document symbols, hover. Mikasa was formerly Copper.",
   "version": "0.0.1",
-  "publisher": "copper-lang",
+  "publisher": "mikasa",
   "repository": {
     "type": "git",
     "url": "https://github.com/liy77/mikasa"
@@ -15,14 +15,14 @@
   "icon": "icons/mikasa-lsp.png",
   "main": "./out/extension.js",
   "activationEvents": [
-    "onLanguage:copper",
+    "onLanguage:mikasa",
     "onLanguage:kson"
   ],
   "contributes": {
     "languages": [
       {
-        "id": "copper",
-        "aliases": ["Mikasa", "Copper", "copper"],
+        "id": "mikasa",
+        "aliases": ["Mikasa", "mikasa"],
         "extensions": [".mika", ".crs"],
         "configuration": "./language-configuration.json",
         "icon": {
@@ -43,7 +43,7 @@
     ],
     "commands": [
       {
-        "command": "copper.restartLanguageServer",
+        "command": "mikasa.restartLanguageServer",
         "title": "Restart Language Server",
         "category": "Mikasa"
       },
@@ -60,7 +60,7 @@
     ],
     "snippets": [
       {
-        "language": "copper",
+        "language": "mikasa",
         "path": "./snippets/mikasa.code-snippets"
       }
     ],
@@ -68,7 +68,7 @@
       {
         "type": "mikasa",
         "label": "Mikasa",
-        "languages": ["copper"],
+        "languages": ["mikasa"],
         "configurationAttributes": {
           "launch": {
             "required": ["program"],
@@ -115,13 +115,13 @@
       }
     ],
     "breakpoints": [
-      { "language": "copper" }
+      { "language": "mikasa" }
     ],
     "grammars": [
       {
-        "language": "copper",
-        "scopeName": "source.copper",
-        "path": "./syntaxes/copper.tmLanguage.json"
+        "language": "mikasa",
+        "scopeName": "source.mikasa",
+        "path": "./syntaxes/mikasa.tmLanguage.json"
       },
       {
         "language": "kson",
@@ -132,12 +132,12 @@
     "configuration": {
       "title": "Mikasa",
       "properties": {
-        "copper.serverPath": {
+        "mikasa.serverPath": {
           "type": "string",
-          "default": "copper-lsp",
-          "description": "Path to the copper-lsp executable. Defaults to PATH lookup."
+          "default": "mikasa-lsp",
+          "description": "Path to the mikasa-lsp executable. Defaults to PATH lookup."
         },
-        "copper.trace.server": {
+        "mikasa.trace.server": {
           "type": "string",
           "enum": ["off", "messages", "verbose"],
           "default": "off",

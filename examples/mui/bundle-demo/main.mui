@@ -1,8 +1,8 @@
-// Test that cforge/mui-dev reads a sibling app.bundle:
+// Test that mikasa/mui-dev reads a sibling app.bundle:
 //   - name/id come from app.bundle (the App() block below sets size only)
 //   - the Image loads via the `mocida://logo.png` asset declared in the bundle
 //
-//   cforge run editors/vscode-mui/examples/bundle-demo/main.mui
+//   mikasa run editors/vscode-mui/examples/bundle-demo/main.mui
 
 App() {
   width: 360

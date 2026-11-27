@@ -1,4 +1,4 @@
-// Copper `fs` standard library — filesystem operations.
+// Mikasa `fs` standard library — filesystem operations.
 //
 // `import { ... } from fs`. Pure Rust std, no dependencies. Bundled as
 // `pub mod fs { ... }` with std/fs_native.rs. A focused superset of the

@@ -5,7 +5,7 @@
 
 use mikasa_syntax::tokenizer::tokenizer::Tokenizer;
 
-/// Full transpile: Copper source → Rust source.
+/// Full transpile: Mikasa source → Rust source.
 fn transpile(src: &str) -> String {
     let tokens = Tokenizer::new(src.to_string()).tokenize();
     mikasa_parser::parser::parse(tokens)

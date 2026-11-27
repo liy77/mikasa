@@ -14,13 +14,13 @@ use mui_syntax::style::{box_spacing_reactive, ReactiveEnv};
 use std::path::PathBuf;
 
 fn toolbar_path() -> PathBuf {
-    // The .mui lives in the Mocidad engine repo, sibling to copper-lang
+    // The .mui lives in the Mocida engine repo, sibling to this mikasa repo
     // (cloned as `mocidad-engine`; older checkouts are named `OndaEngine`).
-    // Walk up from CARGO_MANIFEST_DIR (copper-lang/crates/mui-syntax).
+    // Walk up from CARGO_MANIFEST_DIR (…/crates/mui-syntax).
     let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     p.pop(); // .../mui-syntax
     p.pop(); // .../crates
-    p.pop(); // .../copper-lang
+    p.pop(); // repo root
     let repo = ["mocidad-engine", "MocidadEngine", "OndaEngine"]
         .into_iter()
         .find(|name| p.join(name).is_dir())

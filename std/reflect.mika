@@ -1,9 +1,9 @@
-// Copper `reflect` standard library — real runtime reflection.
+// Mikasa `reflect` standard library — real runtime reflection.
 //
 // `import { Reflected, Value } from reflect`. Pure Rust std, no dependencies.
 // Bundled as `pub mod reflect { ... }`.
 //
-// Importing `reflect` makes EVERY Copper type reflectable. cforge
+// Importing `reflect` makes EVERY Mikasa type reflectable. mikasa
 // auto-generates `impl reflect::Reflect for <Struct>` for each struct, and the
 // scalar / `Vec<T>` / `Option<T>` impls below cover the rest — so reflection
 // is recursive and works on any value the program can hold (nested structs,
@@ -29,7 +29,7 @@
 //
 //   Value.show()         -> string             human-readable rendering
 //
-// A field whose type is itself a Copper struct reflects recursively as
+// A field whose type is itself a Mikasa struct reflects recursively as
 // `Value::Object(...)`; a `Vec<T>`/`Option<T>` reflects as `List`/the inner
 // value. Generic structs (`struct Box<T>`) are skipped (no impl generated).
 
@@ -102,8 +102,8 @@ impl Reflected {
     }
 }
 
-// Every reflectable type implements Reflect. cforge auto-generates the impl
-// for each Copper struct; the impls below cover scalars and containers, so a
+// Every reflectable type implements Reflect. mikasa auto-generates the impl
+// for each Mikasa struct; the impls below cover scalars and containers, so a
 // field of any of these kinds reflects uniformly via `to_value()`.
 trait Reflect {
     func Reflected reflect(&self)

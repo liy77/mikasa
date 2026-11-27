@@ -1,7 +1,7 @@
 {
   "name": "Mikasa Installer",
-  "id": "net.liy77.copper-installer",
+  "id": "net.liy77.mikasa-installer",
   "assets": {
-    "icon-128.png": "assets/copper-128.png"
+    "icon-128.png": "assets/mikasa-128.png"
   }
 }

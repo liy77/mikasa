@@ -6,7 +6,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-const lspPath = path.resolve(__dirname, '..', '..', 'target', 'debug', 'copper-lsp.exe');
+const lspPath = path.resolve(__dirname, '..', '..', 'target', 'debug', 'mikasa-lsp.exe');
 const child = spawn(lspPath, [], { stdio: ['pipe', 'pipe', 'pipe'] });
 
 let buf = Buffer.alloc(0);
@@ -62,7 +62,7 @@ function call(method, params) {
   ].join('\n');
   const uri1 = 'file:///c1.crs';
   send('textDocument/didOpen', {
-    textDocument: { uri: uri1, languageId: 'copper', version: 1, text: text1 },
+    textDocument: { uri: uri1, languageId: 'mikasa', version: 1, text: text1 },
   }, false);
   const r1 = await call('textDocument/completion', {
     textDocument: { uri: uri1 },
@@ -84,7 +84,7 @@ function call(method, params) {
   ].join('\n');
   const uri2 = 'file:///c2.crs';
   send('textDocument/didOpen', {
-    textDocument: { uri: uri2, languageId: 'copper', version: 1, text: text2 },
+    textDocument: { uri: uri2, languageId: 'mikasa', version: 1, text: text2 },
   }, false);
   const r2 = await call('textDocument/completion', {
     textDocument: { uri: uri2 },
@@ -105,7 +105,7 @@ function call(method, params) {
   );
   const uri3 = 'file:///main.crs';
   send('textDocument/didOpen', {
-    textDocument: { uri: uri3, languageId: 'copper', version: 1, text: main },
+    textDocument: { uri: uri3, languageId: 'mikasa', version: 1, text: main },
   }, false);
   // Find a `.|` location in main.crs.
   const lines = main.split('\n');

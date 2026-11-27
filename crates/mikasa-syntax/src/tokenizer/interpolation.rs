@@ -1,6 +1,6 @@
 //! String-interpolation parser.
 //!
-//! Copper string literals support two interpolation forms, identical to the
+//! Mikasa string literals support two interpolation forms, identical to the
 //! ones documented in the language README:
 //!
 //! ```text

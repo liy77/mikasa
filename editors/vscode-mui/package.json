@@ -3,10 +3,10 @@
   "displayName": "MUI (mocida UI)",
   "description": "Language support for MocidaUI (.mui, and .mika files that declare a view) — syntax highlight, color swatches, file icons, and autocomplete. .crm is retired.",
   "version": "0.0.1",
-  "publisher": "copper-lang",
+  "publisher": "mikasa",
   "repository": {
     "type": "git",
-    "url": "https://github.com/liy77/copper-lang"
+    "url": "https://github.com/liy77/mikasa"
   },
   "engines": {
     "vscode": "^1.85.0"

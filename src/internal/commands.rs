@@ -12,8 +12,8 @@ use colored::Colorize;
 use std::collections::HashMap;
 use std::{env, fs, path::Path};
 
-use crate::cforge::fetch::check_version_exists;
-use crate::cforge::pretty;
+use crate::internal::fetch::check_version_exists;
+use crate::internal::pretty;
 
 const PROPERTIES_FILE: &str = "properties.kson";
 /// Lock file pinning every dependency to the exact resolved version, so
@@ -307,7 +307,7 @@ async fn cargo_fetch_locked(_resolved: &[(String, String)]) {
 
     // Build ./dist/rust/Cargo.toml from properties.kson + a stub entry so the
     // manifest is valid for `cargo fetch` (which reads deps but doesn't build).
-    crate::cforge::generate_toml(Vec::new()).await;
+    crate::internal::generate_toml(Vec::new()).await;
     let src_dir = Path::new("./dist/rust/src");
     let _ = fs::create_dir_all(src_dir);
     let main_rs = src_dir.join("main.rs");
@@ -463,7 +463,7 @@ fn join_lines(lines: &[String], original: &str) -> String {
     out
 }
 
-/// `cforge remove <name>` — remove a dependency from `properties.kson` and `properties.lock`.
+/// `mikasa remove <name>` — remove a dependency from `properties.kson` and `properties.lock`.
 pub fn remove(name: &str) {
     if !Path::new(PROPERTIES_FILE).exists() {
         pretty::fail(&format!("No {} found.", PROPERTIES_FILE));
@@ -506,7 +506,7 @@ pub fn remove(name: &str) {
     ));
 }
 
-/// `cforge list` — print all declared dependencies and their locked versions.
+/// `mikasa list` — print all declared dependencies and their locked versions.
 pub fn list() {
     if !Path::new(PROPERTIES_FILE).exists() {
         pretty::fail(&format!("No {} found.", PROPERTIES_FILE));

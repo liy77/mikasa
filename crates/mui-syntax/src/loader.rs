@@ -104,13 +104,30 @@ pub fn load_with(
         if !already {
             visited.push(norm);
         }
-        // Copper/Rust imports contribute logic to the generated crate, not MUI
-        // views. We still read them (so hot-reload watches them via `sources`),
-        // but we don't parse them as MUI or look for view names in them.
-        if !imp.kind.is_mui() {
+        // `.mui` / `.crm` are always component sources. `.mika` is also a MUI
+        // component source when it declares `view`s (App()+view live in .mika
+        // too) — otherwise it is a Mikasa language module and we only watch it.
+        // Skipping view registration for `.mika` made `import { X } from "./X.mika"`
+        // render as the literal placeholder `[X]` at runtime.
+        let doc = if imp.kind.is_mui() {
+            Some(crate::parse(&src))
+        } else if matches!(imp.kind, crate::ast::ImportKind::Mikasa) {
+            let parsed = crate::parse(&src);
+            let has_views = imp
+                .names
+                .iter()
+                .any(|n| parsed.views.iter().any(|v| &v.name == n));
+            if has_views {
+                Some(parsed)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let Some(doc) = doc else {
             continue;
-        }
-        let doc = crate::parse(&src);
+        };
         for e in &doc.errors {
             warnings.push(format!("{}: {}", imp.path, e.message));
         }
@@ -192,6 +209,30 @@ fn normalize(p: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resolves_imported_component_from_mika() {
+        // `.mika` with a `view` must register as a MUI component (not only .mui).
+        let app_src =
+            "import { Clock } from \"./ui/Clock.mika\"\nview Main() { Clock(label: \"hi\") }";
+        let clock_src = "view Clock(label: string = \"\") { Text(\"${label}\") }";
+
+        let mut read = |p: &Path| -> std::io::Result<String> {
+            if p.to_string_lossy().replace('\\', "/").ends_with("Clock.mika") {
+                Ok(clock_src.to_string())
+            } else {
+                Err(std::io::Error::new(std::io::ErrorKind::NotFound, "no"))
+            }
+        };
+        let loaded = load_with(app_src, Path::new("/proj/app.mika"), &mut read);
+        assert!(
+            loaded.warnings.is_empty(),
+            "warnings: {:?}",
+            loaded.warnings
+        );
+        let clock = loaded.component("Clock").expect("Clock registered from .mika");
+        assert_eq!(clock.name, "Clock");
+    }
 
     #[test]
     fn resolves_imported_component() {

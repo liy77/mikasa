@@ -9,7 +9,7 @@
 //   muted: true         silence the audio track
 //   volume: 0.8         0..1 audio level
 //
-// Run it:  cforge run examples/mui/video/video.mui
+// Run it:  mikasa run examples/mui/video/video.mui
 //   NOTE: edit the path below to a real video file on your machine (mocida
 //   decodes via the OS media stack — .mp4/.mov/.webm depending on platform).
 

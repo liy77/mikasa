@@ -4,13 +4,13 @@ use serde_json::Value;
 use std::error::Error;
 use std::time::Duration;
 
-use crate::cforge::cache::RegistryCache;
+use crate::internal::cache::RegistryCache;
 
 const CRATES_IO_URL: &str = "https://crates.io";
 
 static HTTP_CLIENT: Lazy<reqwest::Client> = Lazy::new(|| {
     reqwest::Client::builder()
-        .user_agent("CForge/0.1.0")
+        .user_agent("Mikasa/0.1.0")
         .connect_timeout(Duration::from_secs(3))
         .timeout(Duration::from_secs(8))
         .build()
@@ -41,7 +41,7 @@ fn semver_sort_key(v: &Value) -> (bool, bool, u64, u64, u64) {
 }
 
 /// Check if a version exists in the registry (with persistent disk cache in
-/// `~/.copper/cache/registry.json`).
+/// `~/.mikasa/cache/registry.json`).
 pub async fn check_version_exists(
     crate_name: &str,
     version: &str,

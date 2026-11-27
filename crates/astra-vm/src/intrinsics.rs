@@ -1,9 +1,9 @@
 //! Native `std::...` intrinsics for the interpreter.
 //!
 //! These let the tree-walking interpreter execute the handful of Rust-std leaf
-//! operations that appear in **merged Copper source** — above all
+//! operations that appear in **merged Mikasa source** — above all
 //! `std/cstd.crs`, which is the single source of truth for the `cstd` module
-//! (shared with the cforge transpiler). Without these, the interpreter could not
+//! (shared with the mikasa transpiler). Without these, the interpreter could not
 //! reach stdin, the filesystem, the clock, or the process, and `cstd` would have
 //! to be reimplemented natively (the duplication this module removes).
 //!

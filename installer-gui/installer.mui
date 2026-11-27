@@ -1,4 +1,4 @@
-import { prereqs_quick, prereqs_check, install_copper } from "./backend.rs"
+import { prereqs_quick, prereqs_check, install_mikasa } from "./backend.rs"
 
 App() {
   name: "Mikasa Installer"
@@ -9,10 +9,10 @@ App() {
   background: #1e1e1e
   renderer: vulkan
   mainContent: Installer
-  // `cforge run installer.mui` launches this native host (which links
+  // `mikasa run installer.mui` launches this native host (which links
   // backend.rs) instead of the generic mui-dev, so prereqs + the real install
   // work in the dev loop too.
-  host: "copper-installer"
+  host: "mikasa-installer"
 }
 
 // Orchestrador principal
@@ -43,7 +43,7 @@ view Installer() {
   }
 
   // Prerequisite detection + the actual install run on the native host
-  // (copper-installer), which links backend.rs and drives this view's signals
+  // (mikasa-installer), which links backend.rs and drives this view's signals
   // (source_dir/has_cargo/… are seeded; clicking Install flips `phase`, and the
   // host streams progress into `log_text` and finally sets `phase = "done"`).
 
@@ -64,7 +64,7 @@ view Installer() {
         Image("mocida://icon-128.png", width: 76, height: 76, fillMode: fit)
         Stack(orientation: vertical, gap: 0, align: left, justify: center) {
           Text("Mikasa", size: 38, color: #000000, weight: bold, align: left)
-          Text("Install cforge on this machine", size: 13, color: #0f0f0f, align: left)
+          Text("Install mikasa on this machine", size: 13, color: #0f0f0f, align: left)
         }
       }
     }
@@ -180,7 +180,7 @@ view Installer() {
     // transmitido linha a linha pelo host nativo)
     } else if phase == "installing" {
       Stack(orientation: vertical, gap: 14, padding: 32) {
-        Text("Installing cforge...", size: 16, color: #e6e6e6, weight: bold)
+        Text("Installing mikasa...", size: 16, color: #e6e6e6, weight: bold)
         ProgressBar(
           value: progress,
           max: 100,

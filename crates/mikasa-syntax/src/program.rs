@@ -1,4 +1,4 @@
-//! Whole-program AST for Copper — top-level [`Item`]s with **real bodies**.
+//! Whole-program AST for Mikasa — top-level [`Item`]s with **real bodies**.
 //!
 //! Where the other modules sit
 //! ---------------------------
@@ -21,7 +21,7 @@ use crate::tokenizer::kind::TokenKind;
 use crate::tokenizer::tokenizer::Tokenizer;
 use crate::tokenizer::tokens::Token;
 
-/// A parsed Copper source file.
+/// A parsed Mikasa source file.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct Program {
     pub items: Vec<Item>,
@@ -108,7 +108,7 @@ pub enum Item {
         fields: Vec<Field>,
         span: Span,
     },
-    /// `class Name { members }` (Copper-specific; lowers to struct + impl).
+    /// `class Name { members }` (Mikasa-specific; lowers to struct + impl).
     Class {
         name: String,
         members: Vec<ClassMember>,
@@ -139,12 +139,12 @@ pub enum Item {
         path: String,
         span: Span,
     },
-    /// A top-level statement (Copper allows free-standing statements, which the
+    /// A top-level statement (Mikasa allows free-standing statements, which the
     /// transpiler wraps into `fn main`). Carries the expr-layer statement.
     Stmt(expr::Stmt),
 }
 
-/// Parse a whole Copper source file into a [`Program`]. Never panics.
+/// Parse a whole Mikasa source file into a [`Program`]. Never panics.
 pub fn parse_program(source: &str) -> Program {
     let toks: Vec<Token> = Tokenizer::new(source.to_string())
         .tokenize()

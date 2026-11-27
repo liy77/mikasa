@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::process::{exit, Command};
 use std::{env, fs};
 
-use crate::cforge::COPPER_PATH;
+use crate::internal::MIKASA_PATH;
 
 /// Locate the lson binary, building it from lson-src/ if necessary.
 ///
@@ -12,9 +12,9 @@ use crate::cforge::COPPER_PATH;
 #[allow(dead_code)]
 fn find_lson_binary() -> PathBuf {
     let binary_name = if cfg!(windows) { "lson.exe" } else { "lson" };
-    let copper_path = PathBuf::from(&*COPPER_PATH);
+    let mikasa_path = PathBuf::from(&*MIKASA_PATH);
 
-    let installed = copper_path.join("lson").join(binary_name);
+    let installed = mikasa_path.join("lson").join(binary_name);
     if installed.exists() {
         return installed;
     }
@@ -50,7 +50,7 @@ fn find_lson_binary() -> PathBuf {
         .map(|r| r.join("lson-src"))
         .filter(|p| p.join("Cargo.toml").exists())
         .or_else(|| {
-            let p = copper_path.join("lson-src");
+            let p = mikasa_path.join("lson-src");
             if p.join("Cargo.toml").exists() {
                 Some(p)
             } else {
@@ -90,7 +90,7 @@ fn find_lson_binary() -> PathBuf {
 ///
 /// Mikasa-specific shorthand inside strings (`"path:../foo"`,
 /// `"0.31 [derive]"`) is applied after the toolkit parse so `properties.kson`
-/// still lowers to the objects [`crate::cforge::properties`] expects.
+/// still lowers to the objects [`crate::internal::properties`] expects.
 pub fn parse_native_kson(text: &str) -> Option<Value> {
     let doc = lson::parse_str(text).ok()?;
     let resolved = lson::resolve(&doc, |name| env::var(name).ok()).ok()?;

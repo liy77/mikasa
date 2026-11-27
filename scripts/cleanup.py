@@ -26,7 +26,7 @@ RETAINED = [
     ("lson/, std/", "runtime assets"),
     ("properties.kson", "project configuration"),
     ("examples/", ".crs sample programs"),
-    ("main.crs", "default file for `cforge run`"),
+    ("main.crs", "default file for `mikasa run`"),
 ]
 
 
@@ -48,7 +48,7 @@ def main():
     head("Removing build output")
     remove(ROOT / "target", "target/")
     remove(ROOT / "dist", "dist/")
-    remove(ROOT / "cforge_tokenizer_debug.log", "cforge_tokenizer_debug.log")
+    remove(ROOT / "mikasa_tokenizer_debug.log", "mikasa_tokenizer_debug.log")
 
     head("Retained for distribution")
     for name, why in RETAINED:

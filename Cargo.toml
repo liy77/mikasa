@@ -1,9 +1,9 @@
 [workspace]
 members = [".", "crates/mikasa-syntax", "crates/mikasa-parser", "crates/mikasa-lsp", "crates/mui-syntax", "crates/mui-codegen", "crates/mui-lsp", "crates/astra-vm", "crates/mika-import"]
-# `dist/rust` is the output dir for cforge-transpiled programs; it has its
+# `dist/rust` is the output dir for mikasa-transpiled programs; it has its
 # own Cargo.toml that must NOT be a workspace member. The installer-gui
 # is its own self-contained Tauri app — also kept out.
-exclude = ["dist", "installer-gui", "alloy-gui", "examples/mika-import-rs"]
+exclude = ["dist", "installer-gui", "alloy-gui", "examples/mika-import-rs", "lson-src", "astra-gui"]
 resolver = "2"
 
 [package]
@@ -11,7 +11,7 @@ name = "mikasa"
 version = "0.1.0-beta.0"
 edition = "2021"
 build = "build.rs"
-authors = ["Liy", "Copper Authors"]
+authors = ["Liy", "Mikasa Authors"]
 
 [[bin]]
 name = "mikasa"

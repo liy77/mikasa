@@ -29,7 +29,7 @@ SUITE = ROOT / "tests" / "mikasa"
 EXAMPLES = ROOT / "examples" / "mikasa"
 
 # Prefer an isolated target dir (MCUDevDisk can corrupt incremental builds).
-DEFAULT_TARGET = Path(os.environ.get("CARGO_TARGET_DIR", "/tmp/copper-target"))
+DEFAULT_TARGET = Path(os.environ.get("CARGO_TARGET_DIR", "/tmp/mikasa-target"))
 
 # astra stdout/stderr that mean the test failed even if exit code is weird.
 FAIL_MARKERS = (
@@ -37,7 +37,7 @@ FAIL_MARKERS = (
     "function `",
     "not defined",
     "isn't a wasm export",
-    "delegating to cforge",
+    "delegating to mikasa",
     "Build failed",
     "could not compile",
     "sintaxe @",

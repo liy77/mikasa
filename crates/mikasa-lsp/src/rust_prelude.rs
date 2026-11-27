@@ -1,13 +1,13 @@
-//! Curated table of Rust prelude items that Copper users routinely write
-//! (because Copper transpiles directly to Rust). Drives completion, hover,
+//! Curated table of Rust prelude items that Mikasa users routinely write
+//! (because Mikasa transpiles directly to Rust). Drives completion, hover,
 //! and signature help for `Some`, `None`, `Ok`, `Err`, `Option`, `Result`,
 //! `String`, `Vec`, `HashMap`, the print/format/vec macros, etc.
 //!
 //! Hand-curated rather than parsed from `std` because:
 //! 1. Parsing rustdoc would dwarf the rest of the LSP.
-//! 2. The Copper user only needs the prelude surface, not all of std.
+//! 2. The Mikasa user only needs the prelude surface, not all of std.
 //!
-//! Add an entry whenever a new Rust API becomes idiomatic in Copper.
+//! Add an entry whenever a new Rust API becomes idiomatic in Mikasa.
 
 use tower_lsp::lsp_types::CompletionItemKind;
 
@@ -311,7 +311,7 @@ const PRELUDE: &[RustItem] = &[
         insert: "i64",
         kind: CompletionItemKind::TYPE_PARAMETER,
         detail: "primitive: 64-bit signed integer",
-        doc: "Signed 64-bit integer (Copper `int`).",
+        doc: "Signed 64-bit integer (Mikasa `int`).",
         params: None,
     },
     RustItem {
@@ -375,7 +375,7 @@ const PRELUDE: &[RustItem] = &[
         insert: "f64",
         kind: CompletionItemKind::TYPE_PARAMETER,
         detail: "primitive: 64-bit float",
-        doc: "IEEE-754 double-precision float (Copper `float`).",
+        doc: "IEEE-754 double-precision float (Mikasa `float`).",
         params: None,
     },
     RustItem {

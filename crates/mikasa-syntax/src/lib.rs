@@ -1,6 +1,6 @@
-//! Copper language syntax: tokenizer + AST.
+//! Mikasa language syntax: tokenizer + AST.
 //!
-//! Shared between `cforge` (the transpiler) and `mikasa-lsp` (the language
+//! Shared between `mikasa` (the transpiler) and `mikasa-lsp` (the language
 //! server). The transpiler ignores `ast` and walks tokens directly; the LSP
 //! ignores the transpiler's emit pass and walks the AST.
 
@@ -28,5 +28,5 @@ pub mod tokenizer;
 pub mod utils;
 
 // Re-exports so existing tokenizer code that wrote `crate::ConsumedTrait`
-// (originally from the cforge crate root) keeps compiling.
+// (originally from the mikasa crate root) keeps compiling.
 pub use utils::*;

@@ -1,9 +1,6 @@
 # Installing Mikasa
 
-> **Copper is now Mikasa.** The language was renamed (Copper → Mikasa, Alloy →
-> Astra). The toolchain binary is now `mikasa`.
-
-The Mikasa compiler ships with a universal installer that exposes `cforge`
+The Mikasa compiler ships with a universal installer that exposes `mikasa`
 globally on your system. Installers live in [`scripts/`](../scripts) at the
 project root.
 
@@ -36,8 +33,8 @@ privileges:
 
 | Privilege | Scope | Path |
 | --- | --- | --- |
-| Admin / root | Global (all users) | `C:\Program Files\Copper` *(Windows)*, `/usr/local/lib/copper` *(Unix)* |
-| Normal user | Local (current user) | `%USERPROFILE%\.copper` *(Windows)*, `$HOME/.copper` *(Unix)* |
+| Admin / root | Global (all users) | `C:\Program Files\Mikasa` *(Windows)*, `/usr/local/lib/mikasa` *(Unix)* |
+| Normal user | Local (current user) | `%USERPROFILE%\.mikasa` *(Windows)*, `$HOME/.mikasa` *(Unix)* |
 
 Restart your terminal after installation so the new `PATH` is picked up.
 
@@ -48,31 +45,31 @@ Restart your terminal after installation so the new `PATH` is picked up.
 mikasa run main.mika
 
 # Run the default file (main.mika in cwd)
-cforge run
+mikasa run
 
 # Compile only
 mikasa build main.mika
 
 # Compile every .mika in a directory
-cforge -c -i src/
+mikasa -c -i src/
 
 # Show help
-cforge --help
+mikasa --help
 
 # Show version (with build date for pre-releases)
-cforge --version
+mikasa --version
 ```
 
 ## Bundled scripts
 
 All live in [`scripts/`](../scripts) and are plain Python — one file per task,
 cross-platform (Windows / Linux / macOS). The `_pretty.py` module holds the
-shared copper-themed output styling.
+shared Mikasa-themed output styling.
 
 | Script | Purpose |
 | --- | --- |
 | `install.py` | Build a release binary and install it system- or user-wide |
-| `uninstall.py` | Remove the installation, the `COPPER_PATH` env var, and `bin` from `PATH` |
+| `uninstall.py` | Remove the installation, the `MIKASA_PATH` env var, and `bin` from `PATH` |
 | `build.py` | Build a release binary into `target/release/` without installing |
 | `cleanup.py` | Remove `target/`, `dist/`, and stray debug logs |
 | `diagnose.py` | Print install diagnostics |
@@ -87,21 +84,21 @@ forward to the matching `.py`.
 The repo ships sample programs in [`examples/`](../examples):
 
 ```sh
-cforge run examples/copper/loops.mika
-cforge run examples/copper/interpolation.mika
-cforge run examples/copper/collections.mika
-cforge run examples/copper/matching.mika
-cforge run examples/copper/optional.mika
-cforge run examples/copper/ternary.mika
+mikasa run examples/mikasa/loops.mika
+mikasa run examples/mikasa/interpolation.mika
+mikasa run examples/mikasa/collections.mika
+mikasa run examples/mikasa/matching.mika
+mikasa run examples/mikasa/optional.mika
+mikasa run examples/mikasa/ternary.mika
 ```
 
 ## Uninstall
 
 | Install scope | How to uninstall |
 | --- | --- |
-| Local (Windows) | `python "%USERPROFILE%\.copper\uninstall.py"` (or double-click `uninstall.bat`) |
-| Global (Windows) | Run `python "C:\Program Files\Copper\uninstall.py"` **as Administrator** |
-| Unix | `python ~/.copper/uninstall.py` (or `sudo python /usr/local/lib/copper/uninstall.py` for global) |
+| Local (Windows) | `python "%USERPROFILE%\.mikasa\uninstall.py"` (or double-click `uninstall.bat`) |
+| Global (Windows) | Run `python "C:\Program Files\Mikasa\uninstall.py"` **as Administrator** |
+| Unix | `python ~/.mikasa/uninstall.py` (or `sudo python /usr/local/lib/mikasa/uninstall.py` for global) |
 
 The uninstaller auto-detects scope from your privilege level. You can also run
 `python scripts/uninstall.py` directly from the source tree if the installed
@@ -109,7 +106,7 @@ copy is missing or broken — it works the same way.
 
 ## Project configuration
 
-Copper projects use `properties.kson` at their root:
+Mikasa projects use `properties.kson` at their root:
 
 ```kson
 name = "MyProject"
@@ -119,19 +116,18 @@ edition = 2021
 [dependencies]
 serde_json = "1.0.120"
 regex      = "1.10.5"
-ai_copper  = { git = "https://github.com/CopperRS/ai_copper.git" }
 ```
 
 ## Troubleshooting
 
-### `cforge` is not recognized
+### `mikasa` is not recognized
 
 1. Open a **new** terminal (the running one cached the old `PATH`).
 2. Confirm the install location is in `PATH`:
-   - Windows: `echo %PATH%` should contain `%COPPER_PATH%\bin`.
-   - Unix: `echo $PATH` should contain `$HOME/.copper/bin` or `/usr/local/lib/copper/bin`.
+   - Windows: `echo %PATH%` should contain `%MIKASA_PATH%\bin`.
+   - Unix: `echo $PATH` should contain `$HOME/.mikasa/bin` or `/usr/local/lib/mikasa/bin`.
 3. In PowerShell, `where` is `Where-Object` (a cmdlet), not the PATH search
-   utility. Use `where.exe cforge` or `Get-Command cforge -All`.
+   utility. Use `where.exe mikasa` or `Get-Command mikasa -All`.
 
 ### Permission errors
 

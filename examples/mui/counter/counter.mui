@@ -1,6 +1,6 @@
 // counter.mui — reactive state (signal) + control flow.
 //
-// `mut count = signal(start)` declares reactive state (Copper has no `let`).
+// `mut count = signal(start)` declares reactive state (Mikasa has no `let`).
 // The `if` chooses between children; the Button handlers mutate the signal.
 
 view Counter(start: int = 0) {

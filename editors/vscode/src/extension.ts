@@ -12,14 +12,14 @@ import {
 let client: LanguageClient | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  const config = vscode.workspace.getConfiguration('copper');
-  const rawPath = config.get<string>('serverPath', 'copper-lsp');
+  const config = vscode.workspace.getConfiguration('mikasa');
+  const rawPath = config.get<string>('serverPath', 'mikasa-lsp');
   let serverPath = resolvePath(rawPath);
 
-  // When the user left the default (bare `copper-lsp`), try to locate a built
+  // When the user left the default (bare `mikasa-lsp`), try to locate a built
   // binary under a `target/{release,debug}` near the workspace or extension —
-  // so diagnostics work in the dev tree without putting copper-lsp on PATH.
-  if (rawPath === 'copper-lsp') {
+  // so diagnostics work in the dev tree without putting mikasa-lsp on PATH.
+  if (rawPath === 'mikasa-lsp') {
     const discovered = locateServer(context);
     if (discovered) {
       serverPath = discovered;
@@ -28,11 +28,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Surface the resolved path so users can debug "couldn't create connection
   // to server" errors. Goes to the extension host log.
-  console.log(`[copper] LSP serverPath (raw)=${rawPath} resolved=${serverPath}`);
+  console.log(`[mikasa] LSP serverPath (raw)=${rawPath} resolved=${serverPath}`);
 
   if (path.isAbsolute(serverPath) && !fs.existsSync(serverPath)) {
     vscode.window.showErrorMessage(
-      `copper-lsp not found at "${serverPath}". Set "copper.serverPath" or build the binary (\`cargo build --release -p copper-lsp\`).`
+      `mikasa-lsp not found at "${serverPath}". Set "mikasa.serverPath" or build the binary (\`cargo build --release -p mikasa-lsp\`).`
     );
     return;
   }
@@ -43,14 +43,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   };
 
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [{ scheme: 'file', language: 'copper' }],
+    documentSelector: [{ scheme: 'file', language: 'mikasa' }],
     synchronize: {
       fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{mika,crs}'),
     },
   };
 
   client = new LanguageClient(
-    'copper',
+    'mikasa',
     'Mikasa Language Server',
     serverOptions,
     clientOptions
@@ -60,14 +60,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     await client.start();
   } catch (err) {
     vscode.window.showErrorMessage(
-      `Could not start copper-lsp at "${serverPath}". Set "copper.serverPath" or install the binary on PATH. (${err})`
+      `Could not start mikasa-lsp at "${serverPath}". Set "mikasa.serverPath" or install the binary on PATH. (${err})`
     );
   }
 
   registerDebugger(context);
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('copper.restartLanguageServer', async () => {
+    vscode.commands.registerCommand('mikasa.restartLanguageServer', async () => {
       if (!client) {
         vscode.window.showWarningMessage('Mikasa: no language server is running.');
         return;
@@ -118,12 +118,12 @@ function resolvePath(input: string): string {
 }
 
 /**
- * Locate a built `copper-lsp` binary under a `target/{release,debug}` directory
+ * Locate a built `mikasa-lsp` binary under a `target/{release,debug}` directory
  * by walking up from the workspace folders and the extension itself. Returns the
  * path, or undefined to fall back to a PATH lookup of the bare name.
  */
 function locateServer(context: vscode.ExtensionContext): string | undefined {
-  const exe = process.platform === 'win32' ? 'copper-lsp.exe' : 'copper-lsp';
+  const exe = process.platform === 'win32' ? 'mikasa-lsp.exe' : 'mikasa-lsp';
   const roots: string[] = [];
   for (const f of vscode.workspace.workspaceFolders ?? []) {
     roots.push(f.uri.fsPath);

@@ -1,11 +1,11 @@
-//! Curated method tables for Rust stdlib types that surface in Copper code:
+//! Curated method tables for Rust stdlib types that surface in Mikasa code:
 //! `str` / `String`, `Vec`, `Option`, `Result`, `HashMap`, `i32`/`i64`/`f64`,
 //! `bool`, `char`. Drives `obj.|` completion when the receiver's inferred
 //! type is one of these (or unknown — see `union_methods` for the fallback).
 //!
 //! Hand-curated rather than scraped from rustdoc because the long tail of
 //! std methods is overkill for a transpiler-targeted helper. Add entries
-//! when a method becomes idiomatic in Copper code.
+//! when a method becomes idiomatic in Mikasa code.
 
 use tower_lsp::lsp_types::CompletionItemKind;
 
@@ -17,7 +17,7 @@ pub struct StdMethod {
 }
 
 /// Methods available on `receiver_type`. Strips a leading `&`, trims `mut`,
-/// and normalizes Copper aliases (`int`→`i64`, `string`→`String`, `str`→`&str`)
+/// and normalizes Mikasa aliases (`int`→`i64`, `string`→`String`, `str`→`&str`)
 /// so callers can pass whatever type string the AST gave them.
 pub fn methods_for(receiver_type: &str) -> &'static [StdMethod] {
     let normalized = normalize(receiver_type);

@@ -1,6 +1,6 @@
 //! Transpile-level regression tests for `impl` method lowering.
 //!
-//! These guard the bugs fixed when real Copper code (Mocidad's `vec2.crs` /
+//! These guard the bugs fixed when real Mikasa code (Mocidad's `vec2.crs` /
 //! `aabb.crs`) transpiled to broken Rust: impl-method bodies were rebuilt by a
 //! naive token-join that dropped statement boundaries, mis-fired `let` on
 //! struct-literal fields, and inserted spurious `;` inside multi-line struct
@@ -8,7 +8,7 @@
 
 use mikasa_syntax::tokenizer::tokenizer::Tokenizer;
 
-/// Full transpile: Copper source → Rust source.
+/// Full transpile: Mikasa source → Rust source.
 fn transpile(src: &str) -> String {
     let tokens = Tokenizer::new(src.to_string()).tokenize();
     mikasa_parser::parser::parse(tokens)

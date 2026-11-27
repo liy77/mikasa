@@ -1,8 +1,8 @@
-//! Multi-layer cache system for CForge:
-//!   1. Global package registry cache (`~/.copper/cache/registry.json`) — caches
-//!      resolved crates.io versions so `cforge install` / `generate_toml` never
+//! Multi-layer cache system for Mikasa:
+//!   1. Global package registry cache (`~/.mikasa/cache/registry.json`) — caches
+//!      resolved crates.io versions so `mikasa install` / `generate_toml` never
 //!      re-queries the network for recently resolved packages.
-//!   2. Incremental `.crs` transpilation cache (`<dist>/.cforge_cache.json`) —
+//!   2. Incremental `.crs` transpilation cache (`<dist>/.mikasa_cache.json`) —
 //!      hashes `.crs` source + compiler version and skips tokenization, parsing,
 //!      and `rustfmt` when a file hasn't changed, while `write_if_changed`
 //!      preserves `.rs` modification timestamps so Cargo's incremental build
@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{env, fs};
 
-use crate::cforge::pretty;
+use crate::internal::pretty;
 
 /// TTL for cached crates.io version lookups (24 hours).
 const REGISTRY_TTL_SECS: u64 = 86_400;
@@ -94,12 +94,12 @@ fn now_secs() -> u64 {
         .unwrap_or(0)
 }
 
-/// Global cache directory (`~/.copper/cache`).
+/// Global cache directory (`~/.mikasa/cache`).
 pub fn global_cache_dir() -> PathBuf {
     let home = env::var("USERPROFILE")
         .or_else(|_| env::var("HOME"))
         .unwrap_or_else(|_| ".".to_string());
-    PathBuf::from(home).join(".copper").join("cache")
+    PathBuf::from(home).join(".mikasa").join("cache")
 }
 
 pub fn registry_cache_path() -> PathBuf {
@@ -107,7 +107,7 @@ pub fn registry_cache_path() -> PathBuf {
 }
 
 pub fn transpile_cache_path(output_dir: &str) -> PathBuf {
-    Path::new(output_dir).join(".cforge_cache.json")
+    Path::new(output_dir).join(".mikasa_cache.json")
 }
 
 impl TranspileCache {
@@ -193,7 +193,7 @@ impl RegistryCache {
     }
 }
 
-/// CLI handler for `cforge cache [status|clean]`.
+/// CLI handler for `mikasa cache [status|clean]`.
 pub fn handle_cache_command(action: Option<&str>, output_dir: Option<&str>) {
     let out = output_dir.unwrap_or("./dist");
     match action.unwrap_or("status") {
@@ -208,7 +208,7 @@ pub fn handle_cache_command(action: Option<&str>, output_dir: Option<&str>) {
                 removed += 1;
             }
             pretty::ok(&format!(
-                "Cleared CForge caches ({} cache file(s) removed)",
+                "Cleared Mikasa caches ({} cache file(s) removed)",
                 removed
             ));
         }
@@ -220,7 +220,7 @@ pub fn handle_cache_command(action: Option<&str>, output_dir: Option<&str>) {
                 .and_then(|s| serde_json::from_str::<TranspileCache>(&s).ok())
                 .map(|c| c.entries.len())
                 .unwrap_or(0);
-            pretty::head("CForge Cache Status");
+            pretty::head("Mikasa Cache Status");
             println!(
                 "  {} {} ({} cached packages)",
                 "Registry cache:".bold(),

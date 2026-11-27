@@ -2,7 +2,7 @@
 name = "mikasa-syntax"
 version = "0.0.1-pre-alpha"
 edition = "2021"
-description = "Tokenizer and AST for the Copper language. Shared between cforge (the transpiler) and mikasa-lsp (the language server)."
+description = "Tokenizer and AST for the Mikasa language. Shared between mikasa (the transpiler) and mikasa-lsp (the language server)."
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

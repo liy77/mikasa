@@ -9,8 +9,8 @@ const REPO: &str = "liy77/mikasa";
 pub fn run() -> i32 {
     let current = format!(
         "{} ({} {})",
-        env!("CFORGE_VERSION"),
-        env!("COPPER_BUILD_DATE"),
+        env!("MIKASA_VERSION"),
+        env!("MIKASA_BUILD_DATE"),
         env!("GIT_COMMIT_HASH")
     );
     println!("mikasa {current}");
@@ -50,51 +50,9 @@ pub fn run() -> i32 {
         eprintln!("could not replace {}: {e}", exe.display());
         return 1;
     }
-    // Keep `mikasa` and legacy `cforge` names in sync in the same bin dir.
-    sync_twin_names(&exe);
     println!("updated {}", exe.display());
     println!("open a new terminal and run `mikasa -v`");
     0
-}
-
-/// After replacing `mikasa` (or legacy `cforge`), mirror the other name so
-/// both commands stay on PATH without a second download.
-fn sync_twin_names(exe: &Path) {
-    let stem = exe
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("")
-        .to_ascii_lowercase();
-    let twin_name = if stem == "mikasa" {
-        if cfg!(windows) {
-            "cforge.exe"
-        } else {
-            "cforge"
-        }
-    } else if stem == "cforge" {
-        if cfg!(windows) {
-            "mikasa.exe"
-        } else {
-            "mikasa"
-        }
-    } else {
-        return;
-    };
-    let twin = exe.with_file_name(twin_name);
-    if twin == exe {
-        return;
-    }
-    match std::fs::copy(exe, &twin) {
-        Ok(_) => {
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let _ = std::fs::set_permissions(&twin, std::fs::Permissions::from_mode(0o755));
-            }
-            println!("also updated {}", twin.display());
-        }
-        Err(e) => eprintln!("note: could not sync {}: {e}", twin.display()),
-    }
 }
 
 fn platform_key() -> &'static str {

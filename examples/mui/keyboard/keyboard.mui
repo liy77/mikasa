@@ -14,7 +14,7 @@
 //   R         → reset to 0
 //   Space     → big bonus (+10)
 //
-// Run it:  cforge run examples/mui/keyboard/keyboard.mui
+// Run it:  mikasa run examples/mui/keyboard/keyboard.mui
 
 app {
   name: "Keyboard Input"

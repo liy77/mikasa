@@ -1,7 +1,7 @@
 //! Shared Mikasa keyword + primitive-type descriptions.
 //!
 //! These are embedded at compile time from the **single source of truth**,
-//! `editors/copper-lexicon.json`, which the MUI/CRM VS Code extension also
+//! `editors/mikasa-lexicon.json`, which the MUI/CRM VS Code extension also
 //! reads at runtime. Keeping both sides on one file means the keyword/type
 //! hovers in `.crs` (this server) and in `.mui`/`.crm` (the MUI extension) can
 //! never drift. Edit the JSON, not this file.
@@ -16,7 +16,7 @@ pub struct Entry {
     pub doc: String,
 }
 
-const RAW: &str = include_str!("../../../editors/copper-lexicon.json");
+const RAW: &str = include_str!("../../../editors/mikasa-lexicon.json");
 
 static LEXICON: Lazy<Lexicon> = Lazy::new(|| {
     let v: Value = serde_json::from_str(RAW).unwrap_or(Value::Null);
@@ -61,7 +61,7 @@ pub fn keywords() -> &'static [Entry] {
 }
 
 /// Build the hover markdown for a keyword or primitive type, identical in
-/// shape to what the MUI extension renders: a ```copper signature block plus
+/// shape to what the MUI extension renders: a ```mikasa signature block plus
 /// the description. Returns `None` for words not in the lexicon.
 pub fn builtin_markdown(word: &str) -> Option<String> {
     let hit = LEXICON
@@ -69,7 +69,7 @@ pub fn builtin_markdown(word: &str) -> Option<String> {
         .iter()
         .chain(LEXICON.types.iter())
         .find(|e| e.name == word)?;
-    Some(format!("```copper\n{}\n```\n\n{}", hit.detail, hit.doc))
+    Some(format!("```mikasa\n{}\n```\n\n{}", hit.detail, hit.doc))
 }
 
 #[cfg(test)]
@@ -82,12 +82,12 @@ mod tests {
         // fails — guarding against a broken edit to the shared file.
         assert!(
             !keywords().is_empty(),
-            "no keywords parsed from copper-lexicon.json"
+            "no keywords parsed from mikasa-lexicon.json"
         );
         for w in ["func", "mut", "struct", "impl", "if", "match", "import"] {
             assert!(
                 keywords().iter().any(|e| e.name == w),
-                "keyword `{w}` missing from copper-lexicon.json"
+                "keyword `{w}` missing from mikasa-lexicon.json"
             );
         }
     }
@@ -98,11 +98,11 @@ mod tests {
         // shows for the same words.
         assert_eq!(
             builtin_markdown("func").as_deref(),
-            Some("```copper\nfunc RetType name(params)\n```\n\nDeclares a function.")
+            Some("```mikasa\nfunc RetType name(params)\n```\n\nDeclares a function.")
         );
         assert_eq!(
             builtin_markdown("int").as_deref(),
-            Some("```copper\nint\n```\n\n64-bit signed integer (alias for i64).")
+            Some("```mikasa\nint\n```\n\n64-bit signed integer (alias for i64).")
         );
         assert!(builtin_markdown("not_a_keyword").is_none());
     }

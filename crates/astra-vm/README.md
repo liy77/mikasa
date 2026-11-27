@@ -18,12 +18,12 @@
 ## O que é
 
 **Astra** executa `.mika` **na hora**, sem transpile e sem `cargo`. Usa a mesma
-AST do `mikasa-syntax` que o transpiler (`mikasa` / `cforge`) — o que roda aqui
+AST do `mikasa-syntax` que o transpiler (`mikasa` / `mikasa`) — o que roda aqui
 é o mesmo Mikasa que vira Rust nativo.
 
 | Ferramenta | Caminho | Uso |
 | --- | --- | --- |
-| `mikasa` / `cforge` | `.mika` → Rust → `cargo build` | release nativo |
+| `mikasa` / `mikasa` | `.mika` → Rust → `cargo build` | release nativo |
 | **`astra`** | `.mika` → AST → interpret | script, playground, CI leve |
 | `mikasa vm run` | mesmo interpreter | via CLI Mikasa |
 
@@ -33,7 +33,7 @@ AST do `mikasa-syntax` que o transpiler (`mikasa` / `cforge`) — o que roda aqu
 astra run program.mika          # interpreta
 astra build program.mika -o out.ast   # artefato portável (.ast / .loy)
 astra run out.ast               # roda artefato (magic ASTRABC)
-astra check program.mika        # rustc + Miri (via mikasa/cforge)
+astra check program.mika        # rustc + Miri (via mikasa/mikasa)
 mikasa vm run program.mika      # mesmo engine
 ```
 
@@ -111,5 +111,5 @@ cargo build -p astra-vm --bin astra
 # → target/debug/astra
 ```
 
-A crate é isolada: `cforge` / `mui-*` não dependem dela no grafo principal de
+A crate é isolada: `mikasa` / `mui-*` não dependem dela no grafo principal de
 forma que quebre CI cross-platform.

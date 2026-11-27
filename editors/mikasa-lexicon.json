@@ -1,5 +1,5 @@
 {
-  "$comment": "SINGLE SOURCE OF TRUTH for Mikasa keyword + primitive-type descriptions. Read by BOTH the copper-lsp server (embedded via include_str! in src/lexicon.rs) and the MUI/CRM VS Code extension (read at runtime). Editing a description here updates both — they can never drift. Mocida/MUI-specific items (view, signal, computed, effect) are NOT Mikasa keywords and live in the MUI extension's own catalog, not here.",
+  "$comment": "SINGLE SOURCE OF TRUTH for Mikasa keyword + primitive-type descriptions. Read by BOTH the mikasa-lsp server (embedded via include_str! in src/lexicon.rs) and the MUI/CRM VS Code extension (read at runtime). Editing a description here updates both — they can never drift. Mocida/MUI-specific items (view, signal, computed, effect) are NOT Mikasa keywords and live in the MUI extension's own catalog, not here.",
   "keywords": [
     { "name": "func", "detail": "func RetType name(params)", "doc": "Declares a function." },
     { "name": "mut", "detail": "mut name = value", "doc": "Declares a mutable variable." },

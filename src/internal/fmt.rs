@@ -9,8 +9,8 @@
 use std::fs;
 use std::path::Path;
 
-use crate::cforge::mui_fmt;
-use crate::cforge::pretty;
+use crate::internal::mui_fmt;
+use crate::internal::pretty;
 
 const INDENT: &str = "    "; // 4 spaces — matches examples/mikasa
 
@@ -174,7 +174,7 @@ fn write_indent(out: &mut String, depth: i32) {
 
 /// Format `src` with the right engine for `path`.
 pub fn format_source(path: &str, src: &str) -> String {
-    if crate::cforge::mui::is_mui_file(path) {
+    if crate::internal::mui::is_mui_file(path) {
         mui_fmt::format_mui(src)
     } else {
         format_mika(src)

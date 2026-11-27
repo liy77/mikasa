@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Print install diagnostics for cforge: where it lives, whether it's on PATH,
-the COPPER_PATH variable, and whether the binary actually runs.
+Print install diagnostics for mikasa: where it lives, whether it's on PATH,
+the MIKASA_PATH variable, and whether the binary actually runs.
 
 Cross-platform replacement for the old diagnose.bat (Windows-only).
 
@@ -37,9 +37,9 @@ def is_admin():
 def resolve_scope(force):
     glob = (force == "global") or (force is None and is_admin())
     if SYS == "Windows":
-        install_dir = Path(r"C:\Program Files\Copper") if glob else Path(os.environ["USERPROFILE"]) / ".copper"
+        install_dir = Path(r"C:\Program Files\Mikasa") if glob else Path(os.environ["USERPROFILE"]) / ".mikasa"
     else:
-        install_dir = Path("/usr/local/lib/copper") if glob else Path.home() / ".copper"
+        install_dir = Path("/usr/local/lib/mikasa") if glob else Path.home() / ".mikasa"
     return ("global" if glob else "local"), install_dir
 
 
@@ -60,7 +60,7 @@ def registry_value(scope, name):
 
 
 def main():
-    ap = argparse.ArgumentParser(prog="diagnose.py", description="Diagnose a cforge install.")
+    ap = argparse.ArgumentParser(prog="diagnose.py", description="Diagnose a mikasa install.")
     grp = ap.add_mutually_exclusive_group()
     grp.add_argument("--local", action="store_const", const="local", dest="force")
     grp.add_argument("--global", action="store_const", const="global", dest="force")
@@ -89,22 +89,22 @@ def main():
     else:
         fail(f"Install directory NOT found: {install_dir}")
 
-    # 2. PATH / COPPER_PATH.
+    # 2. PATH / MIKASA_PATH.
     head("Environment")
     if SYS == "Windows":
-        copper_path = registry_value(scope, "COPPER_PATH")
+        mikasa_path = registry_value(scope, "MIKASA_PATH")
         reg_path = registry_value(scope, "PATH") or ""
-        if copper_path:
-            ok(f"COPPER_PATH = {copper_path}")
+        if mikasa_path:
+            ok(f"MIKASA_PATH = {mikasa_path}")
         else:
-            warn("COPPER_PATH not set in this scope's registry.")
-        if r"%COPPER_PATH%\bin" in reg_path or str(install_dir / "bin") in reg_path:
+            warn("MIKASA_PATH not set in this scope's registry.")
+        if r"%MIKASA_PATH%\bin" in reg_path or str(install_dir / "bin") in reg_path:
             ok("Mikasa bin directory present in persisted PATH.")
         else:
             fail("Mikasa bin directory NOT in persisted PATH.")
     else:
-        copper_path = os.environ.get("COPPER_PATH")
-        ok(f"COPPER_PATH = {copper_path}") if copper_path else warn("COPPER_PATH not set in this shell.")
+        mikasa_path = os.environ.get("MIKASA_PATH")
+        ok(f"MIKASA_PATH = {mikasa_path}") if mikasa_path else warn("MIKASA_PATH not set in this shell.")
         if str(install_dir / "bin") in os.environ.get("PATH", ""):
             ok("Mikasa bin directory present in current PATH.")
         else:

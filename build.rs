@@ -9,7 +9,7 @@ fn main() {
     // Force this script to rerun on every cargo invocation so the build date
     // and derived version stay fresh. Pointing rerun-if-changed at a path that
     // does not exist makes cargo treat it as "always changed".
-    println!("cargo:rerun-if-changed=.cforge-build-date-trigger");
+    println!("cargo:rerun-if-changed=.mikasa-build-date-trigger");
 
     // Rerun when the current commit changes.
     println!("cargo:rerun-if-changed=.git/HEAD");
@@ -17,12 +17,11 @@ fn main() {
 
     let (y, m, _d) = build_ymd();
 
-    // CalVer: 0.YY.M  (e.g. 2026-06 → 0.26.6) — shared by both cforge and copper.
+    // CalVer: 0.YY.M  (e.g. 2026-06 → 0.26.6) — Mikasa CalVer.
     let yy = y % 100;
-    println!("cargo:rustc-env=CFORGE_VERSION=0.{}.{}", yy, m);
-    println!("cargo:rustc-env=COPPER_VERSION=0.{}.{}", yy, m);
+    println!("cargo:rustc-env=MIKASA_VERSION=0.{}.{}", yy, m);
     println!(
-        "cargo:rustc-env=COPPER_BUILD_DATE={:04}-{:02}-{:02}",
+        "cargo:rustc-env=MIKASA_BUILD_DATE={:04}-{:02}-{:02}",
         y, m, _d
     );
 
@@ -31,10 +30,10 @@ fn main() {
     println!("cargo:rustc-env=GIT_COMMIT_HASH={}", hash);
 
     if let Ok(target) = std::env::var("TARGET") {
-        println!("cargo:rustc-env=CFORGE_HOST_TARGET={target}");
+        println!("cargo:rustc-env=MIKASA_HOST_TARGET={target}");
     }
 
-    // Copy Cargo.toml next to the binary so cforge can read project metadata.
+    // Copy Cargo.toml next to the binary so mikasa can read project metadata.
     let profile = std::env::var("PROFILE").unwrap_or_else(|_| "debug".to_string());
     let target_dir = Path::new("target").join(profile);
     let dest_cargo = target_dir.join("Cargo.toml");

@@ -1,8 +1,8 @@
 <img src="./assets/mikasa.png" width="128"/>
 
-> **Copper is now Mikasa.** The language was renamed: Copper → **Mikasa**, and
+> **Mikasa is now Mikasa.** The language was renamed: Mikasa → **Mikasa**, and
 > its interpreter Alloy → **Astra**. The toolchain binary is `mikasa` (formerly
-> `cforge`); the interpreter binary is `astra` (the `astra` name still works
+> `mikasa`); the interpreter binary is `astra` (the `astra` name still works
 > where installed as an alias).
 >
 > File extensions were renamed too. The old ones still open, they are just no
@@ -246,8 +246,8 @@ shared between the transpiler and Astra (single source of truth).
 ## Project layout
 
 ```
-copper-lang/
-├── src/                # cforge compiler entrypoint + legacy re-exports
+mikasa/
+├── src/                # mikasa compiler entrypoint + legacy re-exports
 ├── crates/
 │   ├── mikasa-syntax/  # Tokenizer + AST (shared by mikasa, astra, LSPs)
 │   ├── mikasa-parser/  # Streaming transpiler parser
@@ -259,7 +259,7 @@ copper-lang/
 ├── astra-gui/          # Astra GUI playground (MUI host, standalone workspace)
 ├── installer-gui/      # Native MUI installer (Windows-first)
 ├── examples/
-│   ├── copper/         # .mika demos (loops, interpolation, matching, cstd, ...)
+│   ├── mikasa/         # .mika demos (loops, interpolation, matching, cstd, ...)
 │   └── mui/            # MocidaUI demos (hello, counter, keyboard, app, ...)
 ├── scripts/            # Python tooling: install / build / cleanup / diagnose / hooks
 ├── docs/               # INSTALL.md, TODO.md, design specs
@@ -275,7 +275,7 @@ copper-lang/
 ## Examples
 
 ```sh
-# cforge (transpile → Rust)
+# mikasa (transpile → Rust)
 mikasa run examples/mikasa/loops.mika           # loop / while / for / break / continue
 mikasa run examples/mikasa/interpolation.mika   # "Hello $name", "${expr}"
 mikasa run examples/mikasa/collections.mika     # vec literals, closures, ?
@@ -292,18 +292,18 @@ astra build examples/mikasa/collections.mika -o collections.loy
 astra run collections.loy
 
 # MUI examples (need mui-dev on PATH):
-cforge run examples/mui/hello/hello.mui
-cforge run examples/mui/counter/counter.mui
-cforge run examples/mui/keyboard/keyboard.mui
-cforge run examples/mui/app/app.mui
+mikasa run examples/mui/hello/hello.mui
+mikasa run examples/mui/counter/counter.mui
+mikasa run examples/mui/keyboard/keyboard.mui
+mikasa run examples/mui/app/app.mui
 ```
 
 ## Roadmap / TODO
 
 Full backlog with details: [`docs/TODO.md`](./docs/TODO.md).
 
-**Language (cforge)**
-- [x] Core transpile pipeline (`.mika` → Rust), `cforge run` / `-c`
+**Language (mikasa)**
+- [x] Core transpile pipeline (`.mika` → Rust), `mikasa run` / `-c`
 - [x] Variables, functions, classes/structs/impl, imports
 - [x] Loops, `match` (guards/`_`/`|`), `if let` / `while let`
 - [x] Optional chaining `?.`, ternary `?:`, string interpolation `"${expr}"`
@@ -328,8 +328,8 @@ Full backlog with details: [`docs/TODO.md`](./docs/TODO.md).
 - [ ] Short-circuit `&&` / `||` (both sides are currently pre-evaluated)
 
 **MocidaUI (`.mui`, and `.mika` with a `view`)**
-- [x] `cforge run x.mui` dev render (via `mui-dev`)
-- [x] `cforge -c [-r] x.mui` codegen + native build (via `mui-codegen`)
+- [x] `mikasa run x.mui` dev render (via `mui-dev`)
+- [x] `mikasa -c [-r] x.mui` codegen + native build (via `mui-codegen`)
 - [x] Component import/reuse, `app { }` config + bundles
 - [x] `onKeyInput` keyboard handlers, `Dialog` overlay, `Audio` component
 - [x] Common `x:`/`y:` props on every widget

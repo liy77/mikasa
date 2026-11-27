@@ -1,4 +1,4 @@
-//! Typed expression / type AST for the Copper **subset** + a recursive Pratt
+//! Typed expression / type AST for the Mikasa **subset** + a recursive Pratt
 //! parser that builds it from the tokenizer's token stream.
 //!
 //! Why this exists
@@ -6,7 +6,7 @@
 //! `ast.rs` is a declaration-level, span-based tree: it knows where every
 //! `func` / `struct` / `let` is, but bodies are captured as opaque `Span`s and
 //! never turned into expression trees. That is enough for the LSP's document
-//! symbols, but **not** enough to (a) embed Copper expressions in MUI markup or
+//! symbols, but **not** enough to (a) embed Mikasa expressions in MUI markup or
 //! (b) lower them to a JIT IR (Cranelift). Both need a real `Expr` tree with a
 //! slot for a resolved type.
 //!
@@ -15,9 +15,9 @@
 //! Literals, identifiers, member access, calls, indexing, unary/binary ops,
 //! ternary, assignment, ranges, array literals, closures, struct literals, and
 //! `if` / `match` as expressions. This is the surface MUI bindings + event
-//! handlers use. It is intentionally NOT all of Copper — it grows as the JIT
+//! handlers use. It is intentionally NOT all of Mikasa — it grows as the JIT
 //! does. Anything the subset can't form becomes [`ExprKind::Raw`] so a fallback
-//! (the full Copper parser) can take over later.
+//! (the full Mikasa parser) can take over later.
 //!
 //! Every [`Expr`] carries a [`Span`] and a `ty: Option<Type>` slot. The parser
 //! leaves `ty` as `None`; a later inference pass fills it in. That field is what
@@ -32,7 +32,7 @@ use crate::tokenizer::tokens::{Data, Token};
 // Types
 // ===========================================================================
 
-/// A (not-yet-resolved) Copper type. `Unknown` is the parser's default; an
+/// A (not-yet-resolved) Mikasa type. `Unknown` is the parser's default; an
 /// inference pass replaces it. Cranelift lowering keys off the resolved form.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub enum Type {
@@ -144,7 +144,7 @@ pub struct Expr {
 
 impl Expr {
     /// Construct an expression node with no inferred type yet. Public so
-    /// front-ends that embed Copper (e.g. `mui-syntax`) can build fallback
+    /// front-ends that embed Mikasa (e.g. `mui-syntax`) can build fallback
     /// nodes without re-running the parser.
     pub fn new(kind: ExprKind, span: Span) -> Self {
         Self {
@@ -289,9 +289,9 @@ pub enum Pattern {
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub enum Stmt {
-    /// Copper binding: `mut name = value` (mutable) or bare `name = value`
+    /// Mikasa binding: `mut name = value` (mutable) or bare `name = value`
     /// (immutable). `ty` carries an optional `: Type` annotation. There is no
-    /// `let` keyword in Copper.
+    /// `let` keyword in Mikasa.
     Let {
         name: String,
         mutable: bool,
@@ -438,7 +438,7 @@ pub fn parse_stmts_tokens(tokens: &[Token]) -> (Block, Vec<ParseError>) {
 }
 
 /// Resolve a type spelling (e.g. `int`, `Vec<i32>`, `string?`) into a [`Type`],
-/// honouring the shared Copper alias table. Public so the program-level parser
+/// honouring the shared Mikasa alias table. Public so the program-level parser
 /// ([`crate::program`]) resolves return types / field types the same way.
 pub fn type_from_source(s: &str) -> Type {
     type_from_str(s)
@@ -640,7 +640,7 @@ impl Parser {
             }
 
             // `?` is overloaded: postfix try (`expr?`) vs. ternary
-            // (`cond ? a : b`). The real Copper distinguishes them by whether a
+            // (`cond ? a : b`). The real Mikasa distinguishes them by whether a
             // matching `:` follows; we use the cheaper, equivalent rule: if the
             // token after `?` can start an expression it's a ternary, otherwise
             // it's the try operator. (`?.` was already handled above.)
@@ -705,7 +705,7 @@ impl Parser {
             }
 
             // `++` / `--`: the tokenizer emits these as two `+`/`-` tokens.
-            // Copper always treats them as inc/dec (never `x + (+y)`), so stop
+            // Mikasa always treats them as inc/dec (never `x + (+y)`), so stop
             // here and let the statement layer build the `IncDec` node.
             if (op == "+" || op == "-")
                 && self.toks.get(self.pos + 1).map(|t| t.value.as_str()) == Some(op)
@@ -1094,7 +1094,7 @@ impl Parser {
     }
 
     /// Parse a type reference (used by `as` casts). Collects type tokens up to a
-    /// natural boundary and resolves Copper aliases via the shared lexicon, so
+    /// natural boundary and resolves Mikasa aliases via the shared lexicon, so
     /// `as int` yields [`Type::Int`] exactly as the transpiler would.
     fn parse_type(&mut self) -> Type {
         let mut buf = String::new();
@@ -1567,7 +1567,7 @@ impl Parser {
             {
                 self.bump(); // `mut`
             }
-            // A Copper binding is `mut name = expr` / `name = expr` /
+            // A Mikasa binding is `mut name = expr` / `name = expr` /
             // `name: Type = expr` (NO `let`). A leading `mut`, or an identifier
             // whose next token is `=` or `:`, is a binding; anything else
             // (including `obj.field = x`) is an expression statement.
@@ -1677,8 +1677,8 @@ impl Parser {
         }
     }
 
-    /// Parse a Copper binding statement: `mut name = expr` (mutable) or a bare
-    /// `name = expr` (immutable). Copper has no `let` keyword, so we only
+    /// Parse a Mikasa binding statement: `mut name = expr` (mutable) or a bare
+    /// `name = expr` (immutable). Mikasa has no `let` keyword, so we only
     /// consume a leading `mut`, never the name blindly.
     fn parse_bind_stmt(&mut self) -> Option<Stmt> {
         let start = self.cur_span();
@@ -1897,7 +1897,7 @@ impl Parser {
     }
 
     /// Consume a leading `let PAT =` if present (the `if let` / `while let`
-    /// form), returning the pattern. Copper writes `let` only here, never for
+    /// form), returning the pattern. Mikasa writes `let` only here, never for
     /// plain bindings.
     fn parse_opt_let_pattern(&mut self) -> Option<Pattern> {
         if self.peek_val() != Some("let") {
@@ -2022,7 +2022,7 @@ fn bin_op(op: &str) -> Option<(BinOp, u8, u8)> {
 /// operator (`expr?`). Closers, separators, and infix operators cannot start
 /// an expression, so `?` before them is a try.
 /// Resolve a collected type string into a [`Type`], honouring the shared
-/// Copper alias table (so `int`/`uint`/`string`/`void`/... map exactly as the
+/// Mikasa alias table (so `int`/`uint`/`string`/`void`/... map exactly as the
 /// transpiler does) and a few structural forms.
 fn type_from_str(s: &str) -> Type {
     let s = s.trim();
@@ -2032,7 +2032,7 @@ fn type_from_str(s: &str) -> Type {
     if let Some(inner) = s.strip_suffix('?') {
         return Type::Option(Box::new(type_from_str(inner)));
     }
-    // Resolve Copper aliases via the single source of truth, then classify the
+    // Resolve Mikasa aliases via the single source of truth, then classify the
     // resulting Rust spelling.
     let rust = crate::lexicon::convert_type(s);
     match rust.as_str() {
@@ -2067,7 +2067,7 @@ fn span_of(t: &Token) -> Span {
     Span::new(s, e)
 }
 
-/// Decide int vs float from the literal text (Copper's tokenizer keeps the
+/// Decide int vs float from the literal text (Mikasa's tokenizer keeps the
 /// numeric value as the token's string).
 fn number_literal(s: &str) -> Literal {
     let is_float = s.contains('.') || s.contains('e') || s.contains('E');
@@ -2282,7 +2282,7 @@ mod tests {
     #[test]
     fn closure() {
         // Closures appear nested (call args, handler blocks), never at the
-        // absolute start of input — Copper's tokenizer mangles a leading `|`.
+        // absolute start of input — Mikasa's tokenizer mangles a leading `|`.
         let e = expr("(|x, y| x + y)");
         let ExprKind::Closure { params, .. } = e.kind else {
             panic!("expected closure, got {:?}", e.kind)
@@ -2311,7 +2311,7 @@ mod tests {
 
     #[test]
     fn block_with_statements() {
-        // Copper bindings: `mut a = 1` / bare `b = 2` (NO `let`), then a tail.
+        // Mikasa bindings: `mut a = 1` / bare `b = 2` (NO `let`), then a tail.
         let (b, errs) = parse_stmts("mut a = 1\nb = 2\na + b");
         assert!(errs.is_empty(), "errs: {errs:?}");
         assert_eq!(b.stmts.len(), 2);
@@ -2372,7 +2372,7 @@ mod tests {
     }
 
     #[test]
-    fn cast_uses_copper_aliases() {
+    fn cast_uses_mikasa_aliases() {
         // `as int` must resolve through the shared lexicon to Type::Int, just
         // like the transpiler maps `int` -> `i64`.
         let e = expr("x as int");

@@ -3,7 +3,7 @@ const path = require('path');
 
 const lspPath =
   process.argv[2] ||
-  path.resolve(__dirname, '..', '..', 'target', 'debug', 'copper-lsp.exe');
+  path.resolve(__dirname, '..', '..', 'target', 'debug', 'mikasa-lsp.exe');
 
 const child = spawn(lspPath, [], { stdio: ['pipe', 'pipe', 'pipe'] });
 
@@ -65,7 +65,7 @@ function call(method, params) {
   );
   const uri = 'file:///matching.crs';
   send('textDocument/didOpen', {
-    textDocument: { uri, languageId: 'copper', version: 1, text },
+    textDocument: { uri, languageId: 'mikasa', version: 1, text },
   }, false);
 
   // Wait for diagnostics.
@@ -89,7 +89,7 @@ function call(method, params) {
   async function checkSignature(snippet, label) {
     const sigUri = `file:///${label}.crs`;
     send('textDocument/didOpen', {
-      textDocument: { uri: sigUri, languageId: 'copper', version: 1, text: snippet },
+      textDocument: { uri: sigUri, languageId: 'mikasa', version: 1, text: snippet },
     }, false);
     const sig = await call('textDocument/signatureHelp', {
       textDocument: { uri: sigUri },
@@ -107,7 +107,7 @@ function call(method, params) {
   async function checkHover(text, line, character, label) {
     const hoverUri = `file:///hov-${label}.crs`;
     send('textDocument/didOpen', {
-      textDocument: { uri: hoverUri, languageId: 'copper', version: 1, text },
+      textDocument: { uri: hoverUri, languageId: 'mikasa', version: 1, text },
     }, false);
     const hov = await call('textDocument/hover', {
       textDocument: { uri: hoverUri },

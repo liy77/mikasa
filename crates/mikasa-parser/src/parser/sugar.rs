@@ -1,7 +1,7 @@
-//! High-level syntactic sugar rewrites on the Copper token stream.
+//! High-level syntactic sugar rewrites on the Mikasa token stream.
 //!
 //! Runs in [`super::Parser::new`] before `ternary::rewrite` and the main
-//! streaming parser, lowering ergonomic Copper forms into standard tokens:
+//! streaming parser, lowering ergonomic Mikasa forms into standard tokens:
 //!
 //! 1. Modern `func` syntax:
 //!    - `func name(params) -> RetType` → `func RetType name(params)`
@@ -917,7 +917,7 @@ fn rewrite_defer_once(tokens: &[Token]) -> Vec<Token> {
                         let guard = format!("__deferg{n}");
                         // `mut __deferN = std::mem::ManuallyDrop::new(Some(|| { body }));`
                         // keeps the closure address stable, then
-                        // `mut __defergN = __CopperDefer(&mut *__deferN as *mut dyn FnMut());`
+                        // `mut __defergN = __MikasaDefer(&mut *__deferN as *mut dyn FnMut());`
                         // is the guard whose drop invokes it. Declared second, so
                         // it is dropped first.
                         out.push(synth(TokenKind::Keyword, "mut"));
@@ -960,7 +960,7 @@ fn rewrite_defer_once(tokens: &[Token]) -> Vec<Token> {
                         out.push(synth(
                             TokenKind::Identifier,
                             &format!(
-                                "let mut {guard} = __CopperDefer({slot}.as_mut().unwrap() as *mut dyn FnMut());"
+                                "let mut {guard} = __MikasaDefer({slot}.as_mut().unwrap() as *mut dyn FnMut());"
                             ),
                         ));
                         i = close + 1;

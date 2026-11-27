@@ -1,11 +1,11 @@
 //! Drift guard: the typed expression parser ([`mikasa_syntax::expr`]) must keep
-//! up with the real Copper language. Rather than re-listing the grammar (which
+//! up with the real Mikasa language. Rather than re-listing the grammar (which
 //! would itself drift), these tests parse expression/statement snippets taken
 //! verbatim from the language's own `examples/*.crs` and the patterns the
 //! transpiler supports, and assert the parser handles them **without** falling
 //! back to [`ExprKind::Raw`] and **without** errors.
 //!
-//! When someone adds a new expression form to Copper and writes an example for
+//! When someone adds a new expression form to Mikasa and writes an example for
 //! it (the project convention — see CLAUDE.md), extend `SNIPPETS` with that
 //! form. A regression — a form the parser silently turns into `Raw` — fails
 //! here instead of surfacing later as a broken MUI binding or JIT lowering.
@@ -57,7 +57,7 @@ const EXPR_SNIPPETS: &[&str] = &[
     "x as int",
 ];
 
-/// Statement-block snippets (Copper bindings have no `let`).
+/// Statement-block snippets (Mikasa bindings have no `let`).
 const STMT_SNIPPETS: &[&str] = &[
     "mut nums = [1, 2, 3]\nmut first = nums[0]\nfirst",
     "mut threshold = 3\nthreshold",
@@ -120,7 +120,7 @@ fn expression_snippets_parse_without_raw_fallback() {
     }
     assert!(
         failures.is_empty(),
-        "grammar drift — these real Copper forms are not handled:\n  {}",
+        "grammar drift — these real Mikasa forms are not handled:\n  {}",
         failures.join("\n  ")
     );
 }

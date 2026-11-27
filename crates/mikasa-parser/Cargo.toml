@@ -2,7 +2,7 @@
 name = "mikasa-parser"
 version = "0.0.1-pre-alpha"
 edition = "2021"
-description = "Copper → Rust transpiler parser. Consumes mikasa-syntax tokens and emits Rust source. Used by cforge (the compiler binary)."
+description = "Mikasa → Rust transpiler parser. Consumes mikasa-syntax tokens and emits Rust source. Used by mikasa (the compiler binary)."
 
 [dependencies]
 mikasa-syntax = { path = "../mikasa-syntax" }

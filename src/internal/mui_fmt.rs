@@ -1,4 +1,4 @@
-//! `cforge format` — a pretty-printer for MUI (`.mui` / `.crm`) sources.
+//! `mikasa format` — a pretty-printer for MUI (`.mui` / `.crm`) sources.
 //!
 //! The MUI parser drops comments before building the AST, so an AST-based emitter
 //! would silently delete every `// …`. Instead this formatter tokenizes the
@@ -16,7 +16,7 @@
 use std::fs;
 use std::path::Path;
 
-use crate::cforge::pretty;
+use crate::internal::pretty;
 
 const INDENT: &str = "  "; // two spaces per level
 const MAX_WIDTH: usize = 100;
@@ -24,7 +24,7 @@ const MAX_WIDTH: usize = 100;
 /// True for a path this formatter handles: `.mui`, a `.mika` that is a
 /// MocidaUI document, or the retired `.crm`.
 pub fn is_formattable(path: &str) -> bool {
-    crate::cforge::mui::is_mui_file(path)
+    crate::internal::mui::is_mui_file(path)
 }
 
 // ── Scanner ─────────────────────────────────────────────────────────────────
@@ -561,7 +561,7 @@ fn inline_group(open: u8, ch: &[Node]) -> String {
 
 // ── CLI ─────────────────────────────────────────────────────────────────────
 
-/// `cforge format <paths…>`: format each `.mui`/`.crm` file (recursing into
+/// `mikasa format <paths…>`: format each `.mui`/`.crm` file (recursing into
 /// directories). `check` only reports which files would change (exit 1 if any);
 /// `to_stdout` prints the formatted result instead of writing it.
 pub fn format_command(paths: &[String], check: bool, to_stdout: bool) -> i32 {

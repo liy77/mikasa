@@ -1,6 +1,6 @@
 //! Regression: a struct field whose type is a tuple / nested generic
 //! (`Vec<(String, int)>`) must lower correctly — no spurious comma after `(`,
-//! commas inside the type are NOT field boundaries, and Copper aliases inside
+//! commas inside the type are NOT field boundaries, and Mikasa aliases inside
 //! the type (`int` -> `i64`) are converted.
 
 use mikasa_syntax::tokenizer::tokenizer::Tokenizer;

@@ -1,4 +1,4 @@
-// Copper `url` standard library — URL percent-encoding and helpers.
+// Mikasa `url` standard library — URL percent-encoding and helpers.
 //
 // Loaded via `import { ... } from url`. Pure Rust std, no dependencies.
 // Bundled as `pub mod url { ... }` with std/url_native.rs.

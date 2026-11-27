@@ -19,7 +19,7 @@ pub struct CheckInfo {
 /// Fast probe: detects source tree location + default install dirs.
 /// Returns immediately; safe to call on the UI thread.
 pub fn prereqs_quick() -> QuickInfo {
-    let detected_source = detect_copper_source()
+    let detected_source = detect_mikasa_source()
         .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_default();
 
@@ -56,7 +56,7 @@ pub fn prereqs_check() -> CheckInfo {
 
 /// Full install pipeline.  `log` is called with (level, text) pairs where
 /// level ∈ { "step" | "ok" | "info" | "warn" | "error" }.
-pub fn install_copper(
+pub fn install_mikasa(
     source_dir: &str,
     install_dir: &str,
     global: bool,
@@ -89,8 +89,8 @@ pub fn install_copper(
     log("ok", "Created install directories");
 
     // ── Build ─────────────────────────────────────────────────────────────
-    log("step", "Building cforge in release mode (this can take a while)…");
-    let exe_name = if cfg!(windows) { "cforge.exe" } else { "cforge" };
+    log("step", "Building mikasa in release mode (this can take a while)…");
+    let exe_name = if cfg!(windows) { "mikasa.exe" } else { "mikasa" };
     let _ = std::fs::remove_file(src.join("target/release").join(exe_name));
 
     let build = Command::new("cargo")
@@ -135,7 +135,7 @@ pub fn install_copper(
     setup_windows_path(dest, global, &log)?;
 
     log("step", "Installation complete!");
-    log("info", "Restart your terminal so the new PATH/COPPER_PATH take effect.");
+    log("info", "Restart your terminal so the new PATH/MIKASA_PATH take effect.");
     Ok(())
 }
 
@@ -180,10 +180,10 @@ pub fn list_dirs(partial: &str) -> Vec<String> {
 
 // ── Helpers internos ───────────────────────────────────────────────────────
 
-fn detect_copper_source() -> Option<PathBuf> {
+fn detect_mikasa_source() -> Option<PathBuf> {
     let mut dir = std::env::current_dir().ok()?;
     for _ in 0..6 {
-        if dir.join("Cargo.toml").exists() && dir.join("src/cforge").exists() {
+        if dir.join("Cargo.toml").exists() && dir.join("src/mikasa").exists() {
             return Some(dir);
         }
         dir = dir.parent()?.to_owned();
@@ -195,16 +195,16 @@ fn default_install_dirs() -> (String, String) {
     #[cfg(windows)]
     {
         let local = std::env::var("USERPROFILE")
-            .map(|h| format!("{h}\\.copper"))
-            .unwrap_or_else(|_| "C:\\copper".into());
-        (local, "C:\\Program Files\\Copper".into())
+            .map(|h| format!("{h}\\.mikasa"))
+            .unwrap_or_else(|_| "C:\\mikasa".into());
+        (local, "C:\\Program Files\\Mikasa".into())
     }
     #[cfg(not(windows))]
     {
         let local = std::env::var("HOME")
-            .map(|h| format!("{h}/.copper"))
-            .unwrap_or_else(|_| "/opt/copper".into());
-        (local, "/usr/local/lib/copper".into())
+            .map(|h| format!("{h}/.mikasa"))
+            .unwrap_or_else(|_| "/opt/mikasa".into());
+        (local, "/usr/local/lib/mikasa".into())
     }
 }
 
@@ -258,24 +258,24 @@ fn setup_windows_path(dest: &Path, global: bool, log: &impl Fn(&str, &str)) -> R
     };
     let dest_str = dest.to_string_lossy();
 
-    // COPPER_PATH — a plain absolute path, so REG_SZ (matches scripts/install.py).
+    // MIKASA_PATH — a plain absolute path, so REG_SZ (matches scripts/install.py).
     Command::new("reg")
         .args([
             "add", &env_key,
-            "/v", "COPPER_PATH",
+            "/v", "MIKASA_PATH",
             "/t", "REG_SZ",
             "/d", &dest_str,
             "/f",
         ])
         .creation_flags(0x08000000)
         .output()
-        .map_err(|e| format!("reg add COPPER_PATH failed: {e}"))?;
-    log("ok", &format!("COPPER_PATH = {dest_str}"));
+        .map_err(|e| format!("reg add MIKASA_PATH failed: {e}"))?;
+    log("ok", &format!("MIKASA_PATH = {dest_str}"));
 
     // PATH — read the current value robustly, then append our marker. We NEVER
     // overwrite a PATH we couldn't read (that would wipe the user's PATH), so a
     // read error aborts the PATH edit instead of guessing.
-    let marker = r"%COPPER_PATH%\bin";
+    let marker = r"%MIKASA_PATH%\bin";
     let current = reg_query_path(&env_key)?.unwrap_or_default();
     // Keep every non-empty entry except the marker itself, then append exactly
     // ONE marker. This both adds us and *cleans up* the duplicate markers /

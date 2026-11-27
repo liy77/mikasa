@@ -11,11 +11,11 @@ fn transpile(src: &str) -> String {
 fn async_main_gets_tokio_main_and_await() {
     let rust = transpile("async func main() {\n  println!(\"hi\")\n}\n");
     assert!(
-        rust.contains("async fn __copper_main"),
+        rust.contains("async fn __mikasa_main"),
         "async main not renamed: {rust}"
     );
     assert!(
-        rust.contains("#[tokio::main]") && rust.contains("__copper_main().await"),
+        rust.contains("#[tokio::main]") && rust.contains("__mikasa_main().await"),
         "tokio entry missing: {rust}"
     );
 }
@@ -59,7 +59,7 @@ fn sync_main_unchanged_without_async() {
         "sync program must not pull tokio: {rust}"
     );
     assert!(
-        rust.contains("fn main()") && rust.contains("__copper_main();"),
+        rust.contains("fn main()") && rust.contains("__mikasa_main();"),
         "sync wrapper missing: {rust}"
     );
     assert!(

@@ -1,4 +1,4 @@
-// Copper drives the logic; the heavy/number bits are real Rust run via wasm.
+// Mikasa drives the logic; the heavy/number bits are real Rust run via wasm.
 import { gcd, is_prime, pow_mod } from numbers
 
 func main() {
@@ -6,7 +6,7 @@ func main() {
     mut g = gcd(48, 36)
     println("gcd(48, 36) = ${g}")
 
-    println("-- primes up to 30 (Copper loop + Rust is_prime) --")
+    println("-- primes up to 30 (Mikasa loop + Rust is_prime) --")
     mut n = 2
     mut primes = 0
     while n <= 30 {

@@ -1,12 +1,12 @@
 // std/import.crs — dynamic library loading, built on the `libloading` crate.
 //
-// Opens a shared library (.dll / .so / .dylib) at runtime so a Copper program
-// can call into native plugins. This is also a worked example of Copper ↔ Rust
+// Opens a shared library (.dll / .so / .dylib) at runtime so a Mikasa program
+// can call into native plugins. This is also a worked example of Mikasa ↔ Rust
 // interop: `import { Library } from libloading` lowers to `use libloading::...`
-// and cforge adds `libloading` to the generated Cargo.toml.
+// and mikasa adds `libloading` to the generated Cargo.toml.
 //
 // Generic symbol resolution (`func T import<T>(...)`) needs type parameters on
-// functions, which Copper doesn't have yet — so this returns the opened
+// functions, which Mikasa doesn't have yet — so this returns the opened
 // `Library` and you resolve symbols from it on the Rust side.
 
 import { Library } from libloading

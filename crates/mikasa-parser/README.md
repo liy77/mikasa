@@ -1,6 +1,6 @@
 # mikasa-parser
 
-> The Copper → Rust **transpiler parser** — the emit pass `cforge` drives.
+> The Mikasa → Rust **transpiler parser** — the emit pass `mikasa` drives.
 
 Consumes the token stream from [`mikasa-syntax`](../mikasa-syntax) and walks it,
 emitting Rust source into an output buffer. This is one half of the compiler
